@@ -1,0 +1,25 @@
+{
+  "title": "Build a Drone in a Day",
+  "description": "Assemble and fly a mini quadcopter. Learn flight controllers, motors and safe flying. Kits included in the fee.",
+  "category": "Workshop",
+  "tags": ["robotics", "iot"],
+  "day": "sat",
+  "start_time": "10:00",
+  "end_time": "13:00",
+  "venue_name": "Tidel Park Makerspace",
+  "address": "Saravanampatti, Coimbatore",
+  "mode": "in_person",
+  "fee_inr": 300,
+  "deadline_days_before": 2,
+  "eligibility_text": "Engineering students",
+  "eligibility_tags": ["college_student"],
+  "registration_url": null,
+  "organizer_name": "Kovai Makers Lab",
+  "contact": "makers@kovaimakers.org",
+  "field_confidence": {
+    "title": 0.95, "description": 0.84, "category": 0.9, "date": 0.92, "start_time": 0.9,
+    "end_time": 0.9, "venue_name": 0.66, "address": 0.82, "mode": 0.9, "fee_inr": 0.62,
+    "registration_deadline": 0.7, "eligibility_text": 0.75, "registration_url": null, "organizer_name": 0.9
+  },
+  "poster": {"bg": ["#1c1c1e", "#ff9f0a"], "kicker": "KOVAI MAKERS LAB", "price": "₹300 incl. kit"}
+}

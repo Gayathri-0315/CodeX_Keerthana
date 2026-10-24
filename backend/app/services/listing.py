@@ -1,0 +1,200 @@
+"""Organizer listings: form -> event fields, the trust gate with duplicate detection, and reach preview."""
+
+import re
+import uuid
+from datetime import datetime, timedelta
+from types import SimpleNamespace
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from ..models import Event, Organizer, User
+from ..schemas import EventIn
+from ..seed.venues import AREAS
+from ..timeutil import ist_to_utc, to_ist, utcnow
+from . import embeddings, extraction, spam
+from .feed import user_profile, user_windows
+from .matching import check_event
+from .ranking import score_event, tag_label
+
+DUPLICATE_COSINE = 0.92
+DUPLICATE_TITLE_OVERLAP = 0.8
+TITLE_WORD = re.compile(r"[a-z0-9]+")
+REACH_MIN_MATCH = 75
+
+
+def _minutes(hhmm: str) -> int:
+    h, m = hhmm.split(":")
+    return int(h) * 60 + int(m)
+
+
+def form_times(form: EventIn) -> tuple[datetime | None, datetime | None, datetime | None]:
+    """IST form date/times -> naive UTC start, end and registration deadline (end of that day)."""
+    if form.date is None or not form.start_time:
+        return None, None, None
+    start = ist_to_utc(form.date, _minutes(form.start_time))
+    end = ist_to_utc(form.date, _minutes(form.end_time)) if form.end_time else start + timedelta(hours=2)
+    deadline = None
+    if form.registration_deadline:
+        deadline = min(start, ist_to_utc(form.registration_deadline, 23 * 60 + 59))
+    return start, end, deadline
+
+
+def form_coords(db: Session, form: EventIn) -> tuple[float | None, float | None]:
+    if form.mode == "online":
+        return None, None
+    if form.area:
+        area = next((a for a in AREAS if a["name"] == form.area), None)
+        if area:
+            return area["lat"], area["lng"]
+    from .geocode import geocode
+
+    hit = geocode(db, " ".join(x for x in (form.address, form.venue_name) if x))
+    return (hit["lat"], hit["lng"]) if hit else (None, None)
+
+
+def apply_form(db: Session, event: Event, form: EventIn) -> None:
+    start, end, deadline = form_times(form)
+    lat, lng = form_coords(db, form)
+    event.title = form.title.strip()
+    event.description = form.description.strip()
+    event.category = form.category.strip()
+    event.tags = form.tags
+    event.mode = form.mode
+    event.venue_name = (form.venue_name or "").strip() or None
+    event.address = (form.address or "").strip() or None
+    event.lat, event.lng = lat, lng
+    event.start_at, event.end_at, event.registration_deadline = start, end, deadline
+    event.fee_inr = form.fee_inr
+    event.capacity = form.capacity
+    event.eligibility = {"required_tags": form.eligibility_tags, "text": (form.eligibility_text or "").strip()}
+    event.skill_level = form.skill_level
+    event.registration_url = form.registration_url
+    event.poster_url = form.poster_url
+    event.source = form.source
+    event.field_confidence = form.field_confidence
+    embeddings.invalidate_event(event.id or "")
+
+
+def event_form(e: Event) -> dict:
+    """An Event back into the organizer form shape (IST)."""
+    start = to_ist(e.start_at) if e.start_at else None
+    end = to_ist(e.end_at) if e.end_at else None
+    area = next((a["name"] for a in AREAS if e.lat is not None and abs(a["lat"] - e.lat) < 1e-6 and abs(a["lng"] - e.lng) < 1e-6), None)
+    return {
+        "title": e.title, "description": e.description, "category": e.category, "tags": e.tags or [],
+        "date": start.date().isoformat() if start else None,
+        "start_time": start.strftime("%H:%M") if start else None,
+        "end_time": end.strftime("%H:%M") if end else None,
+        "mode": e.mode, "venue_name": e.venue_name, "address": e.address, "area": area,
+        "fee_inr": e.fee_inr, "capacity": e.capacity,
+        "registration_deadline": to_ist(e.registration_deadline).date().isoformat() if e.registration_deadline else None,
+        "eligibility_text": (e.eligibility or {}).get("text") or None,
+        "eligibility_tags": (e.eligibility or {}).get("required_tags") or [],
+        "skill_level": e.skill_level, "registration_url": e.registration_url, "poster_url": e.poster_url,
+        "source": e.source, "field_confidence": e.field_confidence or {},
+    }
+
+
+# ---- trust gate ----
+
+def find_duplicate(db: Session, event_like, exclude_id: str | None) -> tuple[str, str] | None:
+    if event_like.start_at is None:
+        return None
+    day = to_ist(event_like.start_at).date()
+    others = db.scalars(
+        select(Event).where(
+            Event.status.in_(("published", "pending_review")),
+            Event.start_at >= ist_to_utc(day, 0),
+            Event.start_at < ist_to_utc(day, 1440),
+            Event.id != (exclude_id or ""),
+        )
+    ).unique().all()
+    if not others:
+        return None
+    mine = embeddings.compute_event_vector(event_like)
+    best = max(others, key=lambda o: embeddings.cosine(mine, embeddings.event_vector(o)))
+    if embeddings.cosine(mine, embeddings.event_vector(best)) > DUPLICATE_COSINE:
+        return best.id, best.title
+    # The 0.92 cosine is tuned for the embedding model; keyword vectors of a copy with a reworded
+    # description fall short, so near-identical titles on the same date also count.
+    same_title = next((o for o in others if title_overlap(event_like.title, o.title) >= DUPLICATE_TITLE_OVERLAP), None)
+    return (same_title.id, same_title.title) if same_title else None
+
+
+def title_overlap(a: str, b: str) -> float:
+    ta, tb = set(TITLE_WORD.findall((a or "").lower())), set(TITLE_WORD.findall((b or "").lower()))
+    return len(ta & tb) / len(ta | tb) if ta and tb else 0.0
+
+
+def run_gate(db: Session, organizer: Organizer, event_like, exclude_id: str | None) -> spam.Assessment:
+    candidate = spam.Candidate(
+        title=event_like.title or "", description=event_like.description or "", category=event_like.category or "",
+        mode=event_like.mode, venue_name=event_like.venue_name, start_at=event_like.start_at, end_at=event_like.end_at,
+        fee_inr=event_like.fee_inr or 0, registration_url=event_like.registration_url, has_organizer=organizer is not None,
+    )
+    assessment = spam.assess(candidate, organizer.trust_level if organizer else None, utcnow(),
+                             find_duplicate(db, event_like, exclude_id))
+    judgement = extraction.judge_spam(f"{candidate.title}\n{candidate.description}\nFee: ₹{candidate.fee_inr}\nLink: {candidate.registration_url or '-'}")
+    if judgement:
+        assessment = spam.combine_llm(assessment, judgement.risk, judgement.reasons)
+    return assessment
+
+
+def is_first_event(db: Session, organizer: Organizer, exclude_id: str | None) -> bool:
+    other = db.scalar(
+        select(Event.id).where(Event.organizer_id == organizer.id, Event.status == "published", Event.id != (exclude_id or "")).limit(1)
+    )
+    return other is None
+
+
+def predicted_outcome(db: Session, organizer: Organizer, assessment: spam.Assessment, exclude_id: str | None) -> tuple[str, str]:
+    return spam.outcome(assessment.score, organizer.trust_level, organizer.org_email_domain,
+                        is_first_event(db, organizer, exclude_id))
+
+
+def draft_from_form(db: Session, form: EventIn, organizer: Organizer) -> SimpleNamespace:
+    """An unsaved event-like object for previews; quacks like Event for the gate and matching."""
+    start, end, deadline = form_times(form)
+    lat, lng = form_coords(db, form)
+    return SimpleNamespace(
+        id="preview", organizer=organizer, title=form.title, description=form.description, category=form.category,
+        tags=form.tags, mode=form.mode, venue_name=form.venue_name, address=form.address, lat=lat, lng=lng,
+        start_at=start, end_at=end, registration_deadline=deadline, fee_inr=form.fee_inr, capacity=form.capacity,
+        eligibility={"required_tags": form.eligibility_tags, "text": form.eligibility_text or ""},
+        skill_level=form.skill_level, registration_url=form.registration_url, status="published",
+    )
+
+
+# ---- reach preview ----
+
+def reach(db: Session, event_like) -> dict:
+    """Students who'd pass the hard filters with match >= 75, plus a small breakdown."""
+    fields = ("title", "description", "category", "tags", "mode", "venue_name", "lat", "lng", "start_at", "end_at",
+              "fee_inr", "capacity", "eligibility", "skill_level")
+    # A throwaway id keeps this probe's vector out of the shared cache key space.
+    probe = SimpleNamespace(**{k: getattr(event_like, k) for k in fields}, id=f"reach:{uuid.uuid4().hex}")
+    probe.status = "published"
+    probe.registration_deadline = None  # a draft's deadline shouldn't hide it from its own preview
+    if probe.start_at is None or probe.end_at is None:
+        return {"count": 0, "free": 0, "interested": 0, "interest_label": None, "ready": False}
+
+    # Preview an event as it will look before it starts, even if the draft's date is already past.
+    now = min(utcnow(), probe.start_at - timedelta(minutes=1))
+    top_tag = (probe.tags or [None])[0]
+    students = db.scalars(select(User).where(User.role == "student")).all()
+    fit = free = interested = 0
+    try:
+        for u in students:
+            if top_tag and any(i.tag == top_tag for i in u.interests):
+                interested += 1
+            fr = check_event(u, probe, user_windows(db, u), now)
+            if not fr.passed:
+                continue
+            free += 1
+            profile, _ = user_profile(db, u)
+            if score_event(probe, u, fr, profile).match >= REACH_MIN_MATCH:
+                fit += 1
+    finally:
+        embeddings.invalidate_event(probe.id)
+    return {"count": fit, "free": free, "interested": interested, "interest_label": tag_label(top_tag) if top_tag else None, "ready": True}

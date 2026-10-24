@@ -10,8 +10,9 @@ from sqlalchemy.orm import Session
 from ..db import Base, SessionLocal, engine
 from ..models import AvailabilitySlot, Event, Organizer, Registration, User, UserInterest
 from ..security import hash_password
-from ..services import feedcache
+from ..services import feedcache, listing, spam
 from ..timeutil import ist_to_utc, ist_today, utcnow
+from .make_samples import make_posters
 from .venues import AREAS, find_area
 
 SEED_DIR = Path(__file__).parent
@@ -132,12 +133,18 @@ def seed(db: Session) -> dict:
             lat=item["lat"], lng=item["lng"], start_at=start, end_at=end, registration_deadline=deadline,
             fee_inr=item["fee"], capacity=item["capacity"], eligibility=item.get("eligibility", {}),
             skill_level=item["skill"], registration_url=item.get("registration_url"), status=status,
-            verification_label=item.get("label", clean_label), risk_score=item.get("risk", 0),
-            risk_reasons=item.get("risk_reasons", []), source="form",
+            verification_label=item.get("label", clean_label), source="form",
             published_at=now - timedelta(days=rng.randint(1, 6)) if status == "published" else None,
         )
         db.add(e)
         db.flush()
+        # Run the real gate so seeded risk scores and reasons match what an upload would get.
+        # Only earlier events exist yet, so a copy is flagged, never its original.
+        a = spam.assess(
+            spam.Candidate(e.title, e.description, e.category, e.mode, e.venue_name, e.start_at, e.end_at, e.fee_inr, e.registration_url),
+            org.trust_level, now, listing.find_duplicate(db, e, e.id),
+        )
+        e.risk_score, e.risk_reasons, e.duplicate_of = a.score, a.reasons, a.duplicate_of
         events[item["key"]] = e
 
         pool = rng.sample(students, len(students))
@@ -150,6 +157,7 @@ def seed(db: Session) -> dict:
 
     db.commit()
     feedcache.invalidate_all()
+    make_posters(today)
     return {"users": 1 + len(orgs) + 1 + len(students), "events": len(events)}
 
 

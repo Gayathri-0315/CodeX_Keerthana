@@ -9,3 +9,5 @@ backend/*.db
 backend/*.db-*
 backend/uploads/
 .DS_Store
+backend/app/seed/posters/generated/
+backend/app/seed/timetables/generated/

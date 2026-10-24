@@ -1,0 +1,25 @@
+{
+  "title": "Flutter Study Jam",
+  "description": "Build your first cross-platform app with Flutter in a guided session. Install Flutter before you come.",
+  "category": "Workshop",
+  "tags": ["mobile", "web"],
+  "day": "sun",
+  "start_time": "10:00",
+  "end_time": "12:30",
+  "venue_name": "District Central Library",
+  "address": "Gandhipuram, Coimbatore",
+  "mode": "in_person",
+  "fee_inr": 0,
+  "deadline_days_before": 1,
+  "eligibility_text": null,
+  "eligibility_tags": [],
+  "registration_url": null,
+  "organizer_name": "GDG Coimbatore",
+  "contact": null,
+  "field_confidence": {
+    "title": 0.98, "description": 0.8, "category": 0.85, "date": 0.9, "start_time": 0.92,
+    "end_time": 0.9, "venue_name": 0.88, "address": 0.85, "mode": 0.9, "fee_inr": 0.97,
+    "registration_deadline": 0.6, "eligibility_text": null, "registration_url": null, "organizer_name": 0.9
+  },
+  "poster": {"bg": ["#02569b", "#13b9fd"], "kicker": "GDG COIMBATORE", "price": "FREE"}
+}

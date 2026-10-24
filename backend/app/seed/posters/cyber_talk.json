@@ -1,0 +1,25 @@
+{
+  "title": "Stay Safe Online: Cyber Security Talk",
+  "description": "A one-hour online talk on phishing, password managers and spotting fake job offers. Live Q&A at the end.",
+  "category": "Webinar",
+  "tags": ["cybersecurity", "careers"],
+  "day": "wed",
+  "start_time": "18:00",
+  "end_time": "19:00",
+  "venue_name": null,
+  "address": null,
+  "mode": "online",
+  "fee_inr": 0,
+  "deadline_days_before": 0,
+  "eligibility_text": null,
+  "eligibility_tags": [],
+  "registration_url": "https://meet.google.com/abc-defg-hij",
+  "organizer_name": "Coimbatore AI Club",
+  "contact": null,
+  "field_confidence": {
+    "title": 0.96, "description": 0.88, "category": 0.8, "date": 0.9, "start_time": 0.95,
+    "end_time": 0.9, "venue_name": null, "address": null, "mode": 0.95, "fee_inr": 0.95,
+    "registration_deadline": 0.5, "eligibility_text": null, "registration_url": 0.85, "organizer_name": 0.9
+  },
+  "poster": {"bg": ["#1d1d1f", "#30d158"], "kicker": "ONLINE TALK", "price": "FREE"}
+}

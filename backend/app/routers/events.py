@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..deps import current_user
-from ..models import Event, Feedback, SavedEvent, User
+from ..models import Event, Feedback, Report, SavedEvent, User
+from ..schemas import ReportIn
 from ..seed.venues import AREAS
 from ..serializers import event_detail
 from ..services import feedcache
@@ -62,6 +63,25 @@ def undo_dismiss(event_id: str, user: User = Depends(current_user), db: Session 
     db.execute(delete(Feedback).where(Feedback.user_id == user.id, Feedback.event_id == event_id, Feedback.kind == "not_for_me"))
     db.commit()
     feedcache.invalidate(user.id)
+
+
+REPORTS_TO_HIDE = 3
+
+
+@router.post("/events/{event_id}/report", status_code=204)
+def report_event(event_id: str, body: ReportIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """One report per person. Three people reporting since the last review hides the event for review."""
+    event = visible_event(db, event_id, user)
+    if db.scalar(select(Report).where(Report.event_id == event_id, Report.reporter_id == user.id)) is None:
+        db.add(Report(event_id=event_id, reporter_id=user.id, reason=body.reason.strip()))
+        db.flush()
+    q = select(func.count(func.distinct(Report.reporter_id))).where(Report.event_id == event_id)
+    if event.reviewed_at:
+        q = q.where(Report.created_at > event.reviewed_at)
+    if event.status == "published" and db.scalar(q) >= REPORTS_TO_HIDE:
+        event.status = "pending_review"
+        feedcache.invalidate_all()
+    db.commit()
 
 
 @router.get("/areas")

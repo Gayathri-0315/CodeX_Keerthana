@@ -1,0 +1,25 @@
+{
+  "title": "GUARANTEED INTERNSHIP AT TOP MNC",
+  "description": "Guaranteed internship with certificate for all branches! Limited seats pay now. Send Rs 500 registration fee to personal UPI quickjobs@okaxis and WhatsApp the screenshot to 98765 43210.",
+  "category": "Careers",
+  "tags": ["careers"],
+  "day": "sat",
+  "start_time": "11:00",
+  "end_time": "13:00",
+  "venue_name": "Hotel Lobby",
+  "address": "Gandhipuram, Coimbatore",
+  "mode": "in_person",
+  "fee_inr": 500,
+  "deadline_days_before": 0,
+  "eligibility_text": "All branches, all years",
+  "eligibility_tags": ["college_student"],
+  "registration_url": "https://bit.ly/mnc-intern-now",
+  "organizer_name": "Placement Partners",
+  "contact": "98765 43210",
+  "field_confidence": {
+    "title": 0.95, "description": 0.9, "category": 0.8, "date": 0.9, "start_time": 0.9,
+    "end_time": 0.85, "venue_name": 0.7, "address": 0.8, "mode": 0.85, "fee_inr": 0.92,
+    "registration_deadline": 0.6, "eligibility_text": 0.8, "registration_url": 0.9, "organizer_name": 0.7
+  },
+  "poster": {"bg": ["#ff3b30", "#ffcc00"], "kicker": "!!! LAST CHANCE !!!", "price": "PAY ₹500 NOW", "extra": "UPI: quickjobs@okaxis"}
+}

@@ -137,6 +137,9 @@ class Event(Base):
     embedding: Mapped[bytes | None] = mapped_column(LargeBinary)
     source: Mapped[str] = mapped_column(String(16), default="form")
     field_confidence: Mapped[dict] = mapped_column(JSON, default=dict)
+    duplicate_of: Mapped[str | None] = mapped_column(String(36))
+    appeal_note: Mapped[str | None] = mapped_column(String(500))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime)  # last admin decision; older reports are settled
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     published_at: Mapped[datetime | None] = mapped_column(DateTime)
 
@@ -209,6 +212,16 @@ class SavedEvent(Base):
 
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     event_id: Mapped[str] = mapped_column(ForeignKey("events.id", ondelete="CASCADE"), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class ExtractionCache(Base):
+    """AI results keyed by file hash (SPEC 6.4), plus geocoder results keyed by address."""
+
+    __tablename__ = "extraction_cache"
+
+    key: Mapped[str] = mapped_column(String(80), primary_key=True)  # "<kind>:<sha256>"
+    result: Mapped[dict] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 

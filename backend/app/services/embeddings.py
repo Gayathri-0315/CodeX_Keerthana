@@ -130,17 +130,19 @@ def event_text(event) -> list[tuple[str, float]]:
     return [(" ".join(event.tags or []), 2.0), (event.title or "", 1.5), (event.description or "", 1.0)]
 
 
+def compute_event_vector(event):
+    """Uncached; for drafts and forms that have no stable id yet."""
+    if _model is not None:
+        return _encode([f"{event.title}. {event.description} Tags: {', '.join(event.tags or [])}"])[0]
+    return _sparse(event_text(event))
+
+
 def event_vector(event):
     key = f"{event.id}:{backend()}:{event.title}:{len(event.description or '')}"
     hit = _event_cache.get(key)
-    if hit is not None:
-        return hit
-    if _model is not None:
-        vec = _encode([f"{event.title}. {event.description} Tags: {', '.join(event.tags or [])}"])[0]
-    else:
-        vec = _sparse(event_text(event))
-    _event_cache[key] = vec
-    return vec
+    if hit is None:
+        hit = _event_cache[key] = compute_event_vector(event)
+    return hit
 
 
 def text_vector(weighted: list[tuple[str, float]]):

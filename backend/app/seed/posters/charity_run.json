@@ -1,0 +1,25 @@
+{
+  "title": "Kovai 5K Charity Run",
+  "description": "A 5 km morning run around Race Course. Every entry funds school supplies for government schools.",
+  "category": "Sports",
+  "tags": ["sports", "volunteering"],
+  "day": "sun",
+  "start_time": "06:00",
+  "end_time": "08:00",
+  "venue_name": "Race Course Walking Track",
+  "address": "Race Course, Coimbatore",
+  "mode": "in_person",
+  "fee_inr": 150,
+  "deadline_days_before": 2,
+  "eligibility_text": null,
+  "eligibility_tags": [],
+  "registration_url": null,
+  "organizer_name": "Kovai Volunteers",
+  "contact": "run@kovaivolunteers.org",
+  "field_confidence": {
+    "title": 0.97, "description": 0.85, "category": 0.88, "date": 0.93, "start_time": 0.9,
+    "end_time": 0.68, "venue_name": 0.9, "address": 0.9, "mode": 0.92, "fee_inr": 0.9,
+    "registration_deadline": 0.72, "eligibility_text": null, "registration_url": null, "organizer_name": 0.92
+  },
+  "poster": {"bg": ["#34c759", "#a2d729"], "kicker": "KOVAI VOLUNTEERS", "price": "₹150 entry"}
+}

@@ -137,3 +137,71 @@ class AvailabilityPut(BaseModel):
 
 class AvailabilityOut(BaseModel):
     slots: list[SlotOut]
+
+
+# ---- organizer events ----
+
+class EventIn(BaseModel):
+    """The organizer's form. Lenient enough to assess a half-filled draft; publish checks completeness."""
+
+    title: str = Field("", max_length=200)
+    description: str = Field("", max_length=4000)
+    category: str = Field("", max_length=60)
+    tags: list[str] = Field(default_factory=list, max_length=8)
+    date: dt.date | None = None
+    start_time: str | None = None
+    end_time: str | None = None
+    mode: Literal["in_person", "online", "hybrid"] = "in_person"
+    venue_name: str | None = Field(None, max_length=200)
+    address: str | None = Field(None, max_length=300)
+    area: str | None = Field(None, max_length=60)
+    fee_inr: int = Field(0, ge=0, le=100_000)
+    capacity: int | None = Field(None, ge=1, le=100_000)
+    registration_deadline: dt.date | None = None
+    eligibility_text: str | None = Field(None, max_length=200)
+    eligibility_tags: list[str] = Field(default_factory=list, max_length=8)
+    skill_level: Literal["beginner", "intermediate", "advanced"] | None = None
+    registration_url: str | None = Field(None, max_length=500)
+    poster_url: str | None = Field(None, max_length=200)
+    source: Literal["web_upload", "form", "telegram"] = "form"
+    field_confidence: dict[str, float | None] = Field(default_factory=dict)
+
+    @field_validator("start_time", "end_time")
+    @classmethod
+    def _hhmm(cls, v: str | None) -> str | None:
+        if v in (None, ""):
+            return None
+        if not HHMM.match(v):
+            raise ValueError("Use 24-hour HH:MM.")
+        return v
+
+    @field_validator("registration_url")
+    @classmethod
+    def _url(cls, v: str | None) -> str | None:
+        if v in (None, ""):
+            return None
+        if not re.match(r"^https?://[^\s]+$", v):
+            raise ValueError("Use a full link starting with https://")
+        return v
+
+    @field_validator("poster_url")
+    @classmethod
+    def _poster(cls, v: str | None) -> str | None:
+        if v in (None, ""):
+            return None
+        if not re.match(r"^/api/files/[0-9a-f]+\.webp$", v):
+            raise ValueError("Upload the poster through ShowUp.")
+        return v
+
+    @field_validator("tags", "eligibility_tags")
+    @classmethod
+    def _tags(cls, v: list[str]) -> list[str]:
+        return list(dict.fromkeys(t.strip().lower() for t in v if t.strip()))
+
+
+class AppealIn(BaseModel):
+    note: str = Field(min_length=5, max_length=500)
+
+
+class ReportIn(BaseModel):
+    reason: str = Field(min_length=3, max_length=300)

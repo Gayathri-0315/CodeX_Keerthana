@@ -1,0 +1,25 @@
+{
+  "title": "AI Workshop: Prompt to Product",
+  "description": "Turn a prompt into a working app in two hours. Build a small AI assistant with Python and deploy it. Bring a laptop.",
+  "category": "Workshop",
+  "tags": ["ai", "python"],
+  "day": "sat",
+  "start_time": "15:30",
+  "end_time": "17:30",
+  "venue_name": "SNS Hall",
+  "address": "Avinashi Road, Peelamedu, Coimbatore",
+  "mode": "in_person",
+  "fee_inr": 100,
+  "deadline_days_before": 1,
+  "eligibility_text": "Open to all college students",
+  "eligibility_tags": ["college_student"],
+  "registration_url": null,
+  "organizer_name": "Coimbatore AI Club",
+  "contact": "aiclub@kct.ac.in",
+  "field_confidence": {
+    "title": 0.97, "description": 0.86, "category": 0.9, "date": 0.95, "start_time": 0.93,
+    "end_time": 0.55, "venue_name": 0.92, "address": 0.88, "mode": 0.9, "fee_inr": 0.94,
+    "registration_deadline": 0.8, "eligibility_text": 0.75, "registration_url": null, "organizer_name": 0.96
+  },
+  "poster": {"bg": ["#0071e3", "#5ac8fa"], "kicker": "COIMBATORE AI CLUB PRESENTS", "price": "₹100", "end_display": "5:30"}
+}

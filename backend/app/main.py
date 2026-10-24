@@ -11,7 +11,7 @@ from starlette.exceptions import HTTPException
 from .config import settings
 from .db import Base, SessionLocal, engine
 from .models import User
-from .routers import auth, availability, events, feed, users
+from .routers import admin, auth, availability, events, feed, files, organizer, users
 from .services import embeddings
 
 CODES = {400: "bad_request", 401: "unauthorized", 403: "forbidden", 404: "not_found",
@@ -60,7 +60,7 @@ async def validation_error(_req: Request, exc: RequestValidationError):
     return JSONResponse({"error": {"code": "invalid", "message": message}}, status_code=422)
 
 
-for r in (auth.router, users.router, availability.router, feed.router, events.router):
+for r in (auth.router, users.router, availability.router, feed.router, events.router, organizer.router, admin.router, files.router):
     app.include_router(r, prefix="/api")
 
 
