@@ -80,8 +80,7 @@ function Editor({ initial }: { initial: Slot[] }) {
     mutationFn: (s: CalState) => api<{ slots: Slot[] }>("/availability", { method: "PUT", body: { slots: toSlots(s) } }),
     onSuccess: (res) => {
       qc.setQueryData(keys.availability, res.slots);
-      qc.invalidateQueries({ queryKey: keys.feedCount });
-      qc.invalidateQueries({ queryKey: keys.events });
+      qc.invalidateQueries({ queryKey: keys.feedAll });
       setSaveState("saved");
     },
     onError: async (e) => {
@@ -95,7 +94,10 @@ function Editor({ initial }: { initial: Slot[] }) {
   const scheduleSave = useCallback(() => {
     setSaveState("saving");
     window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => save.mutate(stateRef.current), SAVE_DEBOUNCE_MS);
+    timer.current = window.setTimeout(() => {
+      timer.current = 0;
+      save.mutate(stateRef.current);
+    }, SAVE_DEBOUNCE_MS);
   }, [save]);
   // Flush a pending save if the user leaves the page mid-debounce.
   useEffect(() => () => {
@@ -104,8 +106,7 @@ function Editor({ initial }: { initial: Slot[] }) {
       api("/availability", { method: "PUT", body: { slots: toSlots(stateRef.current) } })
         .then(() => {
           qc.invalidateQueries({ queryKey: keys.availability });
-          qc.invalidateQueries({ queryKey: keys.feedCount });
-          qc.invalidateQueries({ queryKey: keys.events });
+          qc.invalidateQueries({ queryKey: keys.feedAll });
         })
         .catch(() => {});
     }

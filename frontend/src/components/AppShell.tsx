@@ -43,6 +43,8 @@ export function AppShell() {
   const { pathname } = useLocation();
   const { data: me } = useMe();
   const student = me?.role === "student";
+  // Event detail has its own sticky action bar, so the tab bar steps aside there.
+  const tabBar = student && !pathname.startsWith("/event/");
 
   return (
     <div className="min-h-dvh">
@@ -73,7 +75,7 @@ export function AppShell() {
         </nav>
       </header>
 
-      <main id="main" className={`mx-auto max-w-[1080px] px-4 pt-4 sm:px-6 md:pt-8 ${student ? "pb-32 md:pb-16" : "pb-16"}`}>
+      <main id="main" className={`mx-auto max-w-[1080px] px-4 pt-4 sm:px-6 md:pt-8 ${tabBar ? "pb-32 md:pb-16" : "pb-16"}`}>
         <Suspense fallback={<div className="h-40" />}>
           <m.div key={pathname} variants={pageVariants} initial="initial" animate="animate">
             <Outlet />
@@ -82,7 +84,7 @@ export function AppShell() {
       </main>
 
       {/* Phone: bottom tab bar */}
-      {student && (
+      {tabBar && (
         <nav className="glass safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-line md:hidden" aria-label="Main">
           <ul className="mx-auto grid max-w-md grid-cols-4">
             {TABS.map((t) => {

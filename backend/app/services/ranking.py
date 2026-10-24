@@ -90,43 +90,52 @@ def pref_score(event, user) -> float:
 class Scored:
     match: int
     interest: int
-    reasons: list[str]
+    reasons: list[tuple[str, str]]  # (kind, text); kind is schedule | interest | travel | budget | eligibility
     slack_min: float | None
+
+    @property
+    def texts(self) -> list[str]:
+        return [t for _, t in self.reasons]
+
+    @property
+    def card_texts(self) -> list[str]:
+        """Cards already show distance and price as chips, so their reasons skip those."""
+        return [t for k, t in self.reasons if k in ("schedule", "interest", "eligibility")][:3]
 
 
 def _km(d: float) -> str:
     return "Under 1 km away" if d < 1 else f"{round(d)} km away"
 
 
-def reasons_for(event, user, fr: FilterResult, overlap: list[str]) -> list[str]:
-    out: list[str] = []
+def reasons_for(event, user, fr: FilterResult, overlap: list[str]) -> list[tuple[str, str]]:
+    out: list[tuple[str, str]] = []
     if fr.window is not None:
         ws, we = to_ist(fr.window[0]), to_ist(fr.window[1])
         day = DAY_NAMES[to_ist(event.start_at).weekday()]
         # Long windows (an all-day free day) read better without the range.
         if (fr.window[1] - fr.window[0]) >= timedelta(hours=12):
-            out.append(f"Fits your free {day}")
+            out.append(("schedule", f"Fits your free {day}"))
         else:
-            out.append(f"Fits your {day} {fmt_range(ws, we)} gap")
+            out.append(("schedule", f"Fits your {day} {fmt_range(ws, we)} gap"))
     if overlap:
         labels = [tag_label(t) for t in overlap[:2]]
         noun = "interests" if len(labels) > 1 else "interest"
-        out.append(f"Matches your {noun} in {' and '.join(labels)}")
+        out.append(("interest", f"Matches your {noun} in {' and '.join(labels)}"))
     if fr.distance_km is not None:
-        out.append(f"{_km(fr.distance_km)}, about {fr.travel_min} min")
+        out.append(("travel", f"{_km(fr.distance_km)}, about {fr.travel_min} min"))
     elif event.mode == "online":
-        out.append("Online, join from anywhere")
+        out.append(("travel", "Online, join from anywhere"))
     elif event.mode == "hybrid":
-        out.append("Join in person or online")
+        out.append(("travel", "Join in person or online"))
     if event.fee_inr == 0:
-        out.append("Free")
+        out.append(("budget", "Free"))
     elif user.budget_max_inr:
-        out.append(f"₹{event.fee_inr:,}, within your ₹{user.budget_max_inr:,} budget")
+        out.append(("budget", f"₹{event.fee_inr:,}, within your ₹{user.budget_max_inr:,} budget"))
     else:
-        out.append(f"₹{event.fee_inr:,}")
+        out.append(("budget", f"₹{event.fee_inr:,}"))
     elig = event.eligibility or {}
     if elig.get("required_tags"):
-        out.append(f"You're eligible ({elig.get('text') or 'meets the requirements'})")
+        out.append(("eligibility", f"You're eligible ({elig.get('text') or 'meets the requirements'})"))
     return out
 
 

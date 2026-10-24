@@ -24,6 +24,8 @@ The first `npm run dev` creates `backend/.venv` and installs the Python requirem
 
 No API keys are needed. Copy `.env.example` to `.env` to change settings.
 
+Interest matching uses keywords and synonyms out of the box. For semantic matching, install the optional model (large download): `backend/.venv/Scripts/python -m pip install -r backend/requirements-ml.txt` on Windows, or `backend/.venv/bin/python ...` elsewhere. It loads in the background on the next start; `/api/health` shows `"matching": "model"` once it's ready.
+
 ## Demo accounts
 
 Password for all: `demo1234`. The sign-in screen also has one-tap demo buttons.
@@ -37,4 +39,4 @@ Seeded event dates are relative to the day you seed, so the demo is always upcom
 
 ## Status
 
-Phases 1 (foundation) and 2 (free-time calendar) are done. See PLAN.md for what's next.
+Phases 1 (foundation), 2 (free-time calendar) and 3 (matching and feed) are done. See PLAN.md for what's next.

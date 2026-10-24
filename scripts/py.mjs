@@ -1,7 +1,7 @@
 // Runs Python inside backend/.venv, creating the venv and installing requirements on first use.
 // Usage: node scripts/py.mjs -m uvicorn app.main:app --reload
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, watch, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -38,23 +38,56 @@ if (!existsSync(stamp) || readFileSync(stamp, "utf8") !== wanted) {
   writeFileSync(stamp, wanted);
 }
 
-// On Windows, uvicorn --reload signals Ctrl+C to its whole console group, which would also stop
-// `npm run dev`. Run Python in its own (hidden) process group and relay its output instead.
-const child = spawn(venvPython, process.argv.slice(2), {
-  cwd: backend,
-  stdio: win ? ["ignore", "pipe", "pipe"] : "inherit",
-  detached: win,
-  windowsHide: true,
-  env: { ...process.env, PYTHONUNBUFFERED: "1" },
-});
-if (win) {
-  child.stdout.pipe(process.stdout);
-  child.stderr.pipe(process.stderr);
+// `--watch <dir>` restarts Python when a .py file under backend/<dir> changes. We do this instead of
+// `uvicorn --reload` because on Windows its reloader stops the worker with a console Ctrl+C, which
+// also stops `npm run dev` (and hangs if Python has no console of its own).
+const args = process.argv.slice(2);
+const watchAt = args.indexOf("--watch");
+const watchDir = watchAt >= 0 ? args.splice(watchAt, 2)[1] : null;
+
+let child = null;
+let restarting = false;
+
+function start() {
+  child = spawn(venvPython, args, { cwd: backend, stdio: "inherit", env: { ...process.env, PYTHONUNBUFFERED: "1" } });
+  child.on("exit", (code) => {
+    if (restarting) {
+      restarting = false;
+      start();
+    } else if (!watchDir) {
+      process.exit(code ?? 1);
+    } else {
+      console.log("[py] Server stopped. Fix the error and save a file to restart.");
+    }
+  });
 }
+
+function kill(proc) {
+  if (!proc || proc.exitCode !== null) return false;
+  if (win) spawnSync("taskkill", ["/pid", String(proc.pid), "/T", "/F"], { stdio: "ignore" });
+  else proc.kill("SIGTERM");
+  return true;
+}
+
+start();
+
+if (watchDir) {
+  let timer = 0;
+  watch(join(backend, watchDir), { recursive: true }, (_event, file) => {
+    if (!file || !String(file).endsWith(".py")) return;
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      console.log(`[py] ${file} changed, restarting...`);
+      restarting = kill(child);
+      if (!restarting) start(); // it had crashed; start fresh
+    }, 200);
+  });
+}
+
 const stop = () => {
-  if (win) spawnSync("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore" });
-  else child.kill("SIGTERM");
+  restarting = false;
+  kill(child);
+  process.exit(0);
 };
 process.on("SIGINT", stop);
 process.on("SIGTERM", stop);
-child.on("exit", (code) => process.exit(code ?? 1));

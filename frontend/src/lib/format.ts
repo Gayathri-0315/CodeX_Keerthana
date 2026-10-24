@@ -43,6 +43,16 @@ export function formatDayTime(startIso: string, endIso: string) {
   return `${s.weekday}, ${clock(s.hour, s.minute, !sameHalf)} to ${clock(e.hour, e.minute)}`;
 }
 
+/** "3 to 5 PM" */
+export function formatTimeRange(startIso: string, endIso: string) {
+  return formatDayTime(startIso, endIso).split(", ").slice(1).join(", ");
+}
+
+/** "Saturday, 31 Oct" */
+export function formatLongDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "short", timeZone: TZ });
+}
+
 /** Minutes since midnight -> "6 AM", "5:30 PM". */
 export function formatMinutes(min: number) {
   return clock(Math.floor(min / 60) % 24, min % 60);

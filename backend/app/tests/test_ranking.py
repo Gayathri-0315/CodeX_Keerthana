@@ -45,17 +45,19 @@ def test_reasons_are_facts_that_passed():
     e = ev("ai", "LLM workshop", ["ai", "python"])
     fr = check_event(u, e, SAT_AFTERNOON, NOW)
     s = score_event(e, u, fr, build_profile(u, Counter()))
-    assert s.reasons[0] == "Fits your Saturday 2 to 6 PM gap"
-    assert s.reasons[1] == "Matches your interests in AI and Python"
-    assert s.reasons[2].endswith("min") and "km away" in s.reasons[2]
-    assert s.reasons[3] == "₹100, within your ₹200 budget"
+    texts = s.texts
+    assert texts[0] == "Fits your Saturday 2 to 6 PM gap"
+    assert texts[1] == "Matches your interests in AI and Python"
+    assert texts[2].endswith("min") and "km away" in texts[2]
+    assert texts[3] == "₹100, within your ₹200 budget"
+    assert s.card_texts == texts[:2]
 
 
 def test_no_interest_reason_without_overlap():
     u = student()
     e = ev("music", "Indie gig", ["music"], fee_inr=0)
     fr = check_event(u, e, SAT_AFTERNOON, NOW)
-    reasons = score_event(e, u, fr, build_profile(u, Counter())).reasons
+    reasons = score_event(e, u, fr, build_profile(u, Counter())).texts
     assert not any(r.startswith("Matches") for r in reasons) and "Free" in reasons
 
 

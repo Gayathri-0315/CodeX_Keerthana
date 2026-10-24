@@ -38,7 +38,9 @@ export type Slot = {
   source: "manual" | "timetable";
 };
 
-export type EventSummary = {
+export type FeedTab = "for_you" | "almost" | "saved";
+
+export type FeedItem = {
   id: string;
   title: string;
   category: string;
@@ -48,13 +50,40 @@ export type EventSummary = {
   start_at: string;
   end_at: string;
   fee_inr: number;
+  capacity: number | null;
+  seats_taken: number;
+  poster_url: string | null;
   verification_label: "organizer_verified" | "details_reviewed" | "unverified";
   organizer_name: string | null;
+  distance_km: number | null;
+  travel_min: number;
   fits: boolean;
   almost: boolean;
-  reason: string | null;
-  distance_km: number | null;
+  clash: string | null;
+  match: number | null;
+  interest: number | null;
+  reasons: string[];
+  card_reasons: string[];
   waitlist: boolean;
+  saved: boolean;
+  dismissed: boolean;
+};
+
+export type FeedPage = { items: FeedItem[]; next_cursor: string | null; total: number };
+
+export type EventDetail = FeedItem & {
+  description: string;
+  address: string | null;
+  lat: number | null;
+  lng: number | null;
+  registration_deadline: string | null;
+  registration_url: string | null;
+  eligibility_text: string | null;
+  skill_level: string | null;
+  status: string;
+  organizer: { name: string; trust_level: string; trust_label: string } | null;
+  why_not: string | null;
+  maps_url: string | null;
 };
 
 export type Area = { name: string; lat: number; lng: number };

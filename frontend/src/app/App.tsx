@@ -15,6 +15,7 @@ const MyEvents = lazy(() => import("../pages/MyEvents"));
 const Alerts = lazy(() => import("../pages/Alerts"));
 const Settings = lazy(() => import("../pages/Settings"));
 const RoleHome = lazy(() => import("../pages/RoleHome"));
+const EventPage = lazy(() => import("../pages/EventPage"));
 
 const loadFeatures = () => import("./features").then((r) => r.default);
 
@@ -83,6 +84,7 @@ export function App() {
                     <Route path="my" element={<MyEvents />} />
                     <Route path="alerts" element={<Alerts />} />
                     <Route path="settings" element={<Settings />} />
+                    <Route path="event/:id" element={<EventPage />} />
                   </Route>
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>

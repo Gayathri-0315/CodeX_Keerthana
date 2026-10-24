@@ -1,12 +1,22 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type InfiniteData,
+  type QueryClient,
+} from "@tanstack/react-query";
 import { api } from "./api";
-import type { Area, EventSummary, Role, Slot, User } from "./types";
+import type { Area, EventDetail, FeedItem, FeedPage, FeedTab, Role, Slot, User } from "./types";
 
 export const keys = {
   me: ["me"] as const,
   availability: ["availability"] as const,
   feedCount: ["feed", "count"] as const,
-  events: ["events"] as const,
+  feed: (tab: FeedTab) => ["feed", "list", tab] as const,
+  /** Everything that depends on the user's free time or profile. */
+  feedAll: ["feed"] as const,
+  event: (id: string) => ["event", id] as const,
   config: ["config"] as const,
 };
 
@@ -80,8 +90,7 @@ export function useUpdateMe() {
     onError: (_e, _p, ctx) => ctx?.prev && qc.setQueryData(keys.me, ctx.prev),
     onSuccess: (user) => {
       qc.setQueryData(keys.me, user);
-      qc.invalidateQueries({ queryKey: keys.feedCount });
-      qc.invalidateQueries({ queryKey: keys.events });
+      qc.invalidateQueries({ queryKey: keys.feedAll });
     },
   });
 }
@@ -91,7 +100,10 @@ export function useUpdateInterests() {
   return useMutation({
     mutationFn: (body: { interests: { tag: string; weight: number }[]; interest_text?: string }) =>
       api<User>("/users/me/interests", { method: "PUT", body }),
-    onSuccess: (user) => qc.setQueryData(keys.me, user),
+    onSuccess: (user) => {
+      qc.setQueryData(keys.me, user);
+      qc.invalidateQueries({ queryKey: keys.feedAll });
+    },
   });
 }
 
@@ -112,11 +124,77 @@ export function useFeedCount() {
   });
 }
 
-export function useEvents() {
-  return useQuery({
-    queryKey: keys.events,
-    queryFn: () => api<{ events: EventSummary[] }>("/events").then((r) => r.events),
+export function useFeed(tab: FeedTab) {
+  return useInfiniteQuery({
+    queryKey: keys.feed(tab),
+    queryFn: ({ pageParam }) => api<FeedPage>(`/feed?tab=${tab}&limit=20${pageParam ? `&cursor=${pageParam}` : ""}`),
+    initialPageParam: "",
+    getNextPageParam: (last) => last.next_cursor ?? undefined,
     staleTime: 30_000,
+  });
+}
+
+const fetchEvent = (id: string) => api<EventDetail>(`/events/${id}`);
+
+export function useEvent(id: string) {
+  return useQuery({ queryKey: keys.event(id), queryFn: () => fetchEvent(id), staleTime: 30_000 });
+}
+
+/** Warm the detail cache and the page chunk on hover or touch start. */
+export function usePrefetchEvent() {
+  const qc = useQueryClient();
+  return (id: string) => {
+    void import("../pages/EventPage");
+    void qc.prefetchQuery({ queryKey: keys.event(id), queryFn: () => fetchEvent(id), staleTime: 30_000 });
+  };
+}
+
+type FeedCache = InfiniteData<FeedPage, string>;
+
+/** Apply a change to an event wherever it is cached (every feed tab and its detail). */
+function patchEventEverywhere(qc: QueryClient, id: string, fn: (e: FeedItem) => FeedItem | null) {
+  qc.setQueriesData<FeedCache>({ queryKey: ["feed", "list"] }, (data) =>
+    data && {
+      ...data,
+      pages: data.pages.map((p) => ({ ...p, items: p.items.map(fn).filter((e): e is FeedItem => e !== null) })),
+    },
+  );
+  qc.setQueryData<EventDetail>(keys.event(id), (d) => (d ? ({ ...d, ...(fn(d) ?? { dismissed: true }) } as EventDetail) : d));
+}
+
+export function useSaveEvent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, saved }: { id: string; saved: boolean }) =>
+      api<void>(`/events/${id}/save`, { method: saved ? "POST" : "DELETE" }),
+    onMutate: async ({ id, saved }) => {
+      await qc.cancelQueries({ queryKey: ["feed"] });
+      const snapshot = qc.getQueriesData({ queryKey: ["feed"] });
+      const detail = qc.getQueryData(keys.event(id));
+      patchEventEverywhere(qc, id, (e) => (e.id === id ? { ...e, saved } : e));
+      return { snapshot, detail };
+    },
+    onError: (_e, { id }, ctx) => {
+      ctx?.snapshot.forEach(([key, data]) => qc.setQueryData(key, data));
+      qc.setQueryData(keys.event(id), ctx?.detail);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.feed("saved") }),
+  });
+}
+
+export function useDismissEvent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, undo }: { id: string; undo?: boolean }) =>
+      api<void>(`/events/${id}/dismiss`, { method: undo ? "DELETE" : "POST" }),
+    onMutate: async ({ id, undo }) => {
+      await qc.cancelQueries({ queryKey: ["feed"] });
+      const snapshot = qc.getQueriesData({ queryKey: ["feed"] });
+      if (!undo) patchEventEverywhere(qc, id, (e) => (e.id === id ? null : e));
+      return { snapshot };
+    },
+    onError: (_e, _v, ctx) => ctx?.snapshot.forEach(([key, data]) => qc.setQueryData(key, data)),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["feed"] }),
   });
 }
 

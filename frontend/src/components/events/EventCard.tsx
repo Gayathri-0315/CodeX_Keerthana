@@ -1,9 +1,12 @@
-import { m } from "motion/react";
-import { Clock, MapPin, TriangleAlert } from "lucide-react";
+import { animate, m, useMotionValue, useTransform, type PanInfo } from "motion/react";
+import { Bookmark, Clock, MapPin, Sparkles, TriangleAlert } from "lucide-react";
+import { useRef, type MouseEvent } from "react";
+import { Link } from "react-router-dom";
 import { Tag } from "../ui/Chip";
 import { formatDayTime, formatFee, formatKm } from "../../lib/format";
-import { easeOut } from "../../lib/motion";
-import type { EventSummary } from "../../lib/types";
+import { easeOut, haptic, spring } from "../../lib/motion";
+import { usePrefetchEvent } from "../../lib/queries";
+import type { FeedItem } from "../../lib/types";
 
 const GRADIENTS: Record<string, [string, string]> = {
   Workshop: ["#0071e3", "#5ac8fa"],
@@ -17,46 +20,144 @@ const GRADIENTS: Record<string, [string, string]> = {
   Photography: ["#8e8e93", "#5ac8fa"],
 };
 
-export function Thumb({ category, title, className = "" }: { category: string; title: string; className?: string }) {
-  const [a, b] = GRADIENTS[category] ?? ["#636366", "#aeaeb2"];
+/** Poster when there is one, otherwise a category gradient. Shares a layoutId with the detail hero. */
+export function Thumb({ event, className = "", large = false }: { event: Pick<FeedItem, "id" | "category" | "title" | "poster_url">; className?: string; large?: boolean }) {
+  const [a, b] = GRADIENTS[event.category] ?? ["#636366", "#aeaeb2"];
   return (
-    <div
+    <m.div
+      layoutId={`thumb-${event.id}`}
+      transition={spring}
       aria-hidden
-      className={`grid place-items-center overflow-hidden rounded-[16px] text-white ${className}`}
+      className={`grid place-items-center overflow-hidden text-white ${large ? "rounded-[22px]" : "rounded-[16px]"} ${className}`}
       style={{ background: `linear-gradient(135deg, ${a}, ${b})` }}
     >
-      <span className="text-[26px] font-semibold tracking-tight opacity-90">{title.trim()[0]}</span>
-    </div>
+      {event.poster_url ? (
+        <img src={event.poster_url} alt="" className="size-full object-cover" loading="lazy" decoding="async" />
+      ) : (
+        <span className={`font-semibold tracking-tight opacity-90 ${large ? "text-[64px]" : "text-[26px]"}`}>{event.title.trim()[0]}</span>
+      )}
+    </m.div>
   );
 }
 
-export function EventCard({ event, index }: { event: EventSummary; index: number }) {
+type Props = {
+  event: FeedItem;
+  index: number;
+  onToggleSave: (e: FeedItem) => void;
+  onDismiss?: (e: FeedItem) => void;
+  onRemindSimilar?: (e: FeedItem) => void;
+};
+
+export function EventCard({ event, index, onToggleSave, onDismiss, onRemindSimilar }: Props) {
+  const prefetch = usePrefetchEvent();
+  const x = useMotionValue(0);
+  const revealOpacity = useTransform(x, [-140, -40, 0], [1, 0.4, 0]);
+  const dragged = useRef(false);
+  const muted = event.almost && !event.fits;
+
+  const onDragEnd = (_: unknown, info: PanInfo) => {
+    if (onDismiss && (info.offset.x < -120 || info.velocity.x < -700)) {
+      haptic();
+      animate(x, -window.innerWidth, { duration: 0.22, ease: easeOut }).then(() => onDismiss(event));
+    } else {
+      animate(x, 0, { type: "spring", stiffness: 320, damping: 30 });
+    }
+    window.setTimeout(() => (dragged.current = false), 0);
+  };
+
+  const guardClick = (e: MouseEvent) => {
+    if (dragged.current) e.preventDefault(); // a swipe is not a tap
+  };
+
   return (
-    <m.article
+    <m.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: easeOut, delay: Math.min(index, 8) * 0.03 }}
-      className={`card flex gap-4 p-4 ${event.almost ? "opacity-80" : ""}`}
+      className="relative"
     >
-      <Thumb category={event.category} title={event.title} className="size-[72px] shrink-0" />
-      <div className="min-w-0 flex-1">
-        <h3 className="headline line-clamp-2">{event.title}</h3>
-        <p className="footnote mt-0.5 text-text-2">{event.organizer_name}</p>
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <Tag tone="accent"><Clock className="size-3.5" aria-hidden />{formatDayTime(event.start_at, event.end_at)}</Tag>
-          <Tag><MapPin className="size-3.5" aria-hidden />{formatKm(event.distance_km)}</Tag>
-          <Tag>{formatFee(event.fee_inr)}</Tag>
-          {event.waitlist && <Tag tone="warning">Waitlist</Tag>}
-          {event.verification_label === "unverified" && <Tag tone="warning">Unverified</Tag>}
-        </div>
-        {event.almost && event.reason && (
-          <p className="footnote mt-2 flex items-start gap-1.5 text-warning-text">
-            <TriangleAlert className="mt-px size-4 shrink-0" aria-hidden />
-            {event.reason}
-          </p>
+      {onDismiss && (
+        <m.div style={{ opacity: revealOpacity }} className="absolute inset-0 flex items-center justify-end rounded-[22px] bg-danger/15 pr-6 callout font-semibold text-danger-text" aria-hidden>
+          Not for me
+        </m.div>
+      )}
+      <m.article
+        style={{ x }}
+        drag={onDismiss ? "x" : false}
+        dragDirectionLock
+        dragConstraints={{ left: 0, right: 0 }}
+        dragElastic={{ left: 0.9, right: 0.05 }}
+        onDragStart={() => (dragged.current = true)}
+        onDragEnd={onDragEnd}
+        className="card relative overflow-hidden"
+      >
+        <Link
+          to={`/event/${event.id}`}
+          onClick={guardClick}
+          onPointerEnter={() => prefetch(event.id)}
+          onTouchStart={() => prefetch(event.id)}
+          draggable={false}
+          className="flex gap-4 p-4 pr-14 outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset rounded-[22px]"
+        >
+          <Thumb event={event} className={`size-[72px] shrink-0 ${muted ? "opacity-70 saturate-50" : ""}`} />
+          <div className="min-w-0 flex-1">
+            <h3 className="headline line-clamp-2">{event.title}</h3>
+            <p className="footnote mt-0.5 text-text-2">{event.organizer_name}</p>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <Tag tone={muted ? "neutral" : "accent"}><Clock className="size-3.5" aria-hidden />{formatDayTime(event.start_at, event.end_at)}</Tag>
+              <Tag><MapPin className="size-3.5" aria-hidden />{formatKm(event.distance_km)}</Tag>
+              <Tag>{formatFee(event.fee_inr)}</Tag>
+              {event.waitlist && <Tag tone="warning">Waitlist</Tag>}
+              {event.verification_label === "unverified" && <Tag tone="warning">Unverified</Tag>}
+            </div>
+            {!muted && event.card_reasons.length > 0 && (
+              <ul className="mt-2.5 flex flex-col gap-1" aria-label="Why it fits">
+                {event.card_reasons.map((r) => (
+                  <li key={r} className="footnote flex items-start gap-1.5 text-text-2">
+                    <Sparkles className="mt-px size-3.5 shrink-0 text-accent" aria-hidden />
+                    {r}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {event.clash && (
+              <p className="footnote mt-2 flex items-start gap-1.5 text-warning-text">
+                <TriangleAlert className="mt-px size-4 shrink-0" aria-hidden />
+                {event.clash}
+              </p>
+            )}
+          </div>
+        </Link>
+
+        <button
+          onClick={() => onToggleSave(event)}
+          aria-pressed={event.saved}
+          aria-label={event.saved ? `Unsave ${event.title}` : `Save ${event.title}`}
+          className="pressable absolute right-2 top-2 grid size-11 place-items-center rounded-full text-text-2 hover:text-accent"
+        >
+          <Bookmark className={`size-5 ${event.saved ? "fill-accent text-accent" : ""}`} />
+        </button>
+
+        {muted && onRemindSimilar && (
+          <div className="-mt-2 px-4 pb-3 pl-[104px]">
+            <button onClick={() => onRemindSimilar(event)} className="min-h-11 callout font-medium text-accent">
+              Remind me of similar events
+            </button>
+          </div>
         )}
-      </div>
-    </m.article>
+
+        {event.match != null && !muted && (
+          <div className="h-[3px] w-full bg-text/5" role="meter" aria-valuenow={event.match} aria-valuemin={0} aria-valuemax={100} aria-label="Match">
+            <m.div
+              className="h-full origin-left bg-accent"
+              initial={{ scaleX: 0 }}
+              animate={{ scaleX: event.match / 100 }}
+              transition={{ duration: 0.6, ease: easeOut, delay: 0.1 + Math.min(index, 8) * 0.03 }}
+            />
+          </div>
+        )}
+      </m.article>
+    </m.div>
   );
 }
 
@@ -68,6 +169,7 @@ export function EventCardSkeleton() {
         <div className="skeleton h-4 w-3/4 rounded-full" />
         <div className="skeleton h-3 w-1/3 rounded-full" />
         <div className="skeleton h-6 w-2/3 rounded-full" />
+        <div className="skeleton h-3 w-1/2 rounded-full" />
       </div>
     </div>
   );
