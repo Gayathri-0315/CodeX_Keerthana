@@ -4,9 +4,9 @@ Build order follows SPEC.md section 14. Each phase ends runnable, tested and com
 
 | Phase | Scope | Status |
 |---|---|---|
-| 1 Foundation | Repo, one-command dev/seed, FastAPI + SQLite (WAL) + all models, seed data, JWT cookie auth + demo login, design tokens, app shell (glass nav / tab bar, dark mode), onboarding, interests, settings | in progress |
-| 2 Free-time calendar | 7 x 32 paint grid (rAF-batched, memoized cells), presets, "This week only" overrides, 400 ms debounced batched save, live "N events fit" pill, keyboard grid | next |
-| 3 Matching and feed | Ranking, reasons, Almost list, feed UI, detail, save/dismiss, embeddings + fallback | |
+| 1 Foundation | Repo, one-command dev/seed, FastAPI + SQLite (WAL) + all models, seed data, JWT cookie auth + demo login, design tokens, app shell (glass nav / tab bar, dark mode), onboarding, interests, settings | done |
+| 2 Free-time calendar | 7 x 32 paint grid (rAF-batched, memoized cells), presets, "This week only" overrides, 400 ms debounced batched save, live "N events fit" pill, keyboard grid | done |
+| 3 Matching and feed | Ranking, reasons, Almost list, feed UI, detail, save/dismiss, embeddings + fallback | next |
 | 4 Poster to listing | Extraction (mock + live), confirm screen, trust gate, reach preview, admin queue, reports | |
 | 5 Attendance | Register animation + pass, SSE toasts, notification rules, reminders, waitlist, .ics, QR check-in, analytics | |
 | 6 Timetable + polish | Timetable import, Telegram poster flow, states, a11y and performance passes, README | |
@@ -20,6 +20,9 @@ Build order follows SPEC.md section 14. Each phase ends runnable, tested and com
 - **Onboarding order:** hero, account, interests, where and how much, then "When are you free?" which opens the calendar; finishing there shows the done check and Home. (Spec lists free time before location; moving it last lets the calendar be the final, longest step.)
 - **Area search** uses the seeded Coimbatore venue table instead of Nominatim, so onboarding works offline.
 - **Budget "Any"** is stored as `budget_max_inr = null`.
+- **Calendar painting:** drags paint the rectangle from the first cell to the pointer (so Mon to Fri 5 to 9 PM is one drag), applied once per animation frame over a snapshot so shrinking a drag reverts cleanly. On touch, a tap toggles one cell and a 180 ms hold starts painting; a quick swipe still scrolls. Phones get a one-day snap pager plus a week overview. The 30-minute grid marks a cell free only when a slot covers all of it, and slot parts outside 06:00 to 22:00 are preserved on save.
+- **Onboarding "Upload my timetable"** is added in Phase 6 with timetable import, so there is no dead-end button before then.
+- **Organizer and admin** accounts land on a placeholder until Phase 4.
 
 ## Deviations from the spec (data only)
 
