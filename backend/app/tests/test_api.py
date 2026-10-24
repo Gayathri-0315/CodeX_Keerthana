@@ -10,6 +10,13 @@ def test_me_requires_auth_with_error_shape(client):
     assert r.json()["error"]["code"] == "unauthorized"
 
 
+def test_session_is_null_when_signed_out(client):
+    assert client.get("/api/auth/session").json() == {"user": None}
+    client.post("/api/auth/demo", json={"role": "organizer"})
+    user = client.get("/api/auth/session").json()["user"]
+    assert user["role"] == "organizer" and user["organizer"]["trust_level"] == "trusted"
+
+
 def test_register_then_login(client):
     r = client.post("/api/auth/register", json={"name": "Ravi", "email": "Ravi@Example.com", "password": "longenough"})
     assert r.status_code == 200 and r.json()["onboarded"] is False

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -64,6 +64,15 @@ def logout(response: Response):
 @router.get("/me", response_model=UserOut)
 def me(user: User = Depends(current_user)):
     return user_out(user)
+
+
+@router.get("/session")
+def session(request: Request, db: Session = Depends(get_db)):
+    """Like /me, but a signed-out visitor gets `{"user": null}` instead of a 401."""
+    try:
+        return {"user": user_out(current_user(request, db))}
+    except HTTPException:
+        return {"user": None}
 
 
 @router.get("/config")
