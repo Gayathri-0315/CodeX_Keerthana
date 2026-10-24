@@ -14,8 +14,10 @@ const CalendarPage = lazy(() => import("../pages/CalendarPage"));
 const MyEvents = lazy(() => import("../pages/MyEvents"));
 const Alerts = lazy(() => import("../pages/Alerts"));
 const Settings = lazy(() => import("../pages/Settings"));
-const RoleHome = lazy(() => import("../pages/RoleHome"));
 const EventPage = lazy(() => import("../pages/EventPage"));
+const OrganizerHome = lazy(() => import("../pages/organizer/OrganizerHome"));
+const EventEditor = lazy(() => import("../pages/organizer/EventEditor"));
+const ReviewQueue = lazy(() => import("../pages/admin/ReviewQueue"));
 
 const loadFeatures = () => import("./features").then((r) => r.default);
 
@@ -58,7 +60,14 @@ function RequireAuth({ children }: { children: ReactNode }) {
 
 function HomeForRole() {
   const { data: me } = useMe();
-  return me && me.role !== "student" ? <RoleHome /> : <Home />;
+  if (me?.role === "organizer") return <OrganizerHome />;
+  if (me?.role === "admin") return <ReviewQueue />;
+  return <Home />;
+}
+
+function OnlyRole({ role, children }: { role: "organizer" | "admin"; children: ReactNode }) {
+  const { data: me } = useMe();
+  return me?.role === role ? <>{children}</> : <Navigate to="/" replace />;
 }
 
 export function App() {
@@ -85,6 +94,8 @@ export function App() {
                     <Route path="alerts" element={<Alerts />} />
                     <Route path="settings" element={<Settings />} />
                     <Route path="event/:id" element={<EventPage />} />
+                    <Route path="organizer/new" element={<OnlyRole role="organizer"><EventEditor /></OnlyRole>} />
+                    <Route path="organizer/event/:id/edit" element={<OnlyRole role="organizer"><EventEditor key="edit" /></OnlyRole>} />
                   </Route>
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>

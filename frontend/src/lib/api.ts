@@ -8,15 +8,16 @@ export class ApiError extends Error {
   }
 }
 
-type Options = { method?: string; body?: unknown; signal?: AbortSignal };
+type Options = { method?: string; body?: unknown; form?: FormData; signal?: AbortSignal };
 
-export async function api<T>(path: string, { method = "GET", body, signal }: Options = {}): Promise<T> {
+export async function api<T>(path: string, { method = "GET", body, form, signal }: Options = {}): Promise<T> {
   let res: Response;
   try {
     res = await fetch(`/api${path}`, {
-      method,
+      method: form ? "POST" : method,
+      // For FormData the browser sets the multipart boundary itself.
       headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: form ?? (body !== undefined ? JSON.stringify(body) : undefined),
       credentials: "same-origin",
       signal,
     });

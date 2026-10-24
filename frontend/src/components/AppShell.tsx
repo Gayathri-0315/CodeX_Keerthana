@@ -11,6 +11,12 @@ const TABS = [
   { to: "/my", label: "My events", icon: Ticket },
   { to: "/alerts", label: "Alerts", icon: Bell },
 ];
+// Organizers and admins have few destinations; they get desktop links and in-page buttons, no tab bar.
+const DESKTOP_TABS: Record<string, { to: string; label: string }[]> = {
+  student: TABS,
+  organizer: [{ to: "/", label: "Dashboard" }, { to: "/organizer/new", label: "New event" }],
+  admin: [{ to: "/", label: "Review queue" }],
+};
 
 export function Logo() {
   return (
@@ -56,9 +62,9 @@ export function AppShell() {
       <header className="glass safe-top sticky top-0 z-40 hidden border-b border-line md:block">
         <nav className="mx-auto flex h-14 max-w-[1080px] items-center justify-between px-6" aria-label="Main">
           <Link to="/" aria-label="ShowUp home"><Logo /></Link>
-          {student && (
+          {me && (
             <ul className="flex items-center gap-1">
-              {TABS.map((t) => {
+              {DESKTOP_TABS[me.role].map((t) => {
                 const active = t.to === "/" ? pathname === "/" : pathname.startsWith(t.to);
                 return (
                   <li key={t.to}>

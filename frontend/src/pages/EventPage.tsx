@@ -1,11 +1,14 @@
 import { m } from "motion/react";
-import { ArrowLeft, Bookmark, Check, Clock, MapPin, Navigation, Share, ShieldCheck, TriangleAlert, Users } from "lucide-react";
+import { ArrowLeft, Bookmark, Check, Clock, Flag, MapPin, Navigation, Share, ShieldCheck, TriangleAlert, Users } from "lucide-react";
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Thumb } from "../components/events/EventCard";
 import { Button } from "../components/ui/Button";
 import { Tag } from "../components/ui/Chip";
+import { Sheet } from "../components/ui/Sheet";
 import { useToast } from "../components/ui/Toaster";
 import { ApiError } from "../lib/api";
+import { useReportEvent } from "../lib/organizer";
 import { formatFee, formatLongDate, formatTimeRange } from "../lib/format";
 import { easeOut } from "../lib/motion";
 import { useEvent, useSaveEvent } from "../lib/queries";
@@ -150,6 +153,7 @@ function Row({ icon: Icon, label, children }: { icon: typeof Clock; label: strin
 function ActionBar({ event: e }: { event: EventDetail }) {
   const save = useSaveEvent();
   const toast = useToast();
+  const [reporting, setReporting] = useState(false);
 
   const share = async () => {
     const url = `${window.location.origin}/event/${e.id}`;
@@ -173,6 +177,9 @@ function ActionBar({ event: e }: { event: EventDetail }) {
           {e.match != null && <p className="footnote text-text-2 tnum">{e.match}% match</p>}
         </div>
         <div className="flex items-center gap-2">
+          <button onClick={() => setReporting(true)} aria-label="Report this event" className="pressable grid size-11 place-items-center rounded-full bg-text/6 text-text-2">
+            <Flag className="size-5" />
+          </button>
           <button onClick={share} aria-label="Share" className="pressable grid size-11 place-items-center rounded-full bg-text/6 text-accent">
             <Share className="size-5" />
           </button>
@@ -191,7 +198,63 @@ function ActionBar({ event: e }: { event: EventDetail }) {
           </Button>
         </div>
       </div>
+      <ReportSheet eventId={e.id} open={reporting} onClose={() => setReporting(false)} />
     </div>
+  );
+}
+
+const REPORT_REASONS = [
+  "Looks like a scam",
+  "Asks for payment in a suspicious way",
+  "Wrong date, time or place",
+  "Duplicate of another event",
+  "Something else",
+];
+
+function ReportSheet({ eventId, open, onClose }: { eventId: string; open: boolean; onClose: () => void }) {
+  const [reason, setReason] = useState<string | null>(null);
+  const report = useReportEvent();
+  const toast = useToast();
+  return (
+    <Sheet open={open} onClose={onClose} title="Report this event">
+      <p className="callout mb-3 text-text-2">Tell us what's wrong. Your report is private.</p>
+      <div role="radiogroup" aria-label="Reason" className="flex flex-col gap-1">
+        {REPORT_REASONS.map((r) => (
+          <button
+            key={r}
+            role="radio"
+            aria-checked={reason === r}
+            onClick={() => setReason(r)}
+            className={`pressable flex min-h-12 items-center justify-between rounded-[14px] px-4 text-left body ${reason === r ? "bg-accent-soft text-accent" : "hover:bg-text/5"}`}
+          >
+            {r}
+            {reason === r && <Check className="size-5" aria-hidden />}
+          </button>
+        ))}
+      </div>
+      <Button
+        size="lg"
+        full
+        className="mt-5"
+        disabled={!reason}
+        loading={report.isPending}
+        onClick={() =>
+          report.mutate(
+            { id: eventId, reason: reason! },
+            {
+              onSuccess: () => {
+                onClose();
+                setReason(null);
+                toast({ tone: "success", title: "Thanks for reporting", body: "We'll review this event." });
+              },
+              onError: (err) => toast({ tone: "error", title: "Couldn't send report", body: (err as Error).message }),
+            },
+          )
+        }
+      >
+        Send report
+      </Button>
+    </Sheet>
   );
 }
 

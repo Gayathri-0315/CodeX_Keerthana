@@ -7,8 +7,8 @@ Build order follows SPEC.md section 14. Each phase ends runnable, tested and com
 | 1 Foundation | Repo, one-command dev/seed, FastAPI + SQLite (WAL) + all models, seed data, JWT cookie auth + demo login, design tokens, app shell (glass nav / tab bar, dark mode), onboarding, interests, settings | done |
 | 2 Free-time calendar | 7 x 32 paint grid (rAF-batched, memoized cells), presets, "This week only" overrides, 400 ms debounced batched save, live "N events fit" pill, keyboard grid | done |
 | 3 Matching and feed | Ranking, reasons, Almost list, feed UI, detail, save/dismiss, embeddings + fallback | done |
-| 4 Poster to listing | Extraction (mock + live), confirm screen, trust gate, reach preview, admin queue, reports | next |
-| 5 Attendance | Register animation + pass, SSE toasts, notification rules, reminders, waitlist, .ics, QR check-in, analytics | |
+| 4 Poster to listing | Extraction (mock + live), confirm screen, trust gate, reach preview, admin queue, reports | done |
+| 5 Attendance | Register animation + pass, SSE toasts, notification rules, reminders, waitlist, .ics, QR check-in, analytics | next |
 | 6 Timetable + polish | Timetable import, Telegram poster flow, states, a11y and performance passes, README | |
 
 ## Key decisions
@@ -27,6 +27,12 @@ Build order follows SPEC.md section 14. Each phase ends runnable, tested and com
 - **Almost list** = events that fail only the schedule rule and have interest >= 40, sorted by interest. "Remind me of similar events" raises the weight of that event's tags in the user's interests.
 - **Card reasons** skip distance and price (already shown as chips); the detail page shows every reason.
 - **Register** lands in Phase 5, so until then the detail page's sticky bar offers Save and Share.
+- **Live extraction** uses `client.messages.parse()` with the Pydantic schema as `output_format`, a 25 s timeout, one retry with the validation error appended, and a refusal check; on a second failure the fields that individually validate prefill the form. Model comes from `ANTHROPIC_MODEL` (`claude-sonnet-5-5` per the spec's `.env.example`). Server-side refusal fallbacks aren't enabled because the SDK docs bundled here don't cover combining them with `messages.parse()`; a refusal falls back to the manual form instead.
+- **Sample posters** are drawn with Pillow at seed time (dates relative to today) into `seed/posters/generated/` (git-ignored). In demo mode the upload screen offers them as one-tap samples, and mock extraction matches them by file name or hash.
+- **Trust gate details:** the three "personal UPI / phone / QR" checks count once (+40) as the spec's table lists one rule. Duplicates are found by embedding cosine > 0.92 or, because keyword vectors of a reworded copy fall short of 0.92, by >= 80% title-word overlap on the same date. Seeded events get their risk scores from the same gate.
+- **Admin approval** gives `details_reviewed` (or `organizer_verified` if the organizer is verified/trusted); reports older than the last admin decision are treated as settled (`events.reviewed_at`).
+- **"Check this" fields** clear when edited or when the organizer leaves the field (confirming an already-correct value).
+- **Reach preview** with 31 seeded students shows small numbers (the spec's "about 140" assumes a bigger user base).
 - **Dev reload:** `scripts/py.mjs --watch app` restarts uvicorn on .py changes. uvicorn's own `--reload` is not used because on Windows it stops its worker with a console Ctrl+C that also kills `npm run dev`.
 
 ## Deviations from the spec (data only)

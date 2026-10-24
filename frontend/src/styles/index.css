@@ -163,6 +163,7 @@
   animation: shimmer 1.3s infinite;
 }
 @keyframes shimmer { to { transform: translateX(100%); } }
+@keyframes sweep { from { transform: translateY(-6rem); } to { transform: translateY(40rem); } }
 
 /* Range input styled to the system look. */
 input[type="range"].slider { appearance: none; height: 28px; background: transparent; width: 100%; }

@@ -39,4 +39,8 @@ Seeded event dates are relative to the day you seed, so the demo is always upcom
 
 ## Status
 
-Phases 1 (foundation), 2 (free-time calendar) and 3 (matching and feed) are done. See PLAN.md for what's next.
+Phases 1 to 4 are done: foundation, free-time calendar, matching and feed, and poster to listing with the spam/trust gate. See PLAN.md for what's next.
+
+## AI modes
+
+Without `ANTHROPIC_API_KEY` (or with `AI_MODE=mock`) poster reading runs in mock mode: the six sample posters on the "New event" screen are recognised and filled in; any other file opens the manual form. Set `ANTHROPIC_API_KEY` to read real posters with Claude (`ANTHROPIC_MODEL`, default `claude-sonnet-5-5`); results are cached by file hash, and the trust gate also asks Claude for a second opinion.

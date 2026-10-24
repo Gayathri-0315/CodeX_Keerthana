@@ -87,3 +87,78 @@ export type EventDetail = FeedItem & {
 };
 
 export type Area = { name: string; lat: number; lng: number };
+
+// ---- organizer ----
+
+export type EventForm = {
+  title: string;
+  description: string;
+  category: string;
+  tags: string[];
+  date: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  mode: "in_person" | "online" | "hybrid";
+  venue_name: string | null;
+  address: string | null;
+  area: string | null;
+  fee_inr: number;
+  capacity: number | null;
+  registration_deadline: string | null;
+  eligibility_text: string | null;
+  eligibility_tags: string[];
+  skill_level: "beginner" | "intermediate" | "advanced" | null;
+  registration_url: string | null;
+  poster_url: string | null;
+  source: "web_upload" | "form" | "telegram";
+  field_confidence: Record<string, number | null>;
+};
+
+export type Risk = { score: number; level: "low" | "medium" | "high"; reasons: string[]; duplicate_of: string | null };
+export type EventStatus = "draft" | "pending_review" | "published" | "blocked" | "cancelled";
+
+export type OrgEvent = {
+  id: string;
+  status: EventStatus;
+  verification_label: FeedItem["verification_label"];
+  risk: Risk;
+  start_at: string | null;
+  end_at: string | null;
+  seats_taken: number;
+  appeal_note: string | null;
+  published_at: string | null;
+  form: EventForm;
+  message?: string;
+};
+
+export type Reach = { count: number; free: number; interested: number; interest_label: string | null; ready: boolean };
+export type Preview = { risk: Risk; outcome: { status: EventStatus; label: FeedItem["verification_label"] }; reach: Reach };
+
+export type Extraction = {
+  fields: Omit<EventForm, "area" | "capacity" | "skill_level" | "poster_url" | "source"> & {
+    organizer_name: string | null;
+    contact: string | null;
+  };
+  low_confidence: string[];
+  source: "live" | "mock" | "cache";
+  message: string | null;
+  poster_url: string | null;
+};
+
+export type OrgSummary = { org_name: string; trust_level: string; upcoming: number; registrations: number; attendance_rate: number | null };
+
+export type ReviewItem = {
+  id: string;
+  title: string;
+  description: string;
+  status: EventStatus;
+  start_at: string | null;
+  fee_inr: number;
+  registration_url: string | null;
+  poster_url: string | null;
+  risk_score: number;
+  risk_reasons: string[];
+  appeal_note: string | null;
+  reports: { reason: string; at: string }[];
+  organizer: { id: string; name: string; trust_level: string; email_domain: string } | null;
+};
