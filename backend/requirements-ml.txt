@@ -1,0 +1,5 @@
+# Optional: semantic interest matching with all-MiniLM-L6-v2 (large download, pulls in PyTorch).
+# Without it ShowUp uses keyword + synonym matching. Install with:
+#   backend/.venv/Scripts/python -m pip install -r backend/requirements-ml.txt   (Windows)
+#   backend/.venv/bin/python -m pip install -r backend/requirements-ml.txt       (macOS/Linux)
+sentence-transformers>=3.0

@@ -32,5 +32,14 @@ def fmt_time(dt_local: datetime) -> str:
     return f"{h} {suffix}" if dt_local.minute == 0 else f"{h}:{dt_local.minute:02d} {suffix}"
 
 
+def fmt_range(start_local: datetime, end_local: datetime) -> str:
+    """'2 to 6 PM', '11 AM to 1 PM'."""
+    if (start_local.hour < 12) == (end_local.hour < 12):
+        first = fmt_time(start_local).rsplit(" ", 1)[0]
+    else:
+        first = fmt_time(start_local)
+    return f"{first} to {fmt_time(end_local)}"
+
+
 def iso_utc(dt: datetime | None) -> str | None:
     return None if dt is None else dt.replace(tzinfo=timezone.utc).isoformat().replace("+00:00", "Z")

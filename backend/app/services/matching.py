@@ -18,6 +18,7 @@ class FilterResult:
     travel_min: int = 0
     window: tuple[datetime, datetime] | None = None
     waitlist: bool = False
+    need_start: datetime | None = None  # when the user must be free from (start - travel - buffer)
 
     @property
     def almost(self) -> bool:
@@ -82,11 +83,15 @@ def check_event(user, event, windows, now: datetime, registered_count: int = 0) 
     # 6. Schedule fit.
     need_start = event.start_at - timedelta(minutes=travel + BUFFER_MIN)
     window = next((w for w in windows if w[0] <= need_start and w[1] >= event.end_at), None)
-    if user.strict_schedule and window is None:
-        return FilterResult(
-            False, "schedule", _schedule_conflict(event, need_start, windows),
-            distance_km=distance, travel_min=travel, waitlist=waitlist,
-        )
+    if window is None:
+        conflict = _schedule_conflict(event, need_start, windows)
+        if user.strict_schedule:
+            return FilterResult(False, "schedule", conflict, distance_km=distance, travel_min=travel,
+                                waitlist=waitlist, need_start=need_start)
+        # Strict schedule off: keep the event but carry the clash so the UI can flag it.
+        return FilterResult(True, reason=conflict, distance_km=distance, travel_min=travel,
+                            waitlist=waitlist, need_start=need_start)
 
     # 7. Capacity never drops an event; it only marks waitlist.
-    return FilterResult(True, distance_km=distance, travel_min=travel, window=window, waitlist=waitlist)
+    return FilterResult(True, distance_km=distance, travel_min=travel, window=window, waitlist=waitlist,
+                        need_start=need_start)

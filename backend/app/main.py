@@ -12,6 +12,7 @@ from .config import settings
 from .db import Base, SessionLocal, engine
 from .models import User
 from .routers import auth, availability, events, feed, users
+from .services import embeddings
 
 CODES = {400: "bad_request", 401: "unauthorized", 403: "forbidden", 404: "not_found",
          409: "conflict", 422: "invalid", 429: "rate_limited", 503: "unavailable"}
@@ -20,6 +21,8 @@ CODES = {400: "bad_request", 401: "unauthorized", 403: "forbidden", 404: "not_fo
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     Base.metadata.create_all(engine)
+    if settings.app_env != "test":
+        embeddings.start_background_load()
     if settings.demo_mode:
         with SessionLocal() as db:
             empty = db.scalar(select(func.count()).select_from(User)) == 0
@@ -63,4 +66,4 @@ for r in (auth.router, users.router, availability.router, feed.router, events.ro
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "demo_mode": settings.demo_mode, "ai_live": settings.use_live_ai}
+    return {"ok": True, "demo_mode": settings.demo_mode, "ai_live": settings.use_live_ai, "matching": embeddings.backend()}
