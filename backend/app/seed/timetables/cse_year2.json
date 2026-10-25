@@ -1,0 +1,21 @@
+{
+  "periods": [
+    {"day": "Mon", "start": "08:30", "end": "09:20", "label": "Data Structures"},
+    {"day": "Mon", "start": "09:20", "end": "10:10", "label": "Digital Logic"},
+    {"day": "Mon", "start": "10:30", "end": "12:10", "label": "DS Lab"},
+    {"day": "Mon", "start": "13:00", "end": "14:40", "label": "Discrete Maths"},
+    {"day": "Tue", "start": "08:30", "end": "10:10", "label": "OOP with Java"},
+    {"day": "Tue", "start": "10:30", "end": "12:10", "label": "Digital Logic"},
+    {"day": "Tue", "start": "13:00", "end": "15:30", "label": "Java Lab"},
+    {"day": "Wed", "start": "08:30", "end": "10:10", "label": "Discrete Maths"},
+    {"day": "Wed", "start": "10:30", "end": "12:10", "label": "Data Structures"},
+    {"day": "Thu", "start": "08:30", "end": "10:10", "label": "Environmental Science"},
+    {"day": "Thu", "start": "10:30", "end": "12:10", "label": "OOP with Java"},
+    {"day": "Thu", "start": "13:00", "end": "15:30", "label": "Digital Lab"},
+    {"day": "Fri", "start": "08:30", "end": "10:10", "label": "Data Structures"},
+    {"day": "Fri", "start": "10:30", "end": "12:10", "label": "Discrete Maths"}
+  ],
+  "confidence": 0.81,
+  "notes": "Friday afternoon cell was smudged and was left out.",
+  "image": {"title": "B.E. CSE, Year 2, Section B", "bg": "#af52de"}
+}

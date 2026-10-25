@@ -39,6 +39,23 @@ def send(chat_id: str, text: str, buttons: list[dict] | None = None) -> bool:
     return call("sendMessage", payload) is not None
 
 
+MAX_DOWNLOAD = 8 * 1024 * 1024
+
+
+def download(file_id: str) -> bytes | None:
+    """Fetch a file a user sent the bot (photo or document)."""
+    info = call("getFile", {"file_id": file_id})
+    if not info or not info.get("file_path") or (info.get("file_size") or 0) > MAX_DOWNLOAD:
+        return None
+    url = f"https://api.telegram.org/file/bot{settings.telegram_bot_token}/{info['file_path']}"
+    try:
+        with urllib.request.urlopen(url, timeout=20) as resp:
+            return resp.read(MAX_DOWNLOAD + 1)
+    except Exception as e:
+        log.info("Telegram download failed: %s", e)
+        return None
+
+
 def answer_callback(callback_id: str, text: str) -> None:
     call("answerCallbackQuery", {"callback_query_id": callback_id, "text": text})
 

@@ -73,10 +73,8 @@ def _decide(db: Session, event_id: str, approve: bool) -> Event:
 
 @router.post("/events/{event_id}/approve")
 def approve(event_id: str, user: User = Depends(admin_only), db: Session = Depends(get_db)):
-    from .organizer import suggest_in_background
-
     event = _decide(db, event_id, True)
-    jobs.in_background(suggest_in_background, event.id)
+    jobs.in_background(jobs.suggest_for_event, event.id)
     return {"id": event.id, "status": "published"}
 
 

@@ -118,6 +118,13 @@ def tick(now: datetime | None = None) -> None:
                 log.exception("Job %s failed", name)
 
 
+def suggest_for_event(db: Session, event_id: str) -> None:
+    """Match alerts for a newly published event (run in the background after publishing)."""
+    event = db.get(Event, event_id)
+    if event is not None:
+        notify.suggest(db, event)
+
+
 def in_background(fn, *args) -> None:
     """Run fn(db, *args) after the response, in its own session. Inline under tests for determinism."""
     def run():

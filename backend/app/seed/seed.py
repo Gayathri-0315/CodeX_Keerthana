@@ -12,7 +12,7 @@ from ..models import AvailabilitySlot, Event, Organizer, Registration, User, Use
 from ..security import hash_password
 from ..services import feedcache, listing, spam
 from ..timeutil import ist_to_utc, ist_today, utcnow
-from .make_samples import make_posters
+from .make_samples import make_posters, make_timetables
 from .venues import AREAS, find_area
 
 SEED_DIR = Path(__file__).parent
@@ -158,6 +158,7 @@ def seed(db: Session) -> dict:
     db.commit()
     feedcache.invalidate_all()
     make_posters(today)
+    make_timetables()
     return {"users": 1 + len(orgs) + 1 + len(students), "events": len(events)}
 
 

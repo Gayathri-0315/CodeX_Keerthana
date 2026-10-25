@@ -1,0 +1,32 @@
+{
+  "periods": [
+    {"day": "Mon", "start": "09:00", "end": "09:50", "label": "DBMS"},
+    {"day": "Mon", "start": "09:50", "end": "10:40", "label": "Computer Networks"},
+    {"day": "Mon", "start": "11:00", "end": "11:50", "label": "Operating Systems"},
+    {"day": "Mon", "start": "11:50", "end": "12:40", "label": "Maths"},
+    {"day": "Mon", "start": "13:30", "end": "16:30", "label": "DBMS Lab"},
+    {"day": "Tue", "start": "09:00", "end": "09:50", "label": "Operating Systems"},
+    {"day": "Tue", "start": "09:50", "end": "10:40", "label": "Maths"},
+    {"day": "Tue", "start": "11:00", "end": "11:50", "label": "Software Engineering"},
+    {"day": "Tue", "start": "11:50", "end": "12:40", "label": "DBMS"},
+    {"day": "Tue", "start": "13:30", "end": "15:10", "label": "Computer Networks"},
+    {"day": "Wed", "start": "09:00", "end": "09:50", "label": "Computer Networks"},
+    {"day": "Wed", "start": "09:50", "end": "10:40", "label": "Software Engineering"},
+    {"day": "Wed", "start": "11:00", "end": "12:40", "label": "Web Lab"},
+    {"day": "Wed", "start": "13:30", "end": "16:30", "label": "Networks Lab"},
+    {"day": "Thu", "start": "09:00", "end": "09:50", "label": "Maths"},
+    {"day": "Thu", "start": "09:50", "end": "10:40", "label": "DBMS"},
+    {"day": "Thu", "start": "11:00", "end": "11:50", "label": "Operating Systems"},
+    {"day": "Thu", "start": "11:50", "end": "12:40", "label": "Software Engineering"},
+    {"day": "Thu", "start": "13:30", "end": "15:10", "label": "Elective: AI"},
+    {"day": "Fri", "start": "09:00", "end": "09:50", "label": "Software Engineering"},
+    {"day": "Fri", "start": "09:50", "end": "10:40", "label": "Operating Systems"},
+    {"day": "Fri", "start": "11:00", "end": "12:40", "label": "Elective: AI"},
+    {"day": "Fri", "start": "13:30", "end": "16:30", "label": "Mini Project"},
+    {"day": "Sat", "start": "09:00", "end": "09:50", "label": "Soft Skills"},
+    {"day": "Sat", "start": "09:50", "end": "12:30", "label": "Seminar"}
+  ],
+  "confidence": 0.92,
+  "notes": "",
+  "image": {"title": "B.Tech IT, Year 3, Section A", "bg": "#0071e3"}
+}

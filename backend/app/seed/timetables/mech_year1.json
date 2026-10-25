@@ -1,0 +1,18 @@
+{
+  "periods": [
+    {"day": "Mon", "start": "09:15", "end": "12:45", "label": "Engineering Graphics"},
+    {"day": "Mon", "start": "13:45", "end": "16:15", "label": "Physics"},
+    {"day": "Tue", "start": "09:15", "end": "12:45", "label": "Workshop Practice"},
+    {"day": "Tue", "start": "13:45", "end": "16:15", "label": "Chemistry"},
+    {"day": "Wed", "start": "09:15", "end": "12:45", "label": "Maths I"},
+    {"day": "Wed", "start": "13:45", "end": "16:15", "label": "Physics Lab"},
+    {"day": "Thu", "start": "09:15", "end": "12:45", "label": "English"},
+    {"day": "Thu", "start": "13:45", "end": "16:15", "label": "Chemistry Lab"},
+    {"day": "Fri", "start": "09:15", "end": "12:45", "label": "Maths I"},
+    {"day": "Fri", "start": "13:45", "end": "16:15", "label": "Basic Electrical"},
+    {"day": "Sat", "start": "09:15", "end": "12:45", "label": "NSS / Sports"}
+  ],
+  "confidence": 0.95,
+  "notes": "",
+  "image": {"title": "B.E. Mechanical, Year 1", "bg": "#ff9f0a"}
+}

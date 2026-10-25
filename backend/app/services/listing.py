@@ -153,6 +153,41 @@ def predicted_outcome(db: Session, organizer: Organizer, assessment: spam.Assess
                         is_first_event(db, organizer, exclude_id))
 
 
+def form_from_extraction(fields: dict, poster_url: str | None, source: str) -> EventIn:
+    """AI-extracted poster fields -> the organizer form (unknowns stay empty for the organizer to fill)."""
+    known = {k: v for k, v in fields.items() if k in EventIn.model_fields and v not in (None, "", [])}
+    known["tags"] = (known.get("tags") or [])[:4]
+    return EventIn.model_validate({**known, "poster_url": poster_url, "source": source,
+                                   "field_confidence": fields.get("field_confidence") or {}})
+
+
+def publish(db: Session, organizer: Organizer, event: Event) -> str:
+    """Run the gate and publish, review or block. Shared by the web app and the Telegram bot."""
+    from fastapi import HTTPException
+
+    from . import feedcache, jobs
+
+    if event.status in ("published", "cancelled"):
+        raise HTTPException(409, "This event is already " + ("live." if event.status == "published" else "cancelled."))
+    missing = [name for name, ok in (("a title", event.title), ("a date and start time", event.start_at)) if not ok]
+    if event.mode == "in_person" and not event.venue_name:
+        missing.append("a venue")
+    if missing:
+        raise HTTPException(422, f"Add {' and '.join(missing)} before publishing.")
+
+    assessment = run_gate(db, organizer, event, event.id)
+    event.risk_score, event.risk_reasons, event.duplicate_of = assessment.score, assessment.reasons, assessment.duplicate_of
+    status, label = predicted_outcome(db, organizer, assessment, event.id)
+    event.status, event.verification_label = status, label
+    if status == "published":
+        event.published_at = utcnow()
+    db.commit()
+    feedcache.invalidate_all()
+    if status == "published":
+        jobs.in_background(jobs.suggest_for_event, event.id)
+    return status
+
+
 def draft_from_form(db: Session, form: EventIn, organizer: Organizer) -> SimpleNamespace:
     """An unsaved event-like object for previews; quacks like Event for the gate and matching."""
     start, end, deadline = form_times(form)

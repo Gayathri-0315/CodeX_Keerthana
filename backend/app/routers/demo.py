@@ -10,7 +10,6 @@ from ..config import settings
 from ..db import get_db
 from ..deps import current_user
 from ..models import Event, Notification, Registration, User
-from ..schemas import EventIn
 from ..services import feedcache, jobs, listing, notify, registration
 from ..services.extraction import SEED_DIR, resolve_mock_poster
 from ..timeutil import ist_today, utcnow
@@ -41,8 +40,7 @@ def publish_ai_workshop(_: User = Depends(demo_only), db: Session = Depends(get_
     event = db.scalar(select(Event).where(Event.organizer_id == org.id, Event.title == spec["title"], Event.status != "cancelled"))
     if event is None:
         event = Event(organizer_id=org.id, status="draft")
-        form = EventIn.model_validate({k: v for k, v in spec.items() if k in EventIn.model_fields and v is not None} | {"source": "web_upload"})
-        listing.apply_form(db, event, form)
+        listing.apply_form(db, event, listing.form_from_extraction(spec, None, "web_upload"))
         db.add(event)
         db.flush()
     if event.status != "published":

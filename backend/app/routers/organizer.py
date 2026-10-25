@@ -7,7 +7,7 @@ from ..db import get_db
 from ..deps import require_role, upload_limit
 from ..models import Event, Notification, Organizer, Registration, User
 from ..schemas import AppealIn, EventIn
-from ..services import feedcache, jobs, listing, notify, registration, showup_score
+from ..services import feedcache, listing, notify, registration, showup_score
 from ..services.extraction import extract_poster
 from ..services.feed import SEAT_STATUSES
 from ..services.uploads import public_url, read_upload
@@ -138,27 +138,8 @@ def save_event(body: EventIn, event_id: str | None = None, user: User = Depends(
 
 @router.post("/events/{event_id}/publish")
 def publish(event_id: str, user: User = Depends(organizer_only), db: Session = Depends(get_db)):
-    org = my_org(user)
-    event = my_event(db, user, event_id)
-    if event.status in ("published", "cancelled"):
-        raise HTTPException(409, "This event is already " + ("live." if event.status == "published" else "cancelled."))
-    missing = [name for name, ok in (("a title", event.title), ("a date and start time", event.start_at)) if not ok]
-    if event.mode == "in_person" and not event.venue_name:
-        missing.append("a venue")
-    if missing:
-        raise HTTPException(422, f"Add {' and '.join(missing)} before publishing.")
-
-    assessment = listing.run_gate(db, org, event, event.id)
-    event.risk_score, event.risk_reasons, event.duplicate_of = assessment.score, assessment.reasons, assessment.duplicate_of
-    status, label = listing.predicted_outcome(db, org, assessment, event.id)
-    event.status, event.verification_label = status, label
-    if status == "published":
-        event.published_at = utcnow()
-    db.commit()
-    feedcache.invalidate_all()
-    if status == "published":
-        jobs.in_background(suggest_in_background, event.id)
-    return {**event_out(db, event), "message": STATUS_MESSAGES[status]}
+    status = listing.publish(db, my_org(user), my_event(db, user, event_id))
+    return {**event_out(db, db.get(Event, event_id)), "message": STATUS_MESSAGES[status]}
 
 
 class MessageIn(BaseModel):
@@ -167,12 +148,6 @@ class MessageIn(BaseModel):
 
 class CheckinIn(BaseModel):
     token: str = Field(min_length=4, max_length=64)  # the QR's token, or the 6-character code
-
-
-def suggest_in_background(db: Session, event_id: str) -> None:
-    event = db.get(Event, event_id)
-    if event is not None:
-        notify.suggest(db, event)
 
 
 @router.get("/events/{event_id}/registrations")

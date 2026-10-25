@@ -124,6 +124,69 @@ def make_posters(today: date | None = None) -> list[Path]:
     return written
 
 
+TIMETABLES = SEED_DIR / "timetables"
+TT_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+
+
+def _hm(s: str) -> int:
+    h, m = s.split(":")
+    return int(h) * 60 + int(m)
+
+
+def draw_timetable(spec: dict) -> Image.Image:
+    """A class timetable: one row per day, period boxes placed on a 08:00 to 17:00 axis."""
+    w, h = 1400, 820
+    left, top, right = 150, 170, w - 40
+    row_h = 100
+    start, end = 8 * 60, 17 * 60
+    accent = spec["image"]["bg"]
+    img = Image.new("RGB", (w, h), "white")
+    d = ImageDraw.Draw(img)
+    d.rectangle((0, 0, w, 110), fill=accent)
+    d.text((40, 32), _txt(spec["image"]["title"]), font=_font(44), fill="white")
+    d.text((w - 360, 44), "Time table · Odd semester", font=_font(28), fill="white")
+
+    def x(minute: int) -> float:
+        return left + (minute - start) / (end - start) * (right - left)
+
+    for hour in range(8, 18):
+        xx = x(hour * 60)
+        d.line((xx, top - 10, xx, top + row_h * len(TT_DAYS)), fill="#e5e5ea", width=2)
+        d.text((xx - 22, top - 45), f"{hour:02d}:00", font=_font(22), fill="#6e6e73")
+    for i, day in enumerate(TT_DAYS):
+        y = top + i * row_h
+        d.line((40, y, right, y), fill="#d1d1d6", width=2)
+        d.text((50, y + 32), day, font=_font(32), fill="#1d1d1f")
+        for p in (p for p in spec["periods"] if p["day"] == day):
+            x0, x1 = x(_hm(p["start"])) + 3, x(_hm(p["end"])) - 3
+            d.rounded_rectangle((x0, y + 10, x1, y + row_h - 10), radius=10, fill="#f2f2f7", outline=accent, width=2)
+            label = p.get("label") or ""
+            font = _font(22)
+            while label and d.textlength(label, font=font) > x1 - x0 - 16:
+                label = label[:-2] + "…" if len(label) > 2 else ""
+            d.text((x0 + 8, y + 22), label, font=font, fill="#1d1d1f")
+            d.text((x0 + 8, y + 54), f"{p['start']}-{p['end']}", font=_font(18), fill="#6e6e73")
+    d.line((40, top + row_h * len(TT_DAYS), right, top + row_h * len(TT_DAYS)), fill="#d1d1d6", width=2)
+    return img
+
+
+def make_timetables() -> list[Path]:
+    out_dir = TIMETABLES / "generated"
+    out_dir.mkdir(exist_ok=True)
+    written = []
+    for spec_file in sorted(TIMETABLES.glob("*.json")):
+        path = out_dir / f"{spec_file.stem}.png"
+        if not path.is_file() or path.stat().st_mtime < spec_file.stat().st_mtime:
+            draw_timetable(json.loads(spec_file.read_text(encoding="utf-8"))).save(path, "PNG")
+        written.append(path)
+    return written
+
+
+def sample_timetables() -> list[dict]:
+    return [{"name": p.stem, "title": json.loads((TIMETABLES / f"{p.stem}.json").read_text(encoding="utf-8"))["image"]["title"]}
+            for p in sorted((TIMETABLES / "generated").glob("*.png")) if (TIMETABLES / f"{p.stem}.json").is_file()]
+
+
 def sample_posters() -> list[dict]:
     out_dir = POSTERS / "generated"
     return [{"name": p.stem, "title": json.loads((POSTERS / f"{p.stem}.json").read_text(encoding="utf-8"))["title"]}
@@ -131,5 +194,5 @@ def sample_posters() -> list[dict]:
 
 
 if __name__ == "__main__":
-    for p in make_posters():
+    for p in make_posters() + make_timetables():
         print(p)
