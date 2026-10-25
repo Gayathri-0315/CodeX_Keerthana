@@ -39,7 +39,13 @@ Seeded event dates are relative to the day you seed, so the demo is always upcom
 
 ## Status
 
-Phases 1 to 4 are done: foundation, free-time calendar, matching and feed, and poster to listing with the spam/trust gate. See PLAN.md for what's next.
+Phases 1 to 5 are done: foundation, free-time calendar, matching and feed, poster to listing with the spam/trust gate, and registration, alerts, waitlist and check-in. Phase 6 (timetable import and polish) is next; see PLAN.md.
+
+## Demo panel
+
+In demo mode, open Settings → Demo panel (or `/demo`) for one-tap demo steps: publish the AI Workshop (fitting students get a live "A seat that fits your Saturday" alert), release a seat on the full Startup Pitch Night (the demo student is offered it), fast-forward to the "Time to head out" alert, switch accounts, and reset all demo data.
+
+Alerts arrive live in the app. Email is printed to the API console unless `SMTP_HOST` is set. Telegram needs `TELEGRAM_BOT_TOKEN` and `TELEGRAM_BOT_USERNAME`; link it from Settings → Alerts.
 
 ## AI modes
 

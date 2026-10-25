@@ -1,5 +1,5 @@
 import { m } from "motion/react";
-import { ArrowLeft, Bookmark, Check, Clock, Flag, MapPin, Navigation, Share, ShieldCheck, TriangleAlert, Users } from "lucide-react";
+import { ArrowLeft, Bookmark, CalendarPlus, Check, Clock, Flag, MapPin, MoreHorizontal, Navigation, Share, ShieldCheck, TriangleAlert, Users } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Thumb } from "../components/events/EventCard";
@@ -155,6 +155,7 @@ function ActionBar({ event: e }: { event: EventDetail }) {
   const save = useSaveEvent();
   const toast = useToast();
   const [reporting, setReporting] = useState(false);
+  const [more, setMore] = useState(false);
 
   const share = async () => {
     const url = `${window.location.origin}/event/${e.id}`;
@@ -177,31 +178,40 @@ function ActionBar({ event: e }: { event: EventDetail }) {
           <p className="headline tnum">{formatFee(e.fee_inr)}</p>
           {e.match != null && <p className="footnote text-text-2 tnum">{e.match}% match</p>}
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => setReporting(true)} aria-label="Report this event" className="pressable grid size-11 place-items-center rounded-full bg-text/6 text-text-2">
-            <Flag className="size-5" />
-          </button>
-          <button onClick={share} aria-label="Share" className="pressable grid size-11 place-items-center rounded-full bg-text/6 text-accent">
-            <Share className="size-5" />
-          </button>
-          <button
-            onClick={() =>
-              save.mutate(
-                { id: e.id, saved: !e.saved },
-                { onSuccess: () => toast({ tone: "success", title: e.saved ? "Removed from saved" : "Saved" }) },
-              )
-            }
-            aria-pressed={e.saved}
-            aria-label={e.saved ? "Unsave" : "Save"}
-            className="pressable grid size-11 place-items-center rounded-full bg-text/6 text-accent"
-          >
-            <Bookmark className={`size-5 ${e.saved ? "fill-current" : ""}`} />
+        <div className="flex min-w-0 items-center gap-2">
+          <button onClick={() => setMore(true)} aria-label="More actions" aria-haspopup="dialog" className="pressable grid size-11 shrink-0 place-items-center rounded-full bg-text/6 text-accent">
+            <MoreHorizontal className="size-5" />
           </button>
           {e.status === "published" && (e.fits || e.registration || !e.why_not) && <RegisterAction event={e} />}
         </div>
       </div>
+      <Sheet open={more} onClose={() => setMore(false)} title={e.title}>
+        <div className="flex flex-col gap-1">
+          <MenuItem
+            icon={Bookmark}
+            label={e.saved ? "Remove from saved" : "Save"}
+            onClick={() => {
+              setMore(false);
+              save.mutate({ id: e.id, saved: !e.saved }, { onSuccess: () => toast({ tone: "success", title: e.saved ? "Removed from saved" : "Saved" }) });
+            }}
+          />
+          <a href={`/api/events/${e.id}/ics`} onClick={() => setMore(false)} className="pressable flex min-h-12 items-center gap-3 rounded-[14px] px-3 body hover:bg-text/5">
+            <CalendarPlus className="size-5 text-accent" aria-hidden /> Add to calendar
+          </a>
+          <MenuItem icon={Share} label="Share" onClick={() => { setMore(false); void share(); }} />
+          <MenuItem icon={Flag} label="Report this event" tone="danger" onClick={() => { setMore(false); setReporting(true); }} />
+        </div>
+      </Sheet>
       <ReportSheet eventId={e.id} open={reporting} onClose={() => setReporting(false)} />
     </div>
+  );
+}
+
+function MenuItem({ icon: Icon, label, onClick, tone }: { icon: typeof Flag; label: string; onClick: () => void; tone?: "danger" }) {
+  return (
+    <button onClick={onClick} className={`pressable flex min-h-12 items-center gap-3 rounded-[14px] px-3 text-left body hover:bg-text/5 ${tone === "danger" ? "text-danger-text" : ""}`}>
+      <Icon className={`size-5 ${tone === "danger" ? "" : "text-accent"}`} aria-hidden /> {label}
+    </button>
   );
 }
 

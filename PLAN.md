@@ -8,8 +8,8 @@ Build order follows SPEC.md section 14. Each phase ends runnable, tested and com
 | 2 Free-time calendar | 7 x 32 paint grid (rAF-batched, memoized cells), presets, "This week only" overrides, 400 ms debounced batched save, live "N events fit" pill, keyboard grid | done |
 | 3 Matching and feed | Ranking, reasons, Almost list, feed UI, detail, save/dismiss, embeddings + fallback | done |
 | 4 Poster to listing | Extraction (mock + live), confirm screen, trust gate, reach preview, admin queue, reports | done |
-| 5 Attendance | Register animation + pass, SSE toasts, notification rules, reminders, waitlist, .ics, QR check-in, analytics | built; browser pass pending |
-| 6 Timetable + polish | Timetable import, Telegram poster flow, states, a11y and performance passes, README | |
+| 5 Attendance | Register animation + pass, SSE toasts, notification rules, reminders, waitlist, .ics, QR check-in, analytics | done |
+| 6 Timetable + polish | Timetable import, Telegram poster flow, states, a11y and performance passes, README | next |
 
 ## Key decisions
 
