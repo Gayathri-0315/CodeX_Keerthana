@@ -1,0 +1,62 @@
+import { useQueryClient } from "@tanstack/react-query";
+import { Bell, CalendarClock, MapPin, Sparkles, Ticket, TriangleAlert } from "lucide-react";
+import { useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { api } from "../../lib/api";
+import { attKeys, refreshAfterSeatChange } from "../../lib/attendance";
+import { useMe } from "../../lib/queries";
+import type { AppNotification, NotificationAction, Registration } from "../../lib/types";
+import { useToast } from "../ui/Toaster";
+
+const ICON = {
+  match: Sparkles,
+  deadline: CalendarClock,
+  seat_opened: Ticket,
+  reminder_leave_by: MapPin,
+  cancelled_event: TriangleAlert,
+};
+
+/** Listens on /api/stream and turns each alert into a Dynamic-Island toast with its actions. */
+export function LiveAlerts() {
+  const { data: me } = useMe();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const navigate = useNavigate();
+  const handlers = useRef({ toast, navigate });
+  handlers.current = { toast, navigate };
+
+  useEffect(() => {
+    if (!me) return;
+    const es = new EventSource("/api/stream");
+    es.addEventListener("notification", (e) => {
+      const n: AppNotification = JSON.parse((e as MessageEvent).data);
+      qc.invalidateQueries({ queryKey: attKeys.notifications });
+      if (["seat_opened", "cancelled_event"].includes(n.type)) refreshAfterSeatChange(qc, n.event_id ?? undefined);
+      const { toast, navigate } = handlers.current;
+      toast({
+        title: n.title,
+        body: n.body,
+        tone: n.type === "seat_opened" || n.type === "cancelled_event" ? "warning" : "info",
+        icon: ICON[n.type as keyof typeof ICON] ?? Bell,
+        actions: n.actions.slice(0, 2).map((a) => ({ label: a.label, onClick: () => act(a, n) })),
+      });
+
+      function act(a: NotificationAction, note: AppNotification) {
+        void api(`/notifications/${note.id}/read?clicked=true`, { method: "POST" }).catch(() => {});
+        if (a.kind === "view" || a.kind === "register") return navigate(`/event/${a.event_id}`);
+        if (a.kind === "url") return void window.open(a.url, "_blank", "noopener");
+        if (a.kind === "cancel" || !("registration_id" in a)) return navigate(`/my`);
+        const path = a.kind === "confirm_seat" ? "confirm-seat" : "confirm-reminder";
+        api<Registration>(`/registrations/${a.registration_id}/${path}`, { method: "POST" })
+          .then((r) => {
+            refreshAfterSeatChange(qc, r.event.id);
+            toast({ tone: "success", title: a.kind === "confirm_seat" ? "Seat confirmed" : "Great, see you there", body: r.event.title });
+          })
+          .catch((err) => toast({ tone: "error", title: "That didn't work", body: (err as Error).message }));
+      }
+    });
+    return () => es.close();
+  }, [me?.id, qc]); // reconnect only when the signed-in user changes
+
+  return null;
+}

@@ -40,8 +40,84 @@ export type Slot = {
 
 export type FeedTab = "for_you" | "almost" | "saved";
 
+export type RegStatus = "registered" | "waitlisted" | "promoted_pending" | "cancelled" | "attended" | "no_show";
+
+export type RegistrationBrief = {
+  id: string;
+  status: RegStatus;
+  waitlist_position: number | null;
+  promotion_expires_at: string | null;
+  external: boolean;
+};
+
+export type Registration = RegistrationBrief & {
+  checkin_token: string;
+  checkin_code: string;
+  checked_in_at: string | null;
+  reminder_confirmed: boolean;
+  leave_by: string | null;
+  registered_at: string;
+  feedback?: "as_described" | "not_as_described" | null;
+  event: {
+    id: string;
+    title: string;
+    category: string;
+    poster_url: string | null;
+    mode: FeedItem["mode"];
+    venue_name: string | null;
+    address: string | null;
+    start_at: string;
+    end_at: string;
+    fee_inr: number;
+    status: string;
+    maps_url: string | null;
+  };
+  toast?: { title: string; body: string };
+};
+
+export type NotificationAction =
+  | { label: string; kind: "view" | "register"; event_id: string }
+  | { label: string; kind: "confirm_seat" | "confirm_reminder" | "cancel"; registration_id: string }
+  | { label: string; kind: "url"; url: string };
+
+export type AppNotification = {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  event_id: string | null;
+  event_title: string | null;
+  actions: NotificationAction[];
+  created_at: string;
+  read_at: string | null;
+};
+
+export type Registrant = {
+  id: string;
+  name: string;
+  status: RegStatus;
+  waitlist_position: number | null;
+  registered_at: string;
+  checked_in_at: string | null;
+  external: boolean;
+  likelihood: number | null;
+  reasons: string[];
+};
+
+export type Analytics = {
+  registered: number;
+  capacity: number | null;
+  waitlisted: number;
+  expected: number;
+  expected_low: number;
+  expected_high: number;
+  actual: number;
+  ended: boolean;
+};
+
 export type FeedItem = {
   id: string;
+  registration: RegistrationBrief | null;
   title: string;
   category: string;
   tags: string[];
@@ -84,6 +160,7 @@ export type EventDetail = FeedItem & {
   organizer: { name: string; trust_level: string; trust_label: string } | null;
   why_not: string | null;
   maps_url: string | null;
+  next_waitlist_position?: number;
 };
 
 export type Area = { name: string; lat: number; lng: number };

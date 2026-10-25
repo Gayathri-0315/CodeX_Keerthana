@@ -8,7 +8,7 @@ Build order follows SPEC.md section 14. Each phase ends runnable, tested and com
 | 2 Free-time calendar | 7 x 32 paint grid (rAF-batched, memoized cells), presets, "This week only" overrides, 400 ms debounced batched save, live "N events fit" pill, keyboard grid | done |
 | 3 Matching and feed | Ranking, reasons, Almost list, feed UI, detail, save/dismiss, embeddings + fallback | done |
 | 4 Poster to listing | Extraction (mock + live), confirm screen, trust gate, reach preview, admin queue, reports | done |
-| 5 Attendance | Register animation + pass, SSE toasts, notification rules, reminders, waitlist, .ics, QR check-in, analytics | next |
+| 5 Attendance | Register animation + pass, SSE toasts, notification rules, reminders, waitlist, .ics, QR check-in, analytics | built; browser pass pending |
 | 6 Timetable + polish | Timetable import, Telegram poster flow, states, a11y and performance passes, README | |
 
 ## Key decisions
@@ -33,6 +33,11 @@ Build order follows SPEC.md section 14. Each phase ends runnable, tested and com
 - **Admin approval** gives `details_reviewed` (or `organizer_verified` if the organizer is verified/trusted); reports older than the last admin decision are treated as settled (`events.reviewed_at`).
 - **"Check this" fields** clear when edited or when the organizer leaves the field (confirming an already-correct value).
 - **Reach preview** with 31 seeded students shows small numbers (the spec's "about 140" assumes a bigger user base).
+- **Waitlist safety:** seat changes for an event run under a per-event lock in one transaction (single-process pilot). Two cancels racing free two seats and make two offers, never the same seat twice (tested with threads). An unconfirmed offer becomes `cancelled` and the seat moves on.
+- **Quiet hours** hold delivery (the alert is stored and sent by the next scheduler tick after quiet hours end); seat offers are the exception because they expire in minutes. Demo-panel actions bypass quiet hours so the demo works at night.
+- **Notification types** beyond the spec's list: `waitlisted`, `reminder_24h`, `reminder_2h` (alongside `reminder_leave_by`) and `message` (organizer to registrants). Only `match`, `deadline` and `seat_opened` count toward the weekly cap.
+- **Telegram** uses the Bot API over HTTPS directly (no `python-telegram-bot` dependency). Locally it long-polls every 3 s; in production set a webhook to `/api/telegram/webhook` with the secret from `routers/telegram.py:webhook_secret`. Poster upload by Telegram is Phase 6.
+- **Check-in** accepts the QR token or a 6-character code printed under the QR.
 - **Dev reload:** `scripts/py.mjs --watch app` restarts uvicorn on .py changes. uvicorn's own `--reload` is not used because on Windows it stops its worker with a console Ctrl+C that also kills `npm run dev`.
 
 ## Deviations from the spec (data only)

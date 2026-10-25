@@ -18,6 +18,9 @@ const EventPage = lazy(() => import("../pages/EventPage"));
 const OrganizerHome = lazy(() => import("../pages/organizer/OrganizerHome"));
 const EventEditor = lazy(() => import("../pages/organizer/EventEditor"));
 const ReviewQueue = lazy(() => import("../pages/admin/ReviewQueue"));
+const EventManager = lazy(() => import("../pages/organizer/EventManager"));
+const Checkin = lazy(() => import("../pages/organizer/Checkin"));
+const DemoPanel = lazy(() => import("../pages/DemoPanel"));
 
 const loadFeatures = () => import("./features").then((r) => r.default);
 
@@ -96,6 +99,9 @@ export function App() {
                     <Route path="event/:id" element={<EventPage />} />
                     <Route path="organizer/new" element={<OnlyRole role="organizer"><EventEditor /></OnlyRole>} />
                     <Route path="organizer/event/:id/edit" element={<OnlyRole role="organizer"><EventEditor key="edit" /></OnlyRole>} />
+                    <Route path="organizer/event/:id" element={<OnlyRole role="organizer"><EventManager /></OnlyRole>} />
+                    <Route path="organizer/event/:id/checkin" element={<OnlyRole role="organizer"><Checkin /></OnlyRole>} />
+                    <Route path="demo" element={<DemoPanel />} />
                   </Route>
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>

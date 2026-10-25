@@ -1,6 +1,7 @@
-import { Download, LogOut, Minus, Plus, Trash2 } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { Download, FlaskConical, LogOut, Minus, Plus, Trash2 } from "lucide-react";
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/AppShell";
 import { AreaPicker, BudgetPicker, DistanceSlider } from "../components/PlaceControls";
 import { Button } from "../components/ui/Button";
@@ -12,7 +13,7 @@ import { Toggle } from "../components/ui/Toggle";
 import { api } from "../lib/api";
 import { INTERESTS } from "../lib/constants";
 import { formatTime } from "../lib/format";
-import { useMe, useSignOut, useUpdateInterests, useUpdateMe } from "../lib/queries";
+import { keys, useMe, usePublicConfig, useSignOut, useUpdateInterests, useUpdateMe } from "../lib/queries";
 import { getTheme, setTheme, type ThemeChoice } from "../lib/theme";
 import type { User } from "../lib/types";
 
@@ -88,6 +89,7 @@ export default function Settings() {
         )}
         <AppearanceSection />
         <DataSection me={me} />
+        <DemoLink />
       </div>
     </>
   );
@@ -171,6 +173,7 @@ function AlertsSection({ me, patch }: { me: User; patch: (p: Partial<User>, save
   return (
     <Section title="Alerts">
       <Toggle label="In-app" checked={!!me.notif_channels.in_app} onChange={(v) => patch({ notif_channels: { ...me.notif_channels, in_app: v } })} />
+      <TelegramRow me={me} patch={patch} />
       <Toggle label="Email" description={me.email} checked={!!me.notif_channels.email} onChange={(v) => patch({ notif_channels: { ...me.notif_channels, email: v } })} />
       <Row>
         <div className="flex items-center justify-between gap-4">
@@ -212,6 +215,93 @@ function AlertsSection({ me, patch }: { me: User; patch: (p: Partial<User>, save
   );
 }
 
+const QR = lazy(() => import("qrcode.react").then((m) => ({ default: m.QRCodeSVG })));
+
+function TelegramRow({ me, patch }: { me: User; patch: (p: Partial<User>, saved?: string) => void }) {
+  const { data: config } = usePublicConfig();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [link, setLink] = useState<{ code: string; bot_url: string | null } | null>(null);
+
+  // While a code is showing, watch for the bot to link the account.
+  useEffect(() => {
+    if (!link) return;
+    const t = window.setInterval(() => qc.invalidateQueries({ queryKey: keys.me }), 3000);
+    return () => window.clearInterval(t);
+  }, [link, qc]);
+  useEffect(() => {
+    if (link && me.telegram_linked) {
+      setLink(null);
+      toast({ tone: "success", title: "Telegram linked", body: "Alerts will arrive there too." });
+    }
+  }, [link, me.telegram_linked, toast]);
+
+  if (!config?.telegram) {
+    return (
+      <Row>
+        <p className="body">Telegram</p>
+        <p className="footnote text-text-2">Telegram alerts aren't set up on this server yet.</p>
+      </Row>
+    );
+  }
+  if (me.telegram_linked) {
+    return (
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex-1">
+          <Toggle label="Telegram" description="Linked" checked={!!me.notif_channels.telegram} onChange={(v) => patch({ notif_channels: { ...me.notif_channels, telegram: v } })} />
+        </div>
+        <Button
+          size="sm"
+          variant="quiet"
+          onClick={() => api("/telegram/link", { method: "DELETE" }).then(() => qc.invalidateQueries({ queryKey: keys.me }))}
+        >
+          Unlink
+        </Button>
+      </div>
+    );
+  }
+  return (
+    <Row>
+      <div className="flex items-center justify-between gap-3">
+        <span>
+          <span className="body block">Telegram</span>
+          <span className="footnote block text-text-2">Get alerts with Register and Confirm buttons in Telegram.</span>
+        </span>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() =>
+            api<{ code: string; bot_url: string | null }>("/telegram/link-code", { method: "POST" })
+              .then(setLink)
+              .catch((e) => toast({ tone: "error", title: "Couldn't start linking", body: (e as Error).message }))
+          }
+        >
+          Link
+        </Button>
+      </div>
+      {link && (
+        <div className="mt-4 flex flex-wrap items-center gap-5 rounded-[16px] bg-surface-2 p-4">
+          {link.bot_url && (
+            <Suspense fallback={<div className="size-28" />}>
+              <div className="rounded-[12px] bg-white p-2"><QR value={link.bot_url} size={112} marginSize={0} title="Open the ShowUp bot" /></div>
+            </Suspense>
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="callout text-text-2">Send this code to the ShowUp bot:</p>
+            <p className="title-2 font-mono tracking-[0.2em] tnum">{link.code}</p>
+            {link.bot_url && (
+              <a href={link.bot_url} target="_blank" rel="noopener noreferrer" className="callout mt-1 inline-flex min-h-11 items-center font-medium text-accent">
+                Open the bot
+              </a>
+            )}
+            <p className="footnote text-text-2">The code works for 10 minutes. This page updates when you're linked.</p>
+          </div>
+        </div>
+      )}
+    </Row>
+  );
+}
+
 function Stepper({ value, min, max, onChange, label }: { value: number; min: number; max: number; onChange: (v: number) => void; label: string }) {
   return (
     <div className="flex items-center rounded-full bg-text/6" role="group" aria-label={label}>
@@ -242,6 +332,16 @@ function TimeInput({ label, value, onChange }: { label: string; value: string; o
       onBlur={() => v && v !== last.current && onChange(v)}
       className="h-11 rounded-[12px] bg-surface-2 px-3 body tnum shadow-[inset_0_0_0_1px_var(--line)] outline-none focus:shadow-[inset_0_0_0_2px_var(--accent)]"
     />
+  );
+}
+
+function DemoLink() {
+  const { data: config } = usePublicConfig();
+  if (!config?.demo_mode) return null;
+  return (
+    <Link to="/demo" className="pressable card mb-8 flex min-h-12 items-center gap-3 px-5 py-4 callout font-medium text-accent">
+      <FlaskConical className="size-5" aria-hidden /> Demo panel
+    </Link>
   );
 }
 

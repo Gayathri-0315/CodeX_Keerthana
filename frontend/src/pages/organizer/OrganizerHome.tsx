@@ -69,7 +69,10 @@ function EventRow({ event: e }: { event: OrgEvent }) {
   const chip = STATUS_CHIP[e.status];
   return (
     <li>
-      <Link to={`/organizer/event/${e.id}/edit`} className="flex items-center gap-4 p-4 hover:bg-text/3">
+      <Link
+        to={e.status === "published" || e.status === "cancelled" ? `/organizer/event/${e.id}` : `/organizer/event/${e.id}/edit`}
+        className="flex items-center gap-4 p-4 hover:bg-text/3"
+      >
         <Thumb event={{ id: `org-${e.id}`, category: e.form.category, title: e.form.title || "?", poster_url: e.form.poster_url }} className="size-14 shrink-0" />
         <div className="min-w-0 flex-1">
           <p className="headline truncate">{e.form.title || "Untitled"}</p>

@@ -4,6 +4,8 @@ import { Suspense } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { pageVariants, spring } from "../lib/motion";
 import { useMe } from "../lib/queries";
+import { useNotifications } from "../lib/attendance";
+import { LiveAlerts } from "./attendance/LiveAlerts";
 
 const TABS = [
   { to: "/", label: "Home", icon: Home },
@@ -51,9 +53,18 @@ export function AppShell() {
   const student = me?.role === "student";
   // Event detail has its own sticky action bar, so the tab bar steps aside there.
   const tabBar = student && !pathname.startsWith("/event/");
+  const { data: alerts } = useNotifications(student);
+  const unread = alerts?.unread ?? 0;
+  const badge = (to: string) =>
+    to === "/alerts" && unread > 0 ? (
+      <span className="absolute -right-1.5 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-danger px-1 text-[11px] font-semibold text-white tnum" aria-label={`${unread} unread`}>
+        {unread > 9 ? "9+" : unread}
+      </span>
+    ) : null;
 
   return (
     <div className="min-h-dvh">
+      <LiveAlerts />
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[70] focus:rounded-full focus:bg-surface focus:px-4 focus:py-2">
         Skip to content
       </a>
@@ -70,7 +81,7 @@ export function AppShell() {
                   <li key={t.to}>
                     <NavLink to={t.to} className={`relative inline-flex min-h-11 items-center rounded-full px-4 callout font-medium transition-colors ${active ? "text-text" : "text-text-2 hover:text-text"}`}>
                       {active && <m.span layoutId="nav-pill" transition={spring} className="absolute inset-x-1 inset-y-1.5 rounded-full bg-text/6" />}
-                      <span className="relative">{t.label}</span>
+                      <span className="relative">{t.label}{badge(t.to)}</span>
                     </NavLink>
                   </li>
                 );
@@ -103,7 +114,10 @@ export function AppShell() {
                     aria-current={active ? "page" : undefined}
                     className={`pressable flex min-h-[54px] flex-col items-center justify-center gap-0.5 text-[11px] font-medium ${active ? "text-accent" : "text-text-2"}`}
                   >
-                    <Icon className="size-6" strokeWidth={active ? 2.2 : 1.8} aria-hidden />
+                    <span className="relative">
+                      <Icon className="size-6" strokeWidth={active ? 2.2 : 1.8} aria-hidden />
+                      {badge(t.to)}
+                    </span>
                     {t.label}
                   </NavLink>
                 </li>

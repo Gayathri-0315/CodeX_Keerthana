@@ -7,6 +7,7 @@ import { formatDayTime, formatFee, formatKm } from "../../lib/format";
 import { easeOut, haptic, spring } from "../../lib/motion";
 import { usePrefetchEvent } from "../../lib/queries";
 import type { FeedItem } from "../../lib/types";
+import { RegisterAction } from "../attendance/RegisterAction";
 
 const GRADIENTS: Record<string, [string, string]> = {
   Workshop: ["#0071e3", "#5ac8fa"],
@@ -137,6 +138,12 @@ export function EventCard({ event, index, onToggleSave, onDismiss, onRemindSimil
         >
           <Bookmark className={`size-5 ${event.saved ? "fill-accent text-accent" : ""}`} />
         </button>
+
+        {event.fits && !muted && (
+          <div className="-mt-1 flex justify-end px-4 pb-3">
+            <RegisterAction event={event} compact />
+          </div>
+        )}
 
         {muted && onRemindSimilar && (
           <div className="-mt-2 px-4 pb-3 pl-[104px]">

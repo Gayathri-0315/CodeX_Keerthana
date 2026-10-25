@@ -9,6 +9,7 @@ import { Sheet } from "../components/ui/Sheet";
 import { useToast } from "../components/ui/Toaster";
 import { ApiError } from "../lib/api";
 import { useReportEvent } from "../lib/organizer";
+import { RegisterAction } from "../components/attendance/RegisterAction";
 import { formatFee, formatLongDate, formatTimeRange } from "../lib/format";
 import { easeOut } from "../lib/motion";
 import { useEvent, useSaveEvent } from "../lib/queries";
@@ -183,8 +184,7 @@ function ActionBar({ event: e }: { event: EventDetail }) {
           <button onClick={share} aria-label="Share" className="pressable grid size-11 place-items-center rounded-full bg-text/6 text-accent">
             <Share className="size-5" />
           </button>
-          <Button
-            variant={e.saved ? "secondary" : "primary"}
+          <button
             onClick={() =>
               save.mutate(
                 { id: e.id, saved: !e.saved },
@@ -192,10 +192,12 @@ function ActionBar({ event: e }: { event: EventDetail }) {
               )
             }
             aria-pressed={e.saved}
+            aria-label={e.saved ? "Unsave" : "Save"}
+            className="pressable grid size-11 place-items-center rounded-full bg-text/6 text-accent"
           >
-            <Bookmark className={`size-5 ${e.saved ? "fill-current" : ""}`} aria-hidden />
-            {e.saved ? "Saved" : "Save"}
-          </Button>
+            <Bookmark className={`size-5 ${e.saved ? "fill-current" : ""}`} />
+          </button>
+          {e.status === "published" && (e.fits || e.registration || !e.why_not) && <RegisterAction event={e} />}
         </div>
       </div>
       <ReportSheet eventId={e.id} open={reporting} onClose={() => setReporting(false)} />
