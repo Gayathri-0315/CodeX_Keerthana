@@ -152,22 +152,22 @@ class CheckinIn(BaseModel):
 
 @router.get("/events/{event_id}/registrations")
 def event_registrations(event_id: str, user: User = Depends(organizer_only), db: Session = Depends(get_db)):
-    """Registrants with a show-up likelihood (a planning estimate) and its reasons. Never public."""
+    """Registrants for this organizer only. Never public.
+
+    Deliberately no per-person show-up score: rating individual students on reliability invites
+    unfair treatment and is mostly noise at pilot scale. The aggregate estimate is in /analytics.
+    """
     event = my_event(db, user, event_id)
     rows = db.execute(
         select(Registration, User).join(User, User.id == Registration.user_id)
         .where(Registration.event_id == event.id, Registration.status != "cancelled")
         .order_by(Registration.waitlist_position.nulls_first(), Registration.registered_at)
     ).all()
-    out = []
-    for reg, person in rows:
-        lk = registration.compute_likelihood(db, person, event, reg) if reg.status in ("registered", "promoted_pending", "attended", "no_show") else None
-        out.append({
-            "id": reg.id, "name": person.name, "status": reg.status, "waitlist_position": reg.waitlist_position,
-            "registered_at": iso_utc(reg.registered_at), "checked_in_at": iso_utc(reg.checked_in_at),
-            "external": reg.external, "likelihood": lk.p if lk else None, "reasons": lk.reasons if lk else [],
-        })
-    return {"registrations": out}
+    return {"registrations": [{
+        "id": reg.id, "name": person.name, "status": reg.status, "waitlist_position": reg.waitlist_position,
+        "registered_at": iso_utc(reg.registered_at), "checked_in_at": iso_utc(reg.checked_in_at),
+        "external": reg.external, "with_friends": reg.group_id is not None,
+    } for reg, person in rows]}
 
 
 @router.get("/events/{event_id}/analytics")

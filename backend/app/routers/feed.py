@@ -9,6 +9,7 @@ from ..deps import current_user
 from ..models import Registration, SavedEvent, User
 from ..serializers import event_card, registration_brief
 from ..services.feed import evaluate
+from ..services import together
 from ..services.registration import ACTIVE
 
 router = APIRouter(prefix="/feed", tags=["feed"])
@@ -44,8 +45,10 @@ def feed(
         select(Registration).where(Registration.user_id == user.id, Registration.event_id.in_([i.event.id for i in page]),
                                    Registration.status.in_(ACTIVE))
     )}
+    classmates = together.classmates_going(db, user, [i.event.id for i in page])
     return {
-        "items": [event_card(i, data.counts.get(i.event.id, 0), i.event.id in saved, regs.get(i.event.id)) for i in page],
+        "items": [event_card(i, data.counts.get(i.event.id, 0), i.event.id in saved, regs.get(i.event.id), classmates.get(i.event.id))
+                  for i in page],
         "next_cursor": str(offset + limit) if offset + limit < len(items) else None,
         "total": len(items),
     }

@@ -10,7 +10,7 @@ from ..config import settings
 from ..db import get_db
 from ..deps import current_user
 from ..models import Event, Notification, Registration, User
-from ..services import feedcache, jobs, listing, notify, registration
+from ..services import feedcache, jobs, listing, notify, registration, together
 from ..services.extraction import SEED_DIR, resolve_mock_poster
 from ..timeutil import ist_today, utcnow
 
@@ -99,6 +99,29 @@ def fast_forward_leave_by(_: User = Depends(demo_only), db: Session = Depends(ge
     maps = f"https://www.google.com/maps/dir/?api=1&destination={event.lat},{event.lng}"
     notify.create(db, student, "reminder_leave_by", event, title, body, {"registration_id": reg.id, "maps_url": maps}, bypass_quiet=True)
     return {"event_id": event.id}
+
+
+@router.post("/friend-joins")
+def friend_joins(_: User = Depends(demo_only), db: Session = Depends(get_db)):
+    """A classmate accepts the demo student's 'Go together' invite for their next event."""
+    student = _user(db, "student@demo.app")
+    reg = db.scalar(
+        select(Registration).join(Event, Event.id == Registration.event_id)
+        .where(Registration.user_id == student.id, Registration.status == "registered", Event.start_at > utcnow())
+        .order_by(Event.start_at).limit(1)
+    )
+    if reg is None:
+        raise HTTPException(409, "Register the demo student for an event first.")
+    taken = set(db.scalars(select(Registration.user_id).where(Registration.event_id == reg.event_id, Registration.status != "cancelled")))
+    candidates = [u for u in db.scalars(select(User).where(User.role == "student", User.email != student.email)) if u.id not in taken]
+    if not candidates:
+        raise HTTPException(409, "Every demo student is already going to that event.")
+    # Prefer a classmate (same department and year) so the card's "from IT, year 3" count moves too.
+    mine = set(student.eligibility_tags or [])
+    friend = max(candidates, key=lambda u: len(mine & set(u.eligibility_tags or [])))
+    invite = together.create_invite(db, reg)
+    together.accept(db, friend, invite.code)
+    return {"event_id": reg.event_id, "friend": together.first_name(friend)}
 
 
 @router.post("/reset")

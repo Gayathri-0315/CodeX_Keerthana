@@ -60,7 +60,6 @@ class UserOut(Out):
     interests: list[InterestOut]
     strict_schedule: bool
     show_almost: bool
-    telegram_linked: bool = False
     notif_channels: dict
     notif_max_per_week: int
     quiet_hours_start: str
@@ -163,7 +162,7 @@ class EventIn(BaseModel):
     skill_level: Literal["beginner", "intermediate", "advanced"] | None = None
     registration_url: str | None = Field(None, max_length=500)
     poster_url: str | None = Field(None, max_length=200)
-    source: Literal["web_upload", "form", "telegram"] = "form"
+    source: Literal["web_upload", "form"] = "form"
     field_confidence: dict[str, float | None] = Field(default_factory=dict)
 
     @field_validator("start_time", "end_time")

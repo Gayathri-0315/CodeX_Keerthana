@@ -22,10 +22,15 @@ def likelihood(
     reminder_confirmed: bool,
     past_rate: float | None,
     slack_min: float | None,
+    with_friend: bool = False,
 ) -> Likelihood:
-    """`past_rate` is the user's attended / (attended + no-show), only when they have >= 2 past registrations."""
+    """`past_rate` is the user's attended / (attended + no-show), only when they have >= 2 past registrations.
+    `with_friend`: someone in their "Go together" group is still going (beyond SPEC 5.7)."""
     p = 0.70
     reasons: list[str] = []
+    if with_friend:
+        p += 0.10
+        reasons.append("Going with a friend (+10%)")
     if interest is not None and interest >= 80:
         p += 0.10
         reasons.append("Strong interest match (+10%)")

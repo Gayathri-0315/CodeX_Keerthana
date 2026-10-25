@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from ..config import settings
 from ..models import Event, Notification, Registration, User
 from ..timeutil import DAY_NAMES, fmt_range, fmt_time, iso_utc, to_ist, utcnow
-from . import stream, telegram
+from . import stream
 from .email import send_email
 
 log = logging.getLogger("showup.notify")
@@ -61,7 +61,7 @@ def cap_allows(db: Session, user: User, kind: str, now: datetime) -> bool:
 
 def any_channel(user: User) -> bool:
     ch = user.notif_channels or {}
-    return bool(ch.get("in_app") or (ch.get("telegram") and user.telegram_chat_id) or ch.get("email"))
+    return bool(ch.get("in_app") or ch.get("email"))
 
 
 def already_sent(db: Session, user: User, event_id: str | None, kind: str) -> bool:
@@ -99,15 +99,21 @@ def seat_copy(event: Event, minutes: int) -> tuple[str, str]:
     return "A seat just opened up", _fit(f"{_short(event.title)} is yours for {minutes} min. Confirm now.")
 
 
-def reminder_copy(kind: str, event: Event, leave_at: datetime | None) -> tuple[str, str]:
+def reminder_copy(kind: str, event: Event, leave_at: datetime | None, friends: list[str] | None = None) -> tuple[str, str]:
+    """`friends`: first names of people going together with this user (shortest copy wins the 90 chars)."""
     start = to_ist(event.start_at)
     where = event.venue_name or "online"
+    who = (friends[0] if len(friends) == 1 else f"{friends[0]} +{len(friends) - 1}") if friends else None
     if kind == "reminder_24h":
         tomorrow = (start.date() - to_ist(utcnow()).date()).days == 1
         title = f"Tomorrow, {fmt_time(start)}" if tomorrow else f"{DAY_NAMES[start.weekday()]}, {fmt_time(start)}"
+        if who:
+            return title, _fit(f"{_short(event.title, 30)} with {who}. Still going?")
         return title, _fit(f"{_short(event.title)} at {where}. Still going?")
     if kind == "reminder_2h":
         return "In 2 hours", _fit(f"{_short(event.title)} at {where} starts at {fmt_time(start)}.")
+    if who:
+        return "Time to head out", _fit(f"Leave by {fmt_time(to_ist(leave_at))} for {_short(event.title, 26)}. {who} is going too.")
     return "Time to head out", _fit(f"Leave by {fmt_time(to_ist(leave_at))} to reach {_short(event.title, 30)} on time.")
 
 
@@ -142,24 +148,6 @@ def notification_out(n: Notification, event_title: str | None = None) -> dict:
     }
 
 
-def _telegram_buttons(n: Notification) -> list[dict]:
-    out = []
-    for a in actions_for(n):
-        if a["kind"] == "view":
-            out.append({"text": "View", "url": f"{settings.public_url}/event/{a['event_id']}"})
-        elif a["kind"] == "url":
-            out.append({"text": a["label"], "url": a["url"]})
-        elif a["kind"] == "register":
-            out += [{"text": "Register", "callback_data": f"reg:{a['event_id']}"}, {"text": "Not for me", "callback_data": f"nfm:{a['event_id']}"}]
-        elif a["kind"] == "confirm_seat":
-            out.append({"text": "Confirm seat", "callback_data": f"confirm:{a['registration_id']}"})
-        elif a["kind"] == "confirm_reminder":
-            out.append({"text": "Yes, still going", "callback_data": f"yes:{a['registration_id']}"})
-        elif a["kind"] == "cancel":
-            out.append({"text": "Can't make it", "callback_data": f"cancel:{a['registration_id']}"})
-    return out
-
-
 def deliver(db: Session, n: Notification, user: User, now: datetime | None = None, bypass_quiet: bool = False) -> bool:
     """Send on every enabled channel, unless it's quiet hours (then a later flush sends it)."""
     now = now or utcnow()
@@ -172,8 +160,6 @@ def deliver(db: Session, n: Notification, user: User, now: datetime | None = Non
     if ch.get("in_app"):
         stream.publish(user.id, "notification", notification_out(n))
         sent["in_app"] = iso_utc(now)
-    if ch.get("telegram") and user.telegram_chat_id and telegram.send(user.telegram_chat_id, f"{n.title}\n{n.body}", _telegram_buttons(n)):
-        sent["telegram"] = iso_utc(now)
     if ch.get("email"):
         url = f"{settings.public_url}/event/{n.event_id}" if n.event_id else settings.public_url
         if send_email(user.email, n.title, n.body, "Open in ShowUp", url):

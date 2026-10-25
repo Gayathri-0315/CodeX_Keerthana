@@ -259,7 +259,7 @@ def test_checkin_analytics_and_close(client):
     a = client.get(f"/api/organizer/events/{eid}/analytics").json()
     assert a["registered"] == total and a["actual"] == 2 and a["expected_low"] <= a["expected"] <= a["expected_high"]
     regs_out = client.get(f"/api/organizer/events/{eid}/registrations").json()["registrations"]
-    assert all(r["likelihood"] is not None for r in regs_out if r["status"] != "waitlisted")
+    assert regs_out and all("likelihood" not in r and "reasons" not in r for r in regs_out)  # no per-student scores
 
     with SessionLocal() as db:
         e = db.get(Event, eid)

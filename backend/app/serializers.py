@@ -12,11 +12,12 @@ def registration_brief(reg) -> dict | None:
             "promotion_expires_at": iso_utc(reg.promotion_expires_at), "external": reg.external}
 
 
-def event_card(ev: Evaluated, seats_taken: int, saved: bool, reg: dict | None = None) -> dict:
+def event_card(ev: Evaluated, seats_taken: int, saved: bool, reg: dict | None = None, classmates: dict | None = None) -> dict:
     """What a feed card needs. Cards show the first three reasons."""
     e, r, s = ev.event, ev.result, ev.scored
     return {
         "registration": reg,
+        "classmates_going": classmates,
         "id": e.id,
         "title": e.title,
         "category": e.category,
@@ -46,9 +47,11 @@ def event_card(ev: Evaluated, seats_taken: int, saved: bool, reg: dict | None = 
     }
 
 
-def event_detail(ev: Evaluated, seats_taken: int, saved: bool, reg: dict | None = None) -> dict:
+def event_detail(ev: Evaluated, seats_taken: int, saved: bool, reg: dict | None = None, classmates: dict | None = None,
+                 companions: list[dict] | None = None) -> dict:
     e, r = ev.event, ev.result
-    out = event_card(ev, seats_taken, saved, reg)
+    out = event_card(ev, seats_taken, saved, reg, classmates)
+    out["companions"] = companions or []
     org = e.organizer
     out.update({
         "description": e.description,

@@ -10,7 +10,7 @@ from ..models import Event, Feedback, Registration, Report, SavedEvent, User
 from ..schemas import ReportIn
 from ..seed.venues import AREAS
 from ..serializers import event_detail, registration_brief
-from ..services import feedcache, ics, notify, registration
+from ..services import feedcache, ics, notify, registration, together
 from ..services.feed import evaluate_one, registered_counts
 from ..timeutil import DAY_NAMES, fmt_time, to_ist
 
@@ -34,7 +34,11 @@ def get_event(event_id: str, user: User = Depends(current_user), db: Session = D
     ev = evaluate_one(db, user, event)
     saved = db.get(SavedEvent, (user.id, event.id)) is not None
     reg = registration.active_registration(db, user.id, event.id)
-    out = event_detail(ev, registered_counts(db, [event.id]).get(event.id, 0), saved, registration_brief(reg))
+    out = event_detail(
+        ev, registered_counts(db, [event.id]).get(event.id, 0), saved, registration_brief(reg),
+        together.classmates_going(db, user, [event.id]).get(event.id),
+        together.companions_out(db, reg) if reg else [],
+    )
     if reg is None and event.capacity is not None and out["seats_taken"] >= event.capacity:
         waiting = db.scalar(select(func.count()).select_from(Registration).where(
             Registration.event_id == event.id, Registration.status == "waitlisted"))

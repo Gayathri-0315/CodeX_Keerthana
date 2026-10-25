@@ -77,4 +77,4 @@ def session(request: Request, db: Session = Depends(get_db)):
 
 @router.get("/config")
 def public_config():
-    return {"demo_mode": settings.demo_mode, "ai_live": settings.use_live_ai, "telegram": bool(settings.telegram_bot_token)}
+    return {"demo_mode": settings.demo_mode, "ai_live": settings.use_live_ai}

@@ -26,7 +26,7 @@ def new_id() -> str:
 
 
 def default_channels() -> dict:
-    return {"in_app": True, "telegram": False, "email": False}
+    return {"in_app": True, "email": False}
 
 
 class User(Base):
@@ -49,7 +49,6 @@ class User(Base):
     interest_text: Mapped[str] = mapped_column(Text, default="")
     strict_schedule: Mapped[bool] = mapped_column(Boolean, default=True)
     show_almost: Mapped[bool] = mapped_column(Boolean, default=True)
-    telegram_chat_id: Mapped[str | None] = mapped_column(String(64))
     notif_channels: Mapped[dict] = mapped_column(JSON, default=default_channels)
     notif_max_per_week: Mapped[int] = mapped_column(Integer, default=3)
     quiet_hours_start: Mapped[str] = mapped_column(String(5), default="22:00")
@@ -167,6 +166,7 @@ class Registration(Base):
     showup_likelihood: Mapped[float | None] = mapped_column(Float)
     reminder_confirmed: Mapped[bool] = mapped_column(Boolean, default=False)
     external: Mapped[bool] = mapped_column(Boolean, default=False)  # "I registered" on the organizer's own site
+    group_id: Mapped[str | None] = mapped_column(String(36), index=True)  # friends going together share one
 
     @property
     def checkin_code(self) -> str:
@@ -232,9 +232,12 @@ class ExtractionCache(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
-class TelegramLink(Base):
-    __tablename__ = "telegram_links"
+class Invite(Base):
+    """'Go together': a registered student's link that lets friends join them at an event."""
+
+    __tablename__ = "invites"
 
     code: Mapped[str] = mapped_column(String(12), primary_key=True)
-    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    expires_at: Mapped[datetime] = mapped_column(DateTime)
+    registration_id: Mapped[str] = mapped_column(ForeignKey("registrations.id", ondelete="CASCADE"), index=True)
+    event_id: Mapped[str] = mapped_column(ForeignKey("events.id", ondelete="CASCADE"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..deps import current_user
 from ..models import Event, Feedback, Registration, User
-from ..services import jobs, registration
+from ..services import jobs, registration, together
 from ..timeutil import utcnow
 
 router = APIRouter(prefix="/registrations", tags=["registrations"])
@@ -54,6 +54,7 @@ def my_registrations(user: User = Depends(current_user), db: Session = Depends(g
 def cancel(reg_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
     reg = my_registration(db, user, reg_id)
     promoted = registration.cancel(db, reg)
+    together.notify_cancel(db, reg)  # friends hear it from ShowUp before the seat moves on
     if promoted:
         jobs.in_background(jobs.offer_seats, promoted)
     return registration.registration_out(db, reg, user)

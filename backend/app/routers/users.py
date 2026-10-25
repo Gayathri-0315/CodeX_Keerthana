@@ -14,7 +14,6 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 def user_out(user: User) -> UserOut:
     out = UserOut.model_validate(user)
-    out.telegram_linked = bool(user.telegram_chat_id)
     out.organizer = OrganizerOut.model_validate(user.organizer) if user.organizer else None
     return out
 

@@ -70,6 +70,10 @@ def compute_likelihood(db: Session, user: User, event: Event, reg: Registration)
     ev = evaluate_one(db, user, event)
     distance, _ = travel_for(user, event)
     days_before = (event.start_at - reg.registered_at).total_seconds() / 86400
+    with_friend = bool(reg.group_id) and db.scalar(
+        select(func.count()).select_from(Registration).where(
+            Registration.group_id == reg.group_id, Registration.id != reg.id, Registration.status.in_(ACTIVE))
+    ) > 0
     return likelihood(
         interest=ev.scored.interest if ev.scored else None,
         distance_km=distance,
@@ -77,6 +81,7 @@ def compute_likelihood(db: Session, user: User, event: Event, reg: Registration)
         reminder_confirmed=reg.reminder_confirmed,
         past_rate=past_attendance(db, user.id),
         slack_min=ev.scored.slack_min if ev.scored else None,
+        with_friend=with_friend,
     )
 
 
@@ -194,9 +199,12 @@ def expire_offers(db: Session, now: datetime | None = None) -> list[Registration
 
 
 def registration_out(db: Session, reg: Registration, user: User) -> dict:
+    from .together import companions_out  # together builds on this module
+
     e = db.get(Event, reg.event_id)
     lb = leave_by_for(user, e) if e.start_at else None
     return {
+        "companions": companions_out(db, reg),
         "id": reg.id,
         "status": reg.status,
         "waitlist_position": reg.waitlist_position,

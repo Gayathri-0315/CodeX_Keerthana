@@ -12,7 +12,7 @@ from starlette.exceptions import HTTPException
 from .config import settings
 from .db import Base, SessionLocal, engine
 from .models import User
-from .routers import admin, auth, availability, demo, events, feed, files, notifications, organizer, registrations, telegram, users
+from .routers import admin, auth, availability, demo, events, feed, files, notifications, organizer, registrations, together, users
 from .services import embeddings, jobs, stream
 
 CODES = {400: "bad_request", 401: "unauthorized", 403: "forbidden", 404: "not_found",
@@ -65,7 +65,7 @@ async def validation_error(_req: Request, exc: RequestValidationError):
 
 
 for r in (auth.router, users.router, availability.router, feed.router, events.router, organizer.router, admin.router,
-          files.router, registrations.router, notifications.router, telegram.router, demo.router):
+          files.router, registrations.router, notifications.router, together.router, demo.router):
     app.include_router(r, prefix="/api")
 
 

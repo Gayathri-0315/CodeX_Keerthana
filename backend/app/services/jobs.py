@@ -12,7 +12,7 @@ from ..config import settings
 from ..db import SessionLocal
 from ..models import Event, Organizer, Registration, Report, User
 from ..timeutil import utcnow
-from . import feedcache, notify, registration, telegram
+from . import feedcache, notify, registration, together
 from .showup_score import reminder_times
 
 log = logging.getLogger("showup.jobs")
@@ -49,7 +49,8 @@ def send_reminders(db: Session, now: datetime) -> int:
                 continue  # online: nothing to leave for
             # Due now, and not one that was already due when they registered (no "tomorrow" ping an hour before).
             if at <= now and at >= reg.registered_at - timedelta(minutes=1):
-                title, body = notify.reminder_copy(kind, event, registration.leave_by_for(user, event))
+                friends = [together.first_name(u) for _, u in together.companions(db, reg)]
+                title, body = notify.reminder_copy(kind, event, registration.leave_by_for(user, event), friends)
                 payload = {"registration_id": reg.id}
                 if kind == "reminder_leave_by":
                     payload["maps_url"] = f"https://www.google.com/maps/dir/?api=1&destination={event.lat},{event.lng}"
@@ -149,10 +150,6 @@ def start_scheduler() -> None:
 
     _scheduler = BackgroundScheduler(timezone="UTC")
     _scheduler.add_job(tick, "interval", seconds=TICK_SECONDS, max_instances=1, coalesce=True, next_run_time=utcnow() + timedelta(seconds=5))
-    if telegram.enabled():
-        from ..routers.telegram import poll_updates
-
-        _scheduler.add_job(poll_updates, "interval", seconds=3, max_instances=1, coalesce=True)
     _scheduler.start()
 
 
