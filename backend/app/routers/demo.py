@@ -95,7 +95,8 @@ def fast_forward_leave_by(_: User = Depends(demo_only), db: Session = Depends(ge
     reg, event = row
     db.execute(delete(Notification).where(Notification.event_id == event.id, Notification.user_id == student.id, Notification.type == "reminder_leave_by"))
     db.commit()
-    title, body = notify.reminder_copy("reminder_leave_by", event, registration.leave_by_for(student, event))
+    friends = [together.first_name(u) for _, u in together.companions(db, reg)]
+    title, body = notify.reminder_copy("reminder_leave_by", event, registration.leave_by_for(student, event), friends)
     maps = f"https://www.google.com/maps/dir/?api=1&destination={event.lat},{event.lng}"
     notify.create(db, student, "reminder_leave_by", event, title, body, {"registration_id": reg.id, "maps_url": maps}, bypass_quiet=True)
     return {"event_id": event.id}

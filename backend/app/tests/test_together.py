@@ -120,3 +120,5 @@ def test_demo_friend_joins(client):
     r = client.post("/api/demo/friend-joins").json()
     assert r["event_id"] == eid and r["friend"]
     assert client.get("/api/notifications").json()["items"][0]["title"] == f"{r['friend']} is going with you"
+    client.post("/api/demo/leave-by")  # the demo shortcut names friends like the scheduled reminder does
+    assert client.get("/api/notifications").json()["items"][0]["body"].endswith(f"{r['friend']} is going too.")
