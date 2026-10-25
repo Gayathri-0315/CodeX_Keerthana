@@ -18,8 +18,7 @@ export type User = {
   interests: { tag: string; weight: number }[];
   strict_schedule: boolean;
   show_almost: boolean;
-  telegram_linked: boolean;
-  notif_channels: { in_app?: boolean; telegram?: boolean; email?: boolean };
+  notif_channels: { in_app?: boolean; email?: boolean };
   notif_max_per_week: number;
   quiet_hours_start: string;
   quiet_hours_end: string;
@@ -50,7 +49,10 @@ export type RegistrationBrief = {
   external: boolean;
 };
 
+export type Companion = { name: string; status: RegStatus };
+
 export type Registration = RegistrationBrief & {
+  companions: Companion[];
   checkin_token: string;
   checkin_code: string;
   checked_in_at: string | null;
@@ -100,8 +102,25 @@ export type Registrant = {
   registered_at: string;
   checked_in_at: string | null;
   external: boolean;
-  likelihood: number | null;
-  reasons: string[];
+  with_friends: boolean;
+};
+
+export type Invite = {
+  code: string;
+  inviter: string;
+  going: number;
+  problem: string | null;
+  event: {
+    id: string;
+    title: string;
+    category: string;
+    poster_url: string | null;
+    venue_name: string | null;
+    mode: FeedItem["mode"];
+    fee_inr: number;
+    start_at: string | null;
+    end_at: string | null;
+  };
 };
 
 export type Analytics = {
@@ -118,6 +137,7 @@ export type Analytics = {
 export type FeedItem = {
   id: string;
   registration: RegistrationBrief | null;
+  classmates_going: { count: number; label: string } | null;
   title: string;
   category: string;
   tags: string[];
@@ -161,6 +181,7 @@ export type EventDetail = FeedItem & {
   why_not: string | null;
   maps_url: string | null;
   next_waitlist_position?: number;
+  companions: Companion[];
 };
 
 export type Area = { name: string; lat: number; lng: number };
@@ -187,7 +208,7 @@ export type EventForm = {
   skill_level: "beginner" | "intermediate" | "advanced" | null;
   registration_url: string | null;
   poster_url: string | null;
-  source: "web_upload" | "form" | "telegram";
+  source: "web_upload" | "form";
   field_confidence: Record<string, number | null>;
 };
 

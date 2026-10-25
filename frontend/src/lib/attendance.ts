@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { api } from "./api";
 import { keys } from "./queries";
-import type { Analytics, AppNotification, Registrant, Registration } from "./types";
+import type { Analytics, AppNotification, Invite, Registrant, Registration } from "./types";
 
 export const attKeys = {
   mine: ["registrations", "me"] as const,
@@ -66,6 +66,47 @@ export function useFeedback() {
     onSuccess: () => qc.invalidateQueries({ queryKey: attKeys.mine }),
   });
 }
+
+// ---- go together ----
+
+export function useCreateInvite() {
+  return useMutation({
+    mutationFn: (registrationId: string) => api<{ code: string; url: string }>(`/registrations/${registrationId}/invite`, { method: "POST" }),
+  });
+}
+
+export function useInvite(code: string) {
+  return useQuery({ queryKey: ["invite", code], queryFn: () => api<Invite>(`/invites/${code}`), retry: false });
+}
+
+export function useAcceptInvite() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (code: string) => api<Registration>(`/invites/${code}/accept`, { method: "POST" }),
+    onSuccess: (r) => refreshAfterSeatChange(qc, r.event.id),
+  });
+}
+
+/** Where to go after signing in, when someone arrived through an invite link. */
+const RETURN_KEY = "showup-return-to";
+export const returnTo = {
+  set(path: string) {
+    try {
+      sessionStorage.setItem(RETURN_KEY, path);
+    } catch {
+      /* storage blocked: they'll land on Home instead */
+    }
+  },
+  take(): string | null {
+    try {
+      const p = sessionStorage.getItem(RETURN_KEY);
+      sessionStorage.removeItem(RETURN_KEY);
+      return p;
+    } catch {
+      return null;
+    }
+  },
+};
 
 // ---- notifications ----
 

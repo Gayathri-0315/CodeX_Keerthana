@@ -32,6 +32,7 @@ const ReviewQueue = lazy(() => import("../pages/admin/ReviewQueue"));
 const EventManager = lazy(() => import("../pages/organizer/EventManager"));
 const Checkin = lazy(() => import("../pages/organizer/Checkin"));
 const DemoPanel = lazy(() => import("../pages/DemoPanel"));
+const InvitePage = lazy(() => import("../pages/InvitePage"));
 
 
 const queryClient = new QueryClient({
@@ -97,6 +98,7 @@ export function App() {
                 <Routes>
                   <Route path="/welcome" element={<Welcome />} />
                   <Route path="/signin" element={<SignIn />} />
+                  <Route path="/invite/:code" element={<InvitePage />} />
                   <Route
                     element={
                       <RequireAuth>

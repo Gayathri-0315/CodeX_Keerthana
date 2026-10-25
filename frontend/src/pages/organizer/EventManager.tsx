@@ -1,5 +1,5 @@
 import { m } from "motion/react";
-import { ArrowLeft, Download, MessageSquare, Pencil, QrCode, Search, XCircle } from "lucide-react";
+import { ArrowLeft, Download, MessageSquare, Pencil, QrCode, Search, Users, XCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Button } from "../../components/ui/Button";
@@ -50,9 +50,9 @@ export default function EventManager() {
   const live = e.status === "published";
 
   const exportCsv = () => {
-    const header = "Name,Status,Waitlist position,Registered at,Checked in at,Show-up likelihood\n";
+    const header = "Name,Status,Waitlist position,Registered at,Checked in at,Coming with friends\n";
     const body = (registrants.data ?? [])
-      .map((r) => [r.name, STATUS_LABEL[r.status] ?? r.status, r.waitlist_position ?? "", r.registered_at, r.checked_in_at ?? "", r.likelihood ?? ""]
+      .map((r) => [r.name, STATUS_LABEL[r.status] ?? r.status, r.waitlist_position ?? "", r.registered_at, r.checked_in_at ?? "", r.with_friends ? "yes" : ""]
         .map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))
       .join("\n");
     const url = URL.createObjectURL(new Blob([header + body], { type: "text/csv" }));
@@ -127,7 +127,7 @@ export default function EventManager() {
             {rows.map((r) => <RegistrantRow key={r.id} r={r} />)}
           </ul>
         )}
-        <p className="footnote mt-3 text-text-2">Show-up likelihood is a planning estimate from simple rules, not a promise. Attendee lists are only visible to you.</p>
+        <p className="footnote mt-3 text-text-2">Attendee lists are only visible to you.</p>
       </section>
 
       <MessageSheet eventId={id} open={messaging} onClose={() => setMessaging(false)} />
@@ -156,7 +156,7 @@ function TurnoutCard({ a }: { a: Analytics }) {
           <m.div className="absolute inset-y-0 left-0 w-full origin-left rounded-full bg-success" initial={{ scaleX: 0 }} animate={{ scaleX: a.actual / scale }} transition={{ duration: 0.7, ease: easeOut }} />
         </Bar>
       </div>
-      <p className="footnote mt-4 text-text-2">Expected is the sum of each person's show-up likelihood (planning estimate), with a rough 80% range.</p>
+      <p className="footnote mt-4 text-text-2">Expected turnout is a planning estimate from simple rules (distance, timing, friends coming along), with a rough 80% range. Not a promise.</p>
     </div>
   );
 }
@@ -173,37 +173,22 @@ function Bar({ label, value, children }: { label: string; value: React.ReactNode
   );
 }
 
+/** No per-person show-up score here on purpose: organizers see who's coming, not a reliability rating. */
 function RegistrantRow({ r }: { r: Registrant }) {
-  const [open, setOpen] = useState(false);
-  const tone = r.likelihood == null ? "bg-text/20" : r.likelihood >= 0.7 ? "bg-success" : r.likelihood >= 0.45 ? "bg-warning" : "bg-danger";
   return (
-    <li className="px-4 py-3">
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => setOpen((o) => !o)}
-          aria-expanded={open}
-          aria-label={r.likelihood == null ? "No estimate" : `Show-up likelihood ${Math.round(r.likelihood * 100)}%, show reasons`}
-          title={r.reasons.join("\n")}
-          className="grid size-11 shrink-0 place-items-center rounded-full hover:bg-text/5"
-          disabled={r.likelihood == null}
-        >
-          <span className={`size-3 rounded-full ${tone}`} />
-        </button>
-        <div className="min-w-0 flex-1">
-          <p className="body truncate">{r.name}</p>
-          <p className="footnote text-text-2 tnum">
-            {r.status === "waitlisted" ? `Waitlist #${r.waitlist_position}` : STATUS_LABEL[r.status] ?? r.status}
-            {r.checked_in_at && ` at ${formatTime(r.checked_in_at)}`}
-            {r.external && " · registered on your site"}
-          </p>
-        </div>
-        {r.likelihood != null && <span className="callout text-text-2 tnum">{Math.round(r.likelihood * 100)}%</span>}
+    <li className="flex items-center gap-3 px-4 py-3">
+      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-accent-soft callout font-semibold text-accent" aria-hidden>
+        {r.name[0]?.toUpperCase()}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="body truncate">{r.name}</p>
+        <p className="footnote text-text-2 tnum">
+          {r.status === "waitlisted" ? `Waitlist #${r.waitlist_position}` : STATUS_LABEL[r.status] ?? r.status}
+          {r.checked_in_at && ` at ${formatTime(r.checked_in_at)}`}
+          {r.external && " · registered on your site"}
+        </p>
       </div>
-      {open && (
-        <ul className="footnote ml-14 mt-1 list-disc pl-4 text-text-2">
-          {r.reasons.length ? r.reasons.map((x) => <li key={x}>{x}</li>) : <li>Baseline estimate (70%)</li>}
-        </ul>
-      )}
+      {r.with_friends && <Tag tone="accent"><Users className="size-3.5" aria-hidden />With friends</Tag>}
     </li>
   );
 }

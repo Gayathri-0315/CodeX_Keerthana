@@ -10,6 +10,7 @@ import { useToast } from "../components/ui/Toaster";
 import { ApiError } from "../lib/api";
 import { useReportEvent } from "../lib/organizer";
 import { RegisterAction } from "../components/attendance/RegisterAction";
+import { ClassmatesLine, GoTogetherCard } from "../components/attendance/GoTogether";
 import { formatFee, formatLongDate, formatTimeRange } from "../lib/format";
 import { easeOut } from "../lib/motion";
 import { useEvent, useSaveEvent } from "../lib/queries";
@@ -102,6 +103,12 @@ export default function EventPage() {
             </Row>
           )}
         </dl>
+
+        {e.registration && ["registered", "promoted_pending", "waitlisted"].includes(e.registration.status) ? (
+          <GoTogetherCard registrationId={e.registration.id} companions={e.companions} eventTitle={e.title} />
+        ) : (
+          <ClassmatesLine c={e.classmates_going} className="mt-4 px-1 callout" />
+        )}
 
         {(e.clash || e.why_not) && (
           <p className="callout mt-6 flex items-start gap-2 rounded-[14px] bg-warning/12 p-4 text-warning-text">

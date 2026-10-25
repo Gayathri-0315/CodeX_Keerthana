@@ -8,6 +8,7 @@ import { easeOut, haptic, spring } from "../../lib/motion";
 import { usePrefetchEvent } from "../../lib/queries";
 import type { FeedItem } from "../../lib/types";
 import { RegisterAction } from "../attendance/RegisterAction";
+import { ClassmatesLine } from "../attendance/GoTogether";
 
 const GRADIENTS: Record<string, [string, string]> = {
   Workshop: ["#0071e3", "#5ac8fa"],
@@ -121,6 +122,7 @@ export function EventCard({ event, index, onToggleSave, onDismiss, onRemindSimil
                 ))}
               </ul>
             )}
+            {!muted && <ClassmatesLine c={event.classmates_going} className="mt-1.5" />}
             {event.clash && (
               <p className="footnote mt-2 flex items-start gap-1.5 text-warning-text">
                 <TriangleAlert className="mt-px size-4 shrink-0" aria-hidden />

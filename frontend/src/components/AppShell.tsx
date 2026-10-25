@@ -1,10 +1,10 @@
 import { m } from "motion/react";
 import { Bell, CalendarDays, Home, Ticket } from "lucide-react";
-import { Suspense, useRef } from "react";
-import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { Suspense, useEffect, useRef } from "react";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { pageVariants, spring } from "../lib/motion";
 import { useMe } from "../lib/queries";
-import { useNotifications } from "../lib/attendance";
+import { returnTo, useNotifications } from "../lib/attendance";
 import { LiveAlerts } from "./attendance/LiveAlerts";
 
 const TABS = [
@@ -54,6 +54,15 @@ export function AppShell() {
   const firstPath = useRef(pathname);
   const firstScreen = useRef(true);
   if (pathname !== firstPath.current) firstScreen.current = false;
+
+  // Arrived through a friend's invite and had to sign in or onboard first: take them back to it.
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (me && (me.onboarded || me.role !== "student")) {
+      const back = returnTo.take();
+      if (back) navigate(back, { replace: true });
+    }
+  }, [me, navigate]);
   // Event detail has its own sticky action bar, so the tab bar steps aside there.
   const tabBar = student && !pathname.startsWith("/event/");
   const { data: alerts } = useNotifications(student);

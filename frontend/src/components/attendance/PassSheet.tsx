@@ -1,5 +1,6 @@
 import { AnimatePresence, m } from "motion/react";
-import { CalendarPlus, Clock, Navigation, X } from "lucide-react";
+import { CalendarPlus, Clock, Navigation, Users, X } from "lucide-react";
+import { namesText } from "./GoTogether";
 import { lazy, Suspense, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { countdown } from "../../lib/attendance";
@@ -86,6 +87,11 @@ function PassBody({ reg, now }: { reg: Registration; now: number }) {
       )}
 
       <div className="mt-5 flex flex-col items-center gap-1">
+        {reg.companions?.length > 0 && (
+          <p className="callout inline-flex items-center gap-1.5 font-medium text-[#0066cc]">
+            <Users className="size-4" aria-hidden /> Going with {namesText(reg.companions.map((c) => c.name))}
+          </p>
+        )}
         <p className="callout inline-flex items-center gap-1.5 font-medium tnum">
           <Clock className="size-4" aria-hidden /> {countdown(e.start_at, now)}
         </p>

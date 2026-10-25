@@ -31,7 +31,7 @@ export function useMe() {
 export function usePublicConfig() {
   return useQuery({
     queryKey: keys.config,
-    queryFn: () => api<{ demo_mode: boolean; ai_live: boolean; telegram: boolean }>("/auth/config"),
+    queryFn: () => api<{ demo_mode: boolean; ai_live: boolean }>("/auth/config"),
     staleTime: Infinity,
   });
 }

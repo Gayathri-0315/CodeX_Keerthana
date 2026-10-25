@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Bell, CalendarClock, MapPin, Sparkles, Ticket, TriangleAlert } from "lucide-react";
+import { Bell, CalendarClock, MapPin, Sparkles, Ticket, TriangleAlert, Users } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../lib/api";
@@ -14,6 +14,8 @@ const ICON = {
   seat_opened: Ticket,
   reminder_leave_by: MapPin,
   cancelled_event: TriangleAlert,
+  buddy_joined: Users,
+  buddy_cancelled: Users,
 };
 
 /** Listens on /api/stream and turns each alert into a Dynamic-Island toast with its actions. */
@@ -31,12 +33,12 @@ export function LiveAlerts() {
     es.addEventListener("notification", (e) => {
       const n: AppNotification = JSON.parse((e as MessageEvent).data);
       qc.invalidateQueries({ queryKey: attKeys.notifications });
-      if (["seat_opened", "cancelled_event"].includes(n.type)) refreshAfterSeatChange(qc, n.event_id ?? undefined);
+      if (["seat_opened", "cancelled_event", "buddy_joined", "buddy_cancelled"].includes(n.type)) refreshAfterSeatChange(qc, n.event_id ?? undefined);
       const { toast, navigate } = handlers.current;
       toast({
         title: n.title,
         body: n.body,
-        tone: n.type === "seat_opened" || n.type === "cancelled_event" ? "warning" : "info",
+        tone: n.type === "seat_opened" || n.type === "cancelled_event" ? "warning" : n.type === "buddy_joined" ? "success" : "info",
         icon: ICON[n.type as keyof typeof ICON] ?? Bell,
         actions: n.actions.slice(0, 2).map((a) => ({ label: a.label, onClick: () => act(a, n) })),
       });

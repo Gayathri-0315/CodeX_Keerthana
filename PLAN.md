@@ -9,7 +9,8 @@ Build order follows SPEC.md section 14. Each phase ends runnable, tested and com
 | 3 Matching and feed | Ranking, reasons, Almost list, feed UI, detail, save/dismiss, embeddings + fallback | done |
 | 4 Poster to listing | Extraction (mock + live), confirm screen, trust gate, reach preview, admin queue, reports | done |
 | 5 Attendance | Register animation + pass, SSE toasts, notification rules, reminders, waitlist, .ics, QR check-in, analytics | done |
-| 6 Timetable + polish | Timetable import, Telegram poster flow, states, a11y and performance passes, README | done |
+| 6 Timetable + polish | Timetable import, states, a11y and performance passes, README | done |
+| After review | Go together; removed the Telegram bot and per-student scores | done |
 
 ## Key decisions
 
@@ -36,12 +37,10 @@ Build order follows SPEC.md section 14. Each phase ends runnable, tested and com
 - **Waitlist safety:** seat changes for an event run under a per-event lock in one transaction (single-process pilot). Two cancels racing free two seats and make two offers, never the same seat twice (tested with threads). An unconfirmed offer becomes `cancelled` and the seat moves on.
 - **Quiet hours** hold delivery (the alert is stored and sent by the next scheduler tick after quiet hours end); seat offers are the exception because they expire in minutes. Demo-panel actions bypass quiet hours so the demo works at night.
 - **Notification types** beyond the spec's list: `waitlisted`, `reminder_24h`, `reminder_2h` (alongside `reminder_leave_by`) and `message` (organizer to registrants). Only `match`, `deadline` and `seat_opened` count toward the weekly cap.
-- **Telegram** uses the Bot API over HTTPS directly (no `python-telegram-bot` dependency). Locally it long-polls every 3 s; in production set a webhook to `/api/telegram/webhook` with the secret from `routers/telegram.py:webhook_secret`. Poster upload by Telegram is Phase 6.
 - **Check-in** accepts the QR token or a 6-character code printed under the QR.
 - **Timetable import** replaces the weekly free time with the gaps between 08:00 and 21:00 (`TIMETABLE_DAY_START_MIN` / `END_MIN` in config) and keeps one-off changes. The 30-minute grid marks a cell free only when a gap covers all of it, so a 10-minute break between classes doesn't count. The import is not saved until it's applied; a review banner then asks the student to check it.
 - **Contrast (SPEC 8.11 over 7.1):** a few spec colors miss WCAG AA in places. `#0071E3` stays as the filled-button color (`--accent-fill`) in both themes. Blue text uses `#0066CC` in light mode. Secondary text is `#636366` instead of `#6E6E73`, and dark-mode tinted backgrounds are a touch darker.
 - **Performance:** the motion engine loads with the app (async loading left content invisible until it arrived), the first screen skips its enter animation, Home is in the main bundle, and `index.html` starts the session and first-screen API calls while the JS downloads. Icons, motion and shared UI are grouped into a few chunks to cut round trips.
-- **Telegram posters** create a draft (`source: telegram`), run the trust gate, and offer Confirm and publish, Edit on web, or Cancel. Telegram re-encodes photos, so in mock mode only files sent as documents with a sample's file name are recognised.
 - **Dev reload:** `scripts/py.mjs --watch app` restarts uvicorn on .py changes. uvicorn's own `--reload` is not used because on Windows it stops its worker with a console Ctrl+C that also kills `npm run dev`.
 
 ## Deviations from the spec (data only)
@@ -49,3 +48,8 @@ Build order follows SPEC.md section 14. Each phase ends runnable, tested and com
 - Seed: Python Meetup runs Sat 17:00 to 18:00 (spec says to 18:30) because the demo student is free only until 18:00 and the spec requires the meetup in "For you" under strict schedule.
 - Python 3.12 is used (spec says 3.11); nothing depends on 3.12-only features.
 - Extra tables/columns the spec implies but does not list: `saved_events`, `users.home_area`, `users.interest_text`, `extraction_cache` (Phase 4).
+## Changes after the six phases
+
+- **Go together** (beyond the spec): a registered student shares an invite link or QR. A friend who accepts is registered or waitlisted and joins the group. Members see each other on the pass and event page, are named in the 24 h and leave-by reminders, are told when someone joins or drops out, and get +10% in the turnout estimate. Event cards show how many classmates (same department and year) are going: a count, never names. Invite pages are public so a friend can see them before signing in; accepting needs an account, and sign-in returns them to the invite.
+- **Removed the Telegram bot** (SPEC 3, 8.7, 8.9, 9): the alert channel, account linking and poster posting. Alerts are in-app and email. This cuts a channel that couldn't be exercised without a bot token and narrows the product to its core.
+- **Removed per-student show-up scores** from the organizer view (SPEC 5.7, 8.8): rating individual students' reliability invites unfair treatment and is mostly noise at pilot scale. The aggregate expected turnout with its range stays; organizers see "With friends" instead.

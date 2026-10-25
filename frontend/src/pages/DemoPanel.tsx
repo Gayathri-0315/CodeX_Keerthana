@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Megaphone, MapPin, RotateCcw, Ticket } from "lucide-react";
+import { Megaphone, MapPin, RotateCcw, Ticket, Users } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/AppShell";
@@ -12,7 +12,8 @@ import type { Role } from "../lib/types";
 const ACTIONS = [
   { path: "publish-ai-workshop", icon: Megaphone, title: "Publish AI Workshop now", body: "The demo club publishes a new workshop; fitting students get a match alert." },
   { path: "release-seat", icon: Ticket, title: "Release a seat", body: "Puts the demo student first on Startup Pitch Night's waitlist, then someone cancels." },
-  { path: "leave-by", icon: MapPin, title: "Fast-forward to leave-by time", body: "Sends the demo student's next \"Time to head out\" alert now." },
+  { path: "friend-joins", icon: Users, title: "A friend accepts your invite", body: "A classmate joins the demo student's next event through a \"Go together\" link." },
+  { path: "leave-by", icon: MapPin, title: "Fast-forward to leave-by time", body: "Sends the demo student's next \"Time to head out\" alert now (it names friends going too)." },
 ] as const;
 
 /** Hidden helper for live demos (SPEC 12): one tap per step of the demo script. */
