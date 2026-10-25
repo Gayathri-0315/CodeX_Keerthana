@@ -26,6 +26,14 @@ The first `npm run dev` creates `backend/.venv` and installs the Python requirem
 
 `make` targets wrap the npm scripts, for systems that have make.
 
+## Deploy to Render
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Gayathri-0315/CodeX_Keerthana)
+
+The button reads `render.yaml`: one free web service built from the `Dockerfile`. The React app is built and served by the FastAPI backend from the same origin, so cookies and live alerts work without extra setup. Render generates `JWT_SECRET`, and invite links use the service's own URL automatically. Leave `ANTHROPIC_API_KEY` empty for mock mode, or paste a key to read real posters.
+
+On the free plan the service sleeps after 15 minutes idle; the first visit after that takes about a minute. The free disk isn't persistent, so data resets on each restart or deploy; demo mode reseeds automatically. For real use, add a Render persistent disk (and point `DATABASE_URL` at it) or move to Postgres.
+
 ## Environment variables
 
 Copy `.env.example` to `.env` to change any of these.

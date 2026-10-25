@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     smtp_from: str = ""
     waitlist_confirm_minutes: int = 15
     frontend_origin: str = "http://localhost:5173"
+    static_dir: str = ""  # built frontend to serve from the API (one-service deploys)
+    render_external_url: str = ""  # set by Render to the service's public URL
 
     # Timetable gaps are computed inside this daily range (section 5.1).
     timetable_day_start_min: int = 8 * 60
@@ -40,6 +42,12 @@ class Settings(BaseSettings):
             raise ValueError("JWT_SECRET must be set to a long random value when APP_ENV=prod.")
         if self.ai_mode == "live" and not self.anthropic_api_key:
             raise ValueError("AI_MODE=live needs ANTHROPIC_API_KEY. Use AI_MODE=auto or mock to run without it.")
+        if self.render_external_url:
+            # On Render, links and CORS follow the service's own URL unless set explicitly.
+            if "public_url" not in self.model_fields_set:
+                self.public_url = self.render_external_url.rstrip("/")
+            if "frontend_origin" not in self.model_fields_set:
+                self.frontend_origin = self.render_external_url.rstrip("/")
         if self.database_url.startswith("sqlite:///./"):
             # Relative SQLite paths resolve against the backend folder, not the shell's cwd.
             self.database_url = f"sqlite:///{(BACKEND_DIR / self.database_url[12:]).as_posix()}"

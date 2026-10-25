@@ -1,11 +1,13 @@
 import asyncio
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, select
 from starlette.exceptions import HTTPException
 
@@ -72,3 +74,18 @@ for r in (auth.router, users.router, availability.router, feed.router, events.ro
 @app.get("/api/health")
 def health():
     return {"ok": True, "demo_mode": settings.demo_mode, "ai_live": settings.use_live_ai, "matching": embeddings.backend()}
+
+
+# One-service deploys (Render): serve the built SPA from the same origin as the API.
+if settings.static_dir and (Path(settings.static_dir) / "index.html").is_file():
+    STATIC = Path(settings.static_dir).resolve()
+    app.mount("/assets", StaticFiles(directory=STATIC / "assets"), name="assets")
+
+    @app.get("/{path:path}", include_in_schema=False)
+    def spa(path: str):
+        if path.startswith("api/") or path == "api":
+            raise HTTPException(404, "Not Found")
+        file = (STATIC / path).resolve()
+        if path and file.is_file() and STATIC in file.parents:
+            return FileResponse(file)
+        return FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-cache"})

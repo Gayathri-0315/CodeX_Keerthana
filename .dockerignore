@@ -1,0 +1,12 @@
+.git
+**/node_modules
+**/.venv
+**/__pycache__
+**/.pytest_cache
+frontend/dist
+backend/*.db
+backend/*.db-*
+backend/uploads
+backend/app/seed/posters/generated
+backend/app/seed/timetables/generated
+.env

@@ -1,0 +1,18 @@
+# Render Blueprint: one free web service running the Dockerfile (API + built frontend).
+services:
+  - type: web
+    name: codex-keerthana
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DEMO_MODE
+        value: "true"
+      - key: AI_MODE
+        value: auto
+      # Optional: paste a key in the Render dashboard to read real posters and timetables with Claude.
+      - key: ANTHROPIC_API_KEY
+        sync: false
