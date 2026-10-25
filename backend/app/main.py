@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -11,8 +12,8 @@ from starlette.exceptions import HTTPException
 from .config import settings
 from .db import Base, SessionLocal, engine
 from .models import User
-from .routers import admin, auth, availability, events, feed, files, organizer, users
-from .services import embeddings
+from .routers import admin, auth, availability, demo, events, feed, files, notifications, organizer, registrations, telegram, users
+from .services import embeddings, jobs, stream
 
 CODES = {400: "bad_request", 401: "unauthorized", 403: "forbidden", 404: "not_found",
          409: "conflict", 422: "invalid", 429: "rate_limited", 503: "unavailable"}
@@ -21,8 +22,10 @@ CODES = {400: "bad_request", 401: "unauthorized", 403: "forbidden", 404: "not_fo
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     Base.metadata.create_all(engine)
+    stream.bind_loop(asyncio.get_running_loop())
     if settings.app_env != "test":
         embeddings.start_background_load()
+        jobs.start_scheduler()
     if settings.demo_mode:
         with SessionLocal() as db:
             empty = db.scalar(select(func.count()).select_from(User)) == 0
@@ -31,6 +34,7 @@ async def lifespan(_app: FastAPI):
 
                 seed(db)
     yield
+    jobs.stop_scheduler()
 
 
 app = FastAPI(title="ShowUp API", lifespan=lifespan)
@@ -60,7 +64,8 @@ async def validation_error(_req: Request, exc: RequestValidationError):
     return JSONResponse({"error": {"code": "invalid", "message": message}}, status_code=422)
 
 
-for r in (auth.router, users.router, availability.router, feed.router, events.router, organizer.router, admin.router, files.router):
+for r in (auth.router, users.router, availability.router, feed.router, events.router, organizer.router, admin.router,
+          files.router, registrations.router, notifications.router, telegram.router, demo.router):
     app.include_router(r, prefix="/api")
 
 

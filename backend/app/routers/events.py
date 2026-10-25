@@ -1,15 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from pydantic import BaseModel
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
+from ..config import settings
 from ..db import get_db
 from ..deps import current_user
-from ..models import Event, Feedback, Report, SavedEvent, User
+from ..models import Event, Feedback, Registration, Report, SavedEvent, User
 from ..schemas import ReportIn
 from ..seed.venues import AREAS
-from ..serializers import event_detail
-from ..services import feedcache
+from ..serializers import event_detail, registration_brief
+from ..services import feedcache, ics, notify, registration
 from ..services.feed import evaluate_one, registered_counts
+from ..timeutil import DAY_NAMES, fmt_time, to_ist
 
 router = APIRouter(tags=["events"])
 
@@ -30,7 +33,13 @@ def get_event(event_id: str, user: User = Depends(current_user), db: Session = D
     event = visible_event(db, event_id, user)
     ev = evaluate_one(db, user, event)
     saved = db.get(SavedEvent, (user.id, event.id)) is not None
-    return event_detail(ev, registered_counts(db, [event.id]).get(event.id, 0), saved)
+    reg = registration.active_registration(db, user.id, event.id)
+    out = event_detail(ev, registered_counts(db, [event.id]).get(event.id, 0), saved, registration_brief(reg))
+    if reg is None and event.capacity is not None and out["seats_taken"] >= event.capacity:
+        waiting = db.scalar(select(func.count()).select_from(Registration).where(
+            Registration.event_id == event.id, Registration.status == "waitlisted"))
+        out["next_waitlist_position"] = (waiting or 0) + 1
+    return out
 
 
 @router.post("/events/{event_id}/save", status_code=204)
@@ -63,6 +72,38 @@ def undo_dismiss(event_id: str, user: User = Depends(current_user), db: Session 
     db.execute(delete(Feedback).where(Feedback.user_id == user.id, Feedback.event_id == event_id, Feedback.kind == "not_for_me"))
     db.commit()
     feedcache.invalidate(user.id)
+
+
+class RegisterIn(BaseModel):
+    external: bool = False  # "I registered" on the organizer's own site
+
+
+@router.post("/events/{event_id}/register")
+def register(event_id: str, body: RegisterIn | None = None, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """-> registered or waitlisted, with the confirmation copy for the toast."""
+    if user.role != "student":
+        raise HTTPException(403, "Only students can register for events.")
+    event = visible_event(db, event_id, user)
+    reg = registration.register(db, user, event, external=bool(body and body.external))
+    out = registration.registration_out(db, reg, user)
+    start = to_ist(event.start_at)
+    day = DAY_NAMES[start.weekday()]
+    if reg.status == "waitlisted":
+        title, text = "You're on the list", f"You're #{reg.waitlist_position}. We'll ping you if a seat opens."
+    else:
+        lb = registration.leave_by_for(user, event)
+        title = "You're in"
+        text = f"See you {day}." + (f" Leave by {fmt_time(to_ist(lb))}." if lb else "")
+    notify.create(db, user, "registered" if reg.status != "waitlisted" else "waitlisted", event, title, text, {"registration_id": reg.id}, push=False)
+    return {**out, "toast": {"title": title, "body": text}}
+
+
+@router.get("/events/{event_id}/ics")
+def event_calendar(event_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    event = visible_event(db, event_id, user)
+    body = ics.event_ics(event, f"{settings.public_url}/event/{event.id}")
+    filename = "".join(c if c.isalnum() else "-" for c in event.title.lower()).strip("-")[:40] or "event"
+    return Response(body, media_type="text/calendar; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="{filename}.ics"'})
 
 
 REPORTS_TO_HIDE = 3

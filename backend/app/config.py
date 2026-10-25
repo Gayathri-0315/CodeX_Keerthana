@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     jwt_secret: str = "change-me"
     database_url: str = f"sqlite:///{(BACKEND_DIR / 'showup.db').as_posix()}"
     telegram_bot_token: str = ""
+    telegram_bot_username: str = ""  # without @, for the "open the bot" link
+    public_url: str = "http://localhost:5173"  # where links in emails and Telegram messages point
     ors_api_key: str = ""
     smtp_host: str = ""
     smtp_user: str = ""

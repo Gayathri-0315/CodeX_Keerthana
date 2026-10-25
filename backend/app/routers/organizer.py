@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..deps import require_role, upload_limit
-from ..models import Event, Organizer, Registration, User
+from ..models import Event, Notification, Organizer, Registration, User
 from ..schemas import AppealIn, EventIn
-from ..services import feedcache, listing
+from ..services import feedcache, jobs, listing, notify, registration, showup_score
 from ..services.extraction import extract_poster
 from ..services.feed import SEAT_STATUSES
 from ..services.uploads import public_url, read_upload
@@ -155,7 +156,122 @@ def publish(event_id: str, user: User = Depends(organizer_only), db: Session = D
         event.published_at = utcnow()
     db.commit()
     feedcache.invalidate_all()
+    if status == "published":
+        jobs.in_background(suggest_in_background, event.id)
     return {**event_out(db, event), "message": STATUS_MESSAGES[status]}
+
+
+class MessageIn(BaseModel):
+    text: str = Field(min_length=3, max_length=200)
+
+
+class CheckinIn(BaseModel):
+    token: str = Field(min_length=4, max_length=64)  # the QR's token, or the 6-character code
+
+
+def suggest_in_background(db: Session, event_id: str) -> None:
+    event = db.get(Event, event_id)
+    if event is not None:
+        notify.suggest(db, event)
+
+
+@router.get("/events/{event_id}/registrations")
+def event_registrations(event_id: str, user: User = Depends(organizer_only), db: Session = Depends(get_db)):
+    """Registrants with a show-up likelihood (a planning estimate) and its reasons. Never public."""
+    event = my_event(db, user, event_id)
+    rows = db.execute(
+        select(Registration, User).join(User, User.id == Registration.user_id)
+        .where(Registration.event_id == event.id, Registration.status != "cancelled")
+        .order_by(Registration.waitlist_position.nulls_first(), Registration.registered_at)
+    ).all()
+    out = []
+    for reg, person in rows:
+        lk = registration.compute_likelihood(db, person, event, reg) if reg.status in ("registered", "promoted_pending", "attended", "no_show") else None
+        out.append({
+            "id": reg.id, "name": person.name, "status": reg.status, "waitlist_position": reg.waitlist_position,
+            "registered_at": iso_utc(reg.registered_at), "checked_in_at": iso_utc(reg.checked_in_at),
+            "external": reg.external, "likelihood": lk.p if lk else None, "reasons": lk.reasons if lk else [],
+        })
+    return {"registrations": out}
+
+
+@router.get("/events/{event_id}/analytics")
+def analytics(event_id: str, user: User = Depends(organizer_only), db: Session = Depends(get_db)):
+    """Predicted (sum of likelihoods, with a rough range) vs actual check-ins."""
+    event = my_event(db, user, event_id)
+    rows = db.execute(
+        select(Registration, User).join(User, User.id == Registration.user_id)
+        .where(Registration.event_id == event.id, Registration.status.in_(("registered", "promoted_pending", "attended", "no_show")))
+    ).all()
+    ps = [registration.compute_likelihood(db, person, event, reg).p for reg, person in rows]
+    expected, low, high = showup_score.expected_turnout(ps)
+    waitlisted = db.scalar(select(func.count()).select_from(Registration).where(Registration.event_id == event.id, Registration.status == "waitlisted"))
+    return {
+        "registered": len(ps),
+        "capacity": event.capacity,
+        "waitlisted": waitlisted or 0,
+        "expected": expected,
+        "expected_low": low,
+        "expected_high": high,
+        "actual": sum(1 for reg, _ in rows if reg.status == "attended"),
+        "ended": bool(event.end_at and event.end_at < utcnow()),
+    }
+
+
+@router.post("/events/{event_id}/message")
+def message(event_id: str, body: MessageIn, user: User = Depends(organizer_only), db: Session = Depends(get_db)):
+    event = my_event(db, user, event_id)
+    people = db.scalars(select(User).join(Registration, Registration.user_id == User.id).where(
+        Registration.event_id == event.id, Registration.status.in_(("registered", "promoted_pending", "waitlisted")))).all()
+    for person in people:
+        n = Notification(user_id=person.id, type="message", event_id=event.id, title=f"From {my_org(user).org_name}", body=body.text.strip())
+        db.add(n)
+        db.commit()
+        notify.deliver(db, n, person)
+    return {"sent": len(people)}
+
+
+@router.post("/events/{event_id}/cancel")
+def cancel_event(event_id: str, user: User = Depends(organizer_only), db: Session = Depends(get_db)):
+    event = my_event(db, user, event_id)
+    if event.status == "cancelled":
+        return event_out(db, event)
+    regs = db.scalars(select(Registration).where(Registration.event_id == event.id, Registration.status.in_(registration.ACTIVE))).all()
+    now = utcnow()
+    event.status = "cancelled"
+    for r in regs:
+        r.status, r.cancelled_at, r.waitlist_position, r.promotion_expires_at = "cancelled", now, None, None
+    db.commit()
+    feedcache.invalidate_all()
+    for r in regs:
+        person = db.get(User, r.user_id)
+        notify.create(db, person, "cancelled_event", event, "Event cancelled", f"{event.title} was cancelled by the organizer.", bypass_quiet=True)
+    return {**event_out(db, event), "notified": len(regs)}
+
+
+@router.post("/events/{event_id}/checkin")
+def checkin(event_id: str, body: CheckinIn, user: User = Depends(organizer_only), db: Session = Depends(get_db)):
+    """Accepts the QR token or the short manual code. Checking someone in twice is harmless."""
+    event = my_event(db, user, event_id)
+    raw = body.token.strip()
+    reg = db.scalar(select(Registration).where(Registration.event_id == event.id, Registration.checkin_token == raw))
+    if reg is None and len(raw) == 6:
+        code = raw.upper()
+        reg = next((r for r in db.scalars(select(Registration).where(Registration.event_id == event.id)) if r.checkin_code == code), None)
+    if reg is None:
+        raise HTTPException(404, "That pass isn't for this event.")
+    person = db.get(User, reg.user_id)
+    if reg.status == "attended":
+        return {"name": person.name, "status": "already", "checked_in_at": iso_utc(reg.checked_in_at), "count": _attended(db, event.id)}
+    if reg.status not in ("registered", "promoted_pending", "no_show"):
+        raise HTTPException(409, f"{person.name} isn't registered ({reg.status.replace('_', ' ')}).")
+    reg.status, reg.checked_in_at = "attended", utcnow()
+    db.commit()
+    return {"name": person.name, "status": "checked_in", "checked_in_at": iso_utc(reg.checked_in_at), "count": _attended(db, event.id)}
+
+
+def _attended(db: Session, event_id: str) -> int:
+    return db.scalar(select(func.count()).select_from(Registration).where(Registration.event_id == event_id, Registration.status == "attended")) or 0
 
 
 @router.get("/events/{event_id}/reach-preview")

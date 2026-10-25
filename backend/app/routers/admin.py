@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..deps import require_role
 from ..models import Event, Organizer, Report, User
-from ..services import feedcache
+from ..services import feedcache, jobs
 from ..timeutil import iso_utc, utcnow
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -73,7 +73,11 @@ def _decide(db: Session, event_id: str, approve: bool) -> Event:
 
 @router.post("/events/{event_id}/approve")
 def approve(event_id: str, user: User = Depends(admin_only), db: Session = Depends(get_db)):
-    return {"id": _decide(db, event_id, True).id, "status": "published"}
+    from .organizer import suggest_in_background
+
+    event = _decide(db, event_id, True)
+    jobs.in_background(suggest_in_background, event.id)
+    return {"id": event.id, "status": "published"}
 
 
 @router.post("/events/{event_id}/reject")

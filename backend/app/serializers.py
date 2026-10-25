@@ -4,10 +4,19 @@ from .timeutil import iso_utc
 TRUST_LABELS = {"trusted": "Trusted organizer", "verified": "Verified organizer", "new": "New organizer"}
 
 
-def event_card(ev: Evaluated, seats_taken: int, saved: bool) -> dict:
+def registration_brief(reg) -> dict | None:
+    """Just enough for a card or detail page to show the right button."""
+    if reg is None:
+        return None
+    return {"id": reg.id, "status": reg.status, "waitlist_position": reg.waitlist_position,
+            "promotion_expires_at": iso_utc(reg.promotion_expires_at), "external": reg.external}
+
+
+def event_card(ev: Evaluated, seats_taken: int, saved: bool, reg: dict | None = None) -> dict:
     """What a feed card needs. Cards show the first three reasons."""
     e, r, s = ev.event, ev.result, ev.scored
     return {
+        "registration": reg,
         "id": e.id,
         "title": e.title,
         "category": e.category,
@@ -37,9 +46,9 @@ def event_card(ev: Evaluated, seats_taken: int, saved: bool) -> dict:
     }
 
 
-def event_detail(ev: Evaluated, seats_taken: int, saved: bool) -> dict:
+def event_detail(ev: Evaluated, seats_taken: int, saved: bool, reg: dict | None = None) -> dict:
     e, r = ev.event, ev.result
-    out = event_card(ev, seats_taken, saved)
+    out = event_card(ev, seats_taken, saved, reg)
     org = e.organizer
     out.update({
         "description": e.description,

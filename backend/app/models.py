@@ -140,6 +140,7 @@ class Event(Base):
     duplicate_of: Mapped[str | None] = mapped_column(String(36))
     appeal_note: Mapped[str | None] = mapped_column(String(500))
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime)  # last admin decision; older reports are settled
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime)  # after it ended: no-shows marked, organizer stats updated
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     published_at: Mapped[datetime | None] = mapped_column(DateTime)
 
@@ -165,6 +166,12 @@ class Registration(Base):
     checked_in_at: Mapped[datetime | None] = mapped_column(DateTime)
     showup_likelihood: Mapped[float | None] = mapped_column(Float)
     reminder_confirmed: Mapped[bool] = mapped_column(Boolean, default=False)
+    external: Mapped[bool] = mapped_column(Boolean, default=False)  # "I registered" on the organizer's own site
+
+    @property
+    def checkin_code(self) -> str:
+        """Short code for manual check-in when the camera can't scan."""
+        return self.checkin_token.replace("-", "")[:6].upper()
 
 
 class Notification(Base):
