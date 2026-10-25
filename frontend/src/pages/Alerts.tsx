@@ -106,7 +106,7 @@ function AlertRow({ n }: { n: AppNotification }) {
       onClick={open}
       className="flex w-full items-start gap-3 bg-surface px-5 py-4 text-left hover:bg-text/3"
     >
-      <span className={`mt-2 size-2 shrink-0 rounded-full ${n.read_at ? "bg-transparent" : "bg-accent"}`} aria-label={n.read_at ? undefined : "Unread"} />
+      <span className={`mt-2 size-2 shrink-0 rounded-full ${n.read_at ? "bg-transparent" : "bg-accent-fill"}`} aria-label={n.read_at ? undefined : "Unread"} />
       <span className="min-w-0 flex-1">
         <span className="flex items-baseline justify-between gap-3">
           <span className={`callout ${n.read_at ? "font-medium" : "font-semibold"}`}>{n.title}</span>

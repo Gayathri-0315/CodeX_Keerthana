@@ -7,9 +7,10 @@
   --surface: #ffffff;
   --surface-2: #fbfbfd;
   --text: #1d1d1f;
-  --text-2: #6e6e73;
+  --text-2: #636366; /* spec #6E6E73 is 4.1:1 on the segmented track; this passes AA */
   --line: rgba(0, 0, 0, 0.08);
-  --accent: #0071e3;
+  --accent: #0066cc; /* blue text and icons (AA on gray and tinted backgrounds) */
+  --accent-fill: #0071e3; /* spec accent, for filled buttons with white text */
   --accent-soft: rgba(0, 113, 227, 0.1);
   --success: #30d158;
   --warning: #ff9f0a;
@@ -20,7 +21,7 @@
   --glass-bg: rgba(255, 255, 255, 0.72);
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06);
   /* Text-safe variants of the status colors (AA on surfaces). */
-  --success-text: #1a7f37;
+  --success-text: #16702f;
   --warning-text: #a35200;
   --danger-text: #c9241a;
 }
@@ -35,7 +36,8 @@
     --text-2: #a1a1a6;
     --line: rgba(255, 255, 255, 0.12);
     --accent: #2997ff;
-    --accent-soft: rgba(41, 151, 255, 0.16);
+    --accent-fill: #0071e3; /* white on #2997FF is only 3:1 */
+    --accent-soft: rgba(41, 151, 255, 0.12);
     --free: rgba(48, 209, 88, 0.3);
     --free-edge: rgba(48, 209, 88, 0.7);
     --override: rgba(41, 151, 255, 0.24);
@@ -56,7 +58,8 @@
   --text-2: #a1a1a6;
   --line: rgba(255, 255, 255, 0.12);
   --accent: #2997ff;
-  --accent-soft: rgba(41, 151, 255, 0.16);
+  --accent-fill: #0071e3;
+  --accent-soft: rgba(41, 151, 255, 0.12);
   --free: rgba(48, 209, 88, 0.3);
   --free-edge: rgba(48, 209, 88, 0.7);
   --override: rgba(41, 151, 255, 0.24);
@@ -75,6 +78,7 @@
   --color-text-2: var(--text-2);
   --color-line: var(--line);
   --color-accent: var(--accent);
+  --color-accent-fill: var(--accent-fill);
   --color-accent-soft: var(--accent-soft);
   --color-success: var(--success);
   --color-warning: var(--warning);

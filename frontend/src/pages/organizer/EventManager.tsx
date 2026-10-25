@@ -73,7 +73,7 @@ export default function EventManager() {
         </div>
         <div className="flex flex-wrap gap-2">
           {live && (
-            <Link to={`/organizer/event/${id}/checkin`} className="pressable inline-flex min-h-11 items-center gap-2 rounded-[14px] bg-accent px-4 font-semibold text-white">
+            <Link to={`/organizer/event/${id}/checkin`} className="pressable inline-flex min-h-11 items-center gap-2 rounded-[14px] bg-accent-fill px-4 font-semibold text-white">
               <QrCode className="size-5" aria-hidden /> Check-in
             </Link>
           )}
@@ -150,7 +150,7 @@ function TurnoutCard({ a }: { a: Analytics }) {
       <div className="mt-5 flex flex-col gap-5">
         <Bar label="Expected" value={<><CountUp value={Math.round(a.expected)} /> <span className="footnote font-normal text-text-2">({a.expected_low} to {a.expected_high})</span></>}>
           <div className="absolute inset-y-0 rounded-full bg-accent/20" style={{ left: pct(a.expected_low), width: `calc(${pct(a.expected_high)} - ${pct(a.expected_low)})` }} />
-          <m.div className="absolute inset-y-0 left-0 w-full origin-left rounded-full bg-accent" initial={{ scaleX: 0 }} animate={{ scaleX: a.expected / scale }} transition={{ duration: 0.7, ease: easeOut }} />
+          <m.div className="absolute inset-y-0 left-0 w-full origin-left rounded-full bg-accent-fill" initial={{ scaleX: 0 }} animate={{ scaleX: a.expected / scale }} transition={{ duration: 0.7, ease: easeOut }} />
         </Bar>
         <Bar label="Checked in" value={<CountUp value={a.actual} />}>
           <m.div className="absolute inset-y-0 left-0 w-full origin-left rounded-full bg-success" initial={{ scaleX: 0 }} animate={{ scaleX: a.actual / scale }} transition={{ duration: 0.7, ease: easeOut }} />

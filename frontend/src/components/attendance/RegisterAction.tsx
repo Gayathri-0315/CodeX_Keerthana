@@ -161,7 +161,7 @@ export function RegisterAction({ event, compact = false }: { event: FeedItem | E
     return (
       <div className="flex items-center gap-2">
         <AnimatedButton label="I registered" variant="secondary" onRun={run(true)} />
-        <a href={external} target="_blank" rel="noopener noreferrer" className="pressable inline-flex h-11 items-center gap-1.5 rounded-[14px] bg-accent px-4 font-semibold text-white">
+        <a href={external} target="_blank" rel="noopener noreferrer" className="pressable inline-flex h-11 items-center gap-1.5 rounded-[14px] bg-accent-fill px-4 font-semibold text-white">
           Organizer's site <ExternalLink className="size-4" aria-hidden />
         </a>
         {sheets}
@@ -210,7 +210,7 @@ function AnimatedButton({ label, onRun, compact, variant = "primary", tone = "su
     // On success the parent swaps this button for the celebration copy.
   };
 
-  const bg = shown === "success" ? (tone === "warning" ? "bg-warning" : "bg-success") : variant === "primary" ? "bg-accent" : "bg-accent-soft";
+  const bg = shown === "success" ? (tone === "warning" ? "bg-warning" : "bg-success") : variant === "primary" ? "bg-accent-fill" : "bg-accent-soft";
   const fg = shown === "success" || variant === "primary" ? "text-white" : "text-accent";
 
   return (

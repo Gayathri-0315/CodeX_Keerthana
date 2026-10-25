@@ -1,12 +1,14 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, m } from "motion/react";
-import { ChevronLeft, ChevronRight, CloudOff, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, CloudOff, Loader2, ScanLine } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { PageHeader } from "../components/AppShell";
 import { DAY_SHORT } from "../components/calendar/days";
+import { TimetableImport, type TimetableResult } from "../components/calendar/TimetableImport";
 import {
   applyCells,
+  dayFromIntervals,
   effective,
   fromSlots,
   ROWS,
@@ -142,11 +144,62 @@ function Editor({ initial }: { initial: Slot[] }) {
     { label: "Clear", run: () => setCells([0, 1, 2, 3, 4, 5, 6].flatMap((d) => rowsBetween(d, 0, 24 * 60)), 0) },
   ];
 
+  // ---- timetable import: replace weekly free time with the gaps, filling left to right ----
+  const [params, setParams] = useSearchParams();
+  const [importing, setImporting] = useState(params.get("import") === "1");
+  const [review, setReview] = useState<{ notes: string; lowConfidence: boolean } | null>(null);
+  const applyTimetable = (r: TimetableResult) => {
+    setImporting(false);
+    if (params.get("import")) {
+      params.delete("import");
+      setParams(params, { replace: true });
+    }
+    const byDay = Array.from({ length: 7 }, (_, d) => dayFromIntervals(r.free_slots.filter((s) => s.day_of_week === d)));
+    const stepMs = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 70;
+    byDay.forEach((cells, d) =>
+      window.setTimeout(() => {
+        setState((s) => {
+          const recurring = s.recurring.slice();
+          recurring.set(cells, d * ROWS);
+          return { ...s, recurring, recurringSource: "timetable" };
+        });
+        if (d === 6) scheduleSave();
+      }, d * stepMs),
+    );
+    haptic();
+    setReview({ notes: r.timetable.notes, lowConfidence: r.timetable.confidence < 0.7 });
+  };
+
   const gridProps = { state, weekDates, today, focus, onFocus: setFocus, onPaintStart, onPaint, onPaintEnd, onToggleDay: toggleDay };
   const weekLabel = weekOffset === 0 ? "This week" : weekOffset === 1 ? "Next week" : `In ${weekOffset} weeks`;
 
   return (
     <div className="pb-24">
+      <AnimatePresence>
+        {review && (
+          <m.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={spring}
+            role="status"
+            className="mb-4 flex flex-wrap items-center gap-3 rounded-[22px] bg-accent-soft p-4"
+          >
+            <ScanLine className="size-6 shrink-0 text-accent" aria-hidden />
+            <div className="min-w-0 flex-1">
+              <p className="headline">Review your free time. Tap any hour to fix it.</p>
+              {(review.notes || review.lowConfidence) && (
+                <p className="callout text-text-2">
+                  {review.lowConfidence && "Some cells were hard to read. "}
+                  {review.notes}
+                </p>
+              )}
+            </div>
+            <Button onClick={() => setReview(null)}>Looks right</Button>
+          </m.div>
+        )}
+      </AnimatePresence>
+
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <Segmented
           label="Edit mode"
@@ -171,6 +224,9 @@ function Editor({ initial }: { initial: Slot[] }) {
       </div>
 
       <div className="no-scrollbar -mx-4 mb-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+        <button onClick={() => setImporting(true)} className="pressable inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-accent-fill px-4 callout font-semibold text-white">
+          <ScanLine className="size-4" aria-hidden /> Import timetable
+        </button>
         {presets.map((p) => (
           <button key={p.label} onClick={p.run} className="pressable min-h-11 shrink-0 rounded-full bg-surface px-4 callout font-medium shadow-[inset_0_0_0_1px_var(--line)]">
             {p.label}
@@ -193,6 +249,7 @@ function Editor({ initial }: { initial: Slot[] }) {
       )}
 
       <FitPill saveState={saveState} />
+      <TimetableImport open={importing} onClose={() => setImporting(false)} onResult={applyTimetable} />
     </div>
   );
 }

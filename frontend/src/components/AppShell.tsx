@@ -1,6 +1,6 @@
 import { m } from "motion/react";
 import { Bell, CalendarDays, Home, Ticket } from "lucide-react";
-import { Suspense } from "react";
+import { Suspense, useRef } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { pageVariants, spring } from "../lib/motion";
 import { useMe } from "../lib/queries";
@@ -51,6 +51,9 @@ export function AppShell() {
   const { pathname } = useLocation();
   const { data: me } = useMe();
   const student = me?.role === "student";
+  const firstPath = useRef(pathname);
+  const firstScreen = useRef(true);
+  if (pathname !== firstPath.current) firstScreen.current = false;
   // Event detail has its own sticky action bar, so the tab bar steps aside there.
   const tabBar = student && !pathname.startsWith("/event/");
   const { data: alerts } = useNotifications(student);
@@ -94,7 +97,8 @@ export function AppShell() {
 
       <main id="main" className={`mx-auto max-w-[1080px] px-4 pt-4 sm:px-6 md:pt-8 ${tabBar ? "pb-32 md:pb-16" : "pb-16"}`}>
         <Suspense fallback={<div className="h-40" />}>
-          <m.div key={pathname} variants={pageVariants} initial="initial" animate="animate">
+          {/* The first screen paints at once (it's the LCP); later navigations crossfade in. */}
+          <m.div key={pathname} variants={pageVariants} initial={firstScreen.current ? false : "initial"} animate="animate">
             <Outlet />
           </m.div>
         </Suspense>

@@ -12,7 +12,14 @@ export default defineConfig({
     target: "es2020",
     rollupOptions: {
       output: {
-        manualChunks: { react: ["react", "react-dom", "react-router-dom"], query: ["@tanstack/react-query"] },
+        // A few mid-sized chunks instead of a dozen tiny ones per screen: on a 150 ms RTT phone,
+        // round trips cost more than bytes. The QR scanner stays its own lazy chunk.
+        manualChunks(id) {
+          if (/node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/.test(id)) return "react";
+          if (id.includes("@tanstack")) return "query";
+          if (/node_modules[\\/](motion|framer-motion|motion-dom|motion-utils|lucide-react)[\\/]/.test(id)) return "ui";
+          if (/[\\/]src[\\/](lib|components[\\/]ui)[\\/]/.test(id)) return "core";
+        },
       },
     },
   },

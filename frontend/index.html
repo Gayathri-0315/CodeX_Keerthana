@@ -11,6 +11,16 @@
     <script>
       // Apply the saved theme before first paint to avoid a flash.
       try { var t = localStorage.getItem("showup-theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) {}
+      // Start the first API calls while the app's JS is still downloading (src/lib/api.ts picks them up).
+      (function () {
+        var boot = (window.__boot = {});
+        var get = function (p) { return (boot[p] = fetch("/api" + p, { credentials: "same-origin" })); };
+        var path = location.pathname;
+        var first = { "/": ["/feed/count", "/feed?tab=for_you&limit=20"], "/calendar": ["/availability", "/feed/count"], "/my": ["/registrations/me"] }[path];
+        get("/auth/session").then(function (r) { return r.clone().json(); }).then(function (d) {
+          if (d && d.user && d.user.role === "student" && d.user.onboarded && first) first.forEach(get);
+        }).catch(function () {});
+      })();
     </script>
   </head>
   <body>

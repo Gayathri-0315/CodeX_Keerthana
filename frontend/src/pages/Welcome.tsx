@@ -1,5 +1,5 @@
 import { AnimatePresence, m } from "motion/react";
-import { ArrowLeft, CalendarDays, MapPin } from "lucide-react";
+import { ArrowLeft, CalendarDays, MapPin, ScanLine } from "lucide-react";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { Logo } from "../components/AppShell";
@@ -55,7 +55,7 @@ export default function Welcome() {
             {[0, 1, 2, 3].map((i) => (
               <span
                 key={i}
-                className={`h-2 rounded-full transition-all duration-300 ${i === progress ? "w-6 bg-accent" : i < progress ? "w-2 bg-accent/50" : "w-2 bg-text/15"}`}
+                className={`h-2 rounded-full transition-all duration-300 ${i === progress ? "w-6 bg-accent-fill" : i < progress ? "w-2 bg-accent/50" : "w-2 bg-text/15"}`}
               />
             ))}
           </div>
@@ -262,6 +262,18 @@ function Free() {
   return (
     <>
       <StepTitle title="When are you free?" subtitle="We only show events that fit these hours, travel time included." />
+      <button
+        onClick={() => navigate("/calendar?onboarding=1&import=1")}
+        className="pressable liftable card mb-3 flex items-center gap-4 p-5 text-left"
+      >
+        <span className="grid size-12 shrink-0 place-items-center rounded-[14px] bg-accent-soft text-accent">
+          <ScanLine className="size-6" aria-hidden />
+        </span>
+        <span>
+          <span className="headline block">Upload my timetable</span>
+          <span className="callout block text-text-2">Snap your class timetable. We'll find the gaps.</span>
+        </span>
+      </button>
       <button
         onClick={() => navigate("/calendar?onboarding=1")}
         className="pressable liftable card flex items-center gap-4 p-5 text-left"

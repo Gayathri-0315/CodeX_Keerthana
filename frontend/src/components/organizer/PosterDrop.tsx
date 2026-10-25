@@ -89,19 +89,19 @@ export function PosterDrop({ onFile, onManual, error }: Props) {
   );
 }
 
-/** The poster while the AI reads it: a soft shimmer line sweeping down. */
-export function ReadingPoster({ src }: { src: string }) {
+/** An image while the AI reads it: a soft shimmer line sweeping down. */
+export function ReadingPoster({ src, label = "Reading your poster...", alt = "Your poster" }: { src: string; label?: string; alt?: string }) {
   return (
     <div className="mx-auto max-w-sm text-center">
       <div className="relative overflow-hidden rounded-[22px] shadow-card">
-        <img src={src} alt="Your poster" className="w-full" />
+        <img src={src} alt={alt} className="w-full" />
         <div className="absolute inset-0 bg-white/10" />
         <div
           className="absolute inset-x-0 h-24 animate-[sweep_1.6s_ease-in-out_infinite] bg-gradient-to-b from-transparent via-white/50 to-transparent"
           aria-hidden
         />
       </div>
-      <p className="headline mt-5" aria-live="polite">Reading your poster...</p>
+      <p className="headline mt-5" aria-live="polite">{label}</p>
       <p className="callout text-text-2">This takes a few seconds.</p>
     </div>
   );

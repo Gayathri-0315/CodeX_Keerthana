@@ -18,7 +18,7 @@ export function Chip({ label, selected, onToggle }: Props) {
       animate={{ scale: 1 }}
       transition={snappy}
       className={`inline-flex min-h-11 items-center gap-1.5 rounded-full px-4 callout font-medium transition-colors duration-200 ${
-        selected ? "bg-accent text-white" : "bg-surface text-text shadow-[inset_0_0_0_1px_var(--line)]"
+        selected ? "bg-accent-fill text-white" : "bg-surface text-text shadow-[inset_0_0_0_1px_var(--line)]"
       }`}
     >
       {selected && <Check className="size-4" strokeWidth={2.5} aria-hidden />}

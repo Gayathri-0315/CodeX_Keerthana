@@ -34,7 +34,7 @@ export default function EventPage() {
       <div className="card mx-auto mt-8 max-w-md p-8 text-center">
         <p className="headline">{missing ? "This event isn't available." : "Couldn't load this event."}</p>
         <p className="callout mt-1 text-text-2">{missing ? "It may have been removed by the organizer." : "Check your connection, then try again."}</p>
-        <Link to="/" className="pressable mt-4 inline-flex min-h-11 items-center rounded-[14px] bg-accent px-5 font-semibold text-white">Back to events</Link>
+        <Link to="/" className="pressable mt-4 inline-flex min-h-11 items-center rounded-[14px] bg-accent-fill px-5 font-semibold text-white">Back to events</Link>
       </div>
     );
   }
@@ -140,13 +140,14 @@ export default function EventPage() {
 }
 
 function Row({ icon: Icon, label, children }: { icon: typeof Clock; label: string; children: React.ReactNode }) {
+  // dl > div > (dt, dd) is the only valid grouping, so the icon lives inside the dd.
   return (
-    <div className="flex gap-4 py-4">
-      <Icon className="mt-0.5 size-5 shrink-0 text-text-2" aria-hidden />
-      <div className="min-w-0">
-        <dt className="sr-only">{label}</dt>
-        <dd>{children}</dd>
-      </div>
+    <div className="py-4">
+      <dt className="sr-only">{label}</dt>
+      <dd className="flex gap-4">
+        <Icon className="mt-0.5 size-5 shrink-0 text-text-2" aria-hidden />
+        <div className="min-w-0">{children}</div>
+      </dd>
     </div>
   );
 }

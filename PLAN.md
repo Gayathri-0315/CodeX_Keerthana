@@ -9,7 +9,7 @@ Build order follows SPEC.md section 14. Each phase ends runnable, tested and com
 | 3 Matching and feed | Ranking, reasons, Almost list, feed UI, detail, save/dismiss, embeddings + fallback | done |
 | 4 Poster to listing | Extraction (mock + live), confirm screen, trust gate, reach preview, admin queue, reports | done |
 | 5 Attendance | Register animation + pass, SSE toasts, notification rules, reminders, waitlist, .ics, QR check-in, analytics | done |
-| 6 Timetable + polish | Timetable import, Telegram poster flow, states, a11y and performance passes, README | next |
+| 6 Timetable + polish | Timetable import, Telegram poster flow, states, a11y and performance passes, README | done |
 
 ## Key decisions
 
@@ -38,6 +38,10 @@ Build order follows SPEC.md section 14. Each phase ends runnable, tested and com
 - **Notification types** beyond the spec's list: `waitlisted`, `reminder_24h`, `reminder_2h` (alongside `reminder_leave_by`) and `message` (organizer to registrants). Only `match`, `deadline` and `seat_opened` count toward the weekly cap.
 - **Telegram** uses the Bot API over HTTPS directly (no `python-telegram-bot` dependency). Locally it long-polls every 3 s; in production set a webhook to `/api/telegram/webhook` with the secret from `routers/telegram.py:webhook_secret`. Poster upload by Telegram is Phase 6.
 - **Check-in** accepts the QR token or a 6-character code printed under the QR.
+- **Timetable import** replaces the weekly free time with the gaps between 08:00 and 21:00 (`TIMETABLE_DAY_START_MIN` / `END_MIN` in config) and keeps one-off changes. The 30-minute grid marks a cell free only when a gap covers all of it, so a 10-minute break between classes doesn't count. The import is not saved until it's applied; a review banner then asks the student to check it.
+- **Contrast (SPEC 8.11 over 7.1):** a few spec colors miss WCAG AA in places. `#0071E3` stays as the filled-button color (`--accent-fill`) in both themes. Blue text uses `#0066CC` in light mode. Secondary text is `#636366` instead of `#6E6E73`, and dark-mode tinted backgrounds are a touch darker.
+- **Performance:** the motion engine loads with the app (async loading left content invisible until it arrived), the first screen skips its enter animation, Home is in the main bundle, and `index.html` starts the session and first-screen API calls while the JS downloads. Icons, motion and shared UI are grouped into a few chunks to cut round trips.
+- **Telegram posters** create a draft (`source: telegram`), run the trust gate, and offer Confirm and publish, Edit on web, or Cancel. Telegram re-encodes photos, so in mock mode only files sent as documents with a sample's file name are recognised.
 - **Dev reload:** `scripts/py.mjs --watch app` restarts uvicorn on .py changes. uvicorn's own `--reload` is not used because on Windows it stops its worker with a console Ctrl+C that also kills `npm run dev`.
 
 ## Deviations from the spec (data only)

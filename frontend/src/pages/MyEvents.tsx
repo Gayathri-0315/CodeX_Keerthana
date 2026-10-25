@@ -71,7 +71,7 @@ function Empty({ tab }: { tab: Tab }) {
       <p className="headline mt-3">{copy[0]}</p>
       <p className="callout mt-1 text-text-2">{copy[1]}</p>
       {tab !== "past" && (
-        <Link to="/" className="pressable mt-4 inline-flex min-h-11 items-center rounded-[14px] bg-accent px-5 font-semibold text-white">Find events</Link>
+        <Link to="/" className="pressable mt-4 inline-flex min-h-11 items-center rounded-[14px] bg-accent-fill px-5 font-semibold text-white">Find events</Link>
       )}
     </div>
   );
@@ -149,7 +149,7 @@ function PastCard({ reg }: { reg: Registration }) {
                   aria-pressed={on}
                   aria-label={kind === "as_described" ? "Yes" : "No"}
                   onClick={() => fb.mutate({ id: reg.id, kind })}
-                  className={`pressable grid size-11 place-items-center rounded-full ${on ? "bg-accent text-white" : "bg-text/6 text-text-2"}`}
+                  className={`pressable grid size-11 place-items-center rounded-full ${on ? "bg-accent-fill text-white" : "bg-text/6 text-text-2"}`}
                 >
                   <Icon className="size-5" />
                 </button>

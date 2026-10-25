@@ -17,10 +17,11 @@ export type CalState = {
   recurring: Uint8Array; // 1 = free every week
   overrides: Map<string, Override>; // keyed by YYYY-MM-DD
   outside: Slot[]; // slot parts outside 06:00-22:00, kept untouched on save
+  recurringSource: Slot["source"]; // "timetable" once imported from a timetable
 };
 
 export function emptyState(): CalState {
-  return { recurring: new Uint8Array(7 * ROWS), overrides: new Map(), outside: [] };
+  return { recurring: new Uint8Array(7 * ROWS), overrides: new Map(), outside: [], recurringSource: "manual" };
 }
 
 export function effective(s: CalState, date: string, day: number, row: number): 0 | 1 {
@@ -54,6 +55,7 @@ export function fromSlots(slots: Slot[]): CalState {
     const rows = coveredRows(slot.start_min, slot.end_min);
     if (slot.recurring && !slot.date) {
       if (slot.kind === "free") rows.forEach((r) => (s.recurring[idx(slot.day_of_week, r)] = 1));
+      if (slot.source === "timetable") s.recurringSource = "timetable";
       continue;
     }
     if (!slot.date) continue;
@@ -82,7 +84,7 @@ export function toSlots(s: CalState): Slot[] {
   const slots: Slot[] = [...s.outside];
   for (let d = 0; d < 7; d++) {
     for (const [a, b] of runs(s.recurring.subarray(d * ROWS, (d + 1) * ROWS), 1)) {
-      slots.push({ day_of_week: d, start_min: a, end_min: b, recurring: true, date: null, kind: "free", source: "manual" });
+      slots.push({ day_of_week: d, start_min: a, end_min: b, recurring: true, date: null, kind: "free", source: s.recurringSource });
     }
   }
   for (const [date, o] of s.overrides) {
@@ -126,6 +128,13 @@ export function rect(a: Cell, b: Cell): Cell[] {
   for (let d = Math.min(a.day, b.day); d <= Math.max(a.day, b.day); d++)
     for (let r = Math.min(a.row, b.row); r <= Math.max(a.row, b.row); r++) cells.push({ day: d, row: r });
   return cells;
+}
+
+/** One weekday's cells that are fully covered by these [start, end) intervals. */
+export function dayFromIntervals(intervals: { start_min: number; end_min: number }[]): Uint8Array {
+  const out = new Uint8Array(ROWS);
+  for (const iv of intervals) coveredRows(iv.start_min, iv.end_min).forEach((r) => (out[r] = 1));
+  return out;
 }
 
 export function rowsBetween(day: number, fromMin: number, toMin: number): Cell[] {

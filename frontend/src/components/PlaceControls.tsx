@@ -35,7 +35,7 @@ export function AreaPicker({ value, onChange }: { value: Area | null; onChange: 
                 setQ("");
               }}
               className={`pressable inline-flex min-h-11 items-center gap-1.5 rounded-full px-4 callout font-medium ${
-                selected ? "bg-accent text-white" : "bg-surface shadow-[inset_0_0_0_1px_var(--line)]"
+                selected ? "bg-accent-fill text-white" : "bg-surface shadow-[inset_0_0_0_1px_var(--line)]"
               }`}
             >
               {selected && <Check className="size-4" aria-hidden />}
@@ -44,7 +44,7 @@ export function AreaPicker({ value, onChange }: { value: Area | null; onChange: 
           );
         })}
         {value && !shown.some((a) => a.name === value.name) && (
-          <span className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-accent px-4 callout font-medium text-white">
+          <span className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-accent-fill px-4 callout font-medium text-white">
             <Check className="size-4" aria-hidden /> {value.name}
           </span>
         )}

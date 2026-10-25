@@ -1,17 +1,28 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { LazyMotion, MotionConfig } from "motion/react";
+import { domMax, LazyMotion, MotionConfig } from "motion/react";
 import { lazy, Suspense, type ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
+import { ErrorBoundary, NotFound, OfflineBanner } from "../components/AppStates";
 import { Toaster } from "../components/ui/Toaster";
 import { ApiError } from "../lib/api";
 import { useMe } from "../lib/queries";
+import Home from "../pages/Home";
 
-const Welcome = lazy(() => import("../pages/Welcome"));
+const loadCalendar = () => import("../pages/CalendarPage");
+const loadMy = () => import("../pages/MyEvents");
+const loadWelcome = () => import("../pages/Welcome");
+
+// Fetch the current screen's chunk alongside the app bundle instead of after the session check.
+// (Home, every student's landing screen, is in the main bundle.)
+({ "/calendar": loadCalendar, "/my": loadMy, "/welcome": loadWelcome } as Record<string, () => Promise<unknown>>)[
+  window.location.pathname
+]?.();
+
+const Welcome = lazy(loadWelcome);
 const SignIn = lazy(() => import("../pages/SignIn"));
-const Home = lazy(() => import("../pages/Home"));
-const CalendarPage = lazy(() => import("../pages/CalendarPage"));
-const MyEvents = lazy(() => import("../pages/MyEvents"));
+const CalendarPage = lazy(loadCalendar);
+const MyEvents = lazy(loadMy);
 const Alerts = lazy(() => import("../pages/Alerts"));
 const Settings = lazy(() => import("../pages/Settings"));
 const EventPage = lazy(() => import("../pages/EventPage"));
@@ -22,7 +33,6 @@ const EventManager = lazy(() => import("../pages/organizer/EventManager"));
 const Checkin = lazy(() => import("../pages/organizer/Checkin"));
 const DemoPanel = lazy(() => import("../pages/DemoPanel"));
 
-const loadFeatures = () => import("./features").then((r) => r.default);
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -49,7 +59,7 @@ function RequireAuth({ children }: { children: ReactNode }) {
         <div>
           <p className="headline">Can't reach ShowUp right now.</p>
           <p className="callout mt-1 text-text-2">Check your connection, then try again.</p>
-          <button className="pressable mt-4 min-h-11 rounded-full bg-accent px-5 font-semibold text-white" onClick={() => refetch()}>
+          <button className="pressable mt-4 min-h-11 rounded-full bg-accent-fill px-5 font-semibold text-white" onClick={() => refetch()}>
             Try again
           </button>
         </div>
@@ -75,10 +85,13 @@ function OnlyRole({ role, children }: { role: "organizer" | "admin"; children: R
 
 export function App() {
   return (
+    <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
-      <LazyMotion features={loadFeatures} strict>
+      {/* Loaded up front: with async features, m.* elements wait invisible at their initial styles. */}
+      <LazyMotion features={domMax} strict>
         <MotionConfig reducedMotion="user">
           <Toaster>
+            <OfflineBanner />
             <BrowserRouter>
               <Suspense fallback={<Splash />}>
                 <Routes>
@@ -102,8 +115,8 @@ export function App() {
                     <Route path="organizer/event/:id" element={<OnlyRole role="organizer"><EventManager /></OnlyRole>} />
                     <Route path="organizer/event/:id/checkin" element={<OnlyRole role="organizer"><Checkin /></OnlyRole>} />
                     <Route path="demo" element={<DemoPanel />} />
+                    <Route path="*" element={<NotFound />} />
                   </Route>
-                  <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </Suspense>
             </BrowserRouter>
@@ -111,5 +124,6 @@ export function App() {
         </MotionConfig>
       </LazyMotion>
     </QueryClientProvider>
+    </ErrorBoundary>
   );
 }

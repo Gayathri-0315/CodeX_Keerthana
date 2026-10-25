@@ -20,7 +20,7 @@ export default function OrganizerHome() {
         title={summary?.org_name ?? "Your events"}
         subtitle={summary ? TRUST[summary.trust_level] : undefined}
         action={
-          <Link to="/organizer/new" className="pressable inline-flex min-h-11 items-center gap-1.5 rounded-[14px] bg-accent px-4 font-semibold text-white">
+          <Link to="/organizer/new" aria-label="New event" className="pressable inline-flex min-h-11 items-center gap-1.5 rounded-[14px] bg-accent-fill px-4 font-semibold text-white">
             <Plus className="size-5" aria-hidden /> <span className="hidden sm:inline">New event</span>
           </Link>
         }
@@ -44,7 +44,7 @@ export default function OrganizerHome() {
         <div className="card p-8 text-center">
           <p className="headline">No events yet.</p>
           <p className="callout mt-1 text-text-2">Drop a poster and we'll fill in the details.</p>
-          <Link to="/organizer/new" className="pressable mt-4 inline-flex min-h-11 items-center rounded-[14px] bg-accent px-5 font-semibold text-white">Create an event</Link>
+          <Link to="/organizer/new" className="pressable mt-4 inline-flex min-h-11 items-center rounded-[14px] bg-accent-fill px-5 font-semibold text-white">Create an event</Link>
         </div>
       ) : (
         <ul className="card divide-y divide-line">

@@ -87,6 +87,12 @@ export default function Settings() {
             <AlertsSection me={me} patch={patch} />
           </>
         )}
+        {me.role === "organizer" && (
+          <Section title="Telegram">
+            <TelegramRow me={me} patch={patch} />
+            <Row><p className="footnote text-text-2">Once linked, send an event poster to the bot. It reads the poster, runs the trust check, and lets you publish from the chat.</p></Row>
+          </Section>
+        )}
         <AppearanceSection />
         <DataSection me={me} />
         <DemoLink />

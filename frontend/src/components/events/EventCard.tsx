@@ -156,7 +156,7 @@ export function EventCard({ event, index, onToggleSave, onDismiss, onRemindSimil
         {event.match != null && !muted && (
           <div className="h-[3px] w-full bg-text/5" role="meter" aria-valuenow={event.match} aria-valuemin={0} aria-valuemax={100} aria-label="Match">
             <m.div
-              className="h-full origin-left bg-accent"
+              className="h-full origin-left bg-accent-fill"
               initial={{ scaleX: 0 }}
               animate={{ scaleX: event.match / 100 }}
               transition={{ duration: 0.6, ease: easeOut, delay: 0.1 + Math.min(index, 8) * 0.03 }}

@@ -111,7 +111,7 @@ export default function Home() {
           <p className="headline">{EMPTY[tab].title}</p>
           <p className="callout mt-1 text-text-2">{EMPTY[tab].body}</p>
           {tab === "for_you" && (
-            <Link to="/calendar" className="pressable mt-4 inline-flex min-h-11 items-center rounded-[14px] bg-accent px-5 font-semibold text-white">
+            <Link to="/calendar" className="pressable mt-4 inline-flex min-h-11 items-center rounded-[14px] bg-accent-fill px-5 font-semibold text-white">
               Add free time
             </Link>
           )}
