@@ -9,6 +9,24 @@ from .travel import haversine_km, travel_minutes, user_home
 BUFFER_MIN = 10
 
 
+@dataclass(frozen=True)
+class Going:
+    """An event the user is registered for. Its time counts as busy (prompt v2, item 5)."""
+
+    event_id: str
+    start_at: datetime
+    end_at: datetime
+    title: str
+
+
+def going_clash(event, need_start: datetime, going) -> str | None:
+    """'You're already going to <event>' if this event (travel included) overlaps one the user is going to."""
+    for g in going or ():
+        if g.event_id != event.id and g.start_at < event.end_at and g.end_at > need_start:
+            return f"You're already going to {g.title}."
+    return None
+
+
 @dataclass
 class FilterResult:
     passed: bool
@@ -44,8 +62,9 @@ def _schedule_conflict(event, need_start: datetime, windows) -> str:
     return f"You'd need to leave by {fmt_time(to_ist(need_start))}, you're free from {fmt_time(to_ist(w[0]))} on {day}."
 
 
-def check_event(user, event, windows, now: datetime, registered_count: int = 0) -> FilterResult:
-    """Run the hard filters in spec order. `windows` are the user's merged free windows (naive UTC)."""
+def check_event(user, event, windows, now: datetime, registered_count: int = 0, going=()) -> FilterResult:
+    """Run the hard filters in spec order. `windows` are the user's merged free windows (naive UTC);
+    `going` are events the user is registered for, which count as busy."""
     # 1. Status, not started, deadline open.
     if event.status != "published" or event.start_at is None or event.end_at is None:
         return FilterResult(False, "status", "Not open for registration.")
@@ -83,9 +102,10 @@ def check_event(user, event, windows, now: datetime, registered_count: int = 0) 
 
     # 6. Schedule fit.
     need_start = event.start_at - timedelta(minutes=travel + BUFFER_MIN)
-    window = next((w for w in windows if w[0] <= need_start and w[1] >= event.end_at), None)
+    busy = going_clash(event, need_start, going)
+    window = None if busy else next((w for w in windows if w[0] <= need_start and w[1] >= event.end_at), None)
     if window is None:
-        conflict = _schedule_conflict(event, need_start, windows)
+        conflict = busy or _schedule_conflict(event, need_start, windows)
         if user.strict_schedule:
             return FilterResult(False, "schedule", conflict, distance_km=distance, travel_min=travel,
                                 waitlist=waitlist, need_start=need_start)
@@ -98,7 +118,7 @@ def check_event(user, event, windows, now: datetime, registered_count: int = 0) 
                         need_start=need_start)
 
 
-def time_fit(user, event, windows) -> tuple[bool, str | None]:
+def time_fit(user, event, windows, going=()) -> tuple[bool, str | None]:
     """Only the schedule question, whatever the other filters say: can the user be there, travel included?
 
     Used for the "Fits your time" badge on Explore, where events failing other rules still show.
@@ -109,6 +129,8 @@ def time_fit(user, event, windows) -> tuple[bool, str | None]:
     if event.mode == "in_person" and event.lat is not None and event.lng is not None:
         travel = travel_minutes(haversine_km(*user_home(user), event.lat, event.lng))
     need_start = event.start_at - timedelta(minutes=travel + BUFFER_MIN)
+    if busy := going_clash(event, need_start, going):
+        return False, busy
     if any(w[0] <= need_start and w[1] >= event.end_at for w in windows):
         return True, None
     return False, _schedule_conflict(event, need_start, windows)

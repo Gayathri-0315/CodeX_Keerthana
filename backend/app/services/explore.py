@@ -55,11 +55,11 @@ def apply_filters(data: FeedData, f: Filters) -> list[Evaluated]:
     return sorted((i for i in data.items if _matches(i, f)), key=lambda i: i.event.start_at)
 
 
-def fit_badge(ev: Evaluated, user, windows) -> dict:
+def fit_badge(ev: Evaluated, user, windows, going=()) -> dict:
     r = ev.result
     if r.passed and r.window is not None:
         return {"fits": True, "reason": None}
     if r.failed_rule == "schedule" or (r.passed and r.window is None):
         return {"fits": False, "reason": r.reason}
-    fits, reason = time_fit(user, ev.event, windows)
+    fits, reason = time_fit(user, ev.event, windows, going)
     return {"fits": fits, "reason": reason}

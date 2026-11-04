@@ -18,13 +18,16 @@ import {
   type Cell,
   type Mode,
 } from "../components/calendar/model";
-import { WeekGrid } from "../components/calendar/WeekGrid";
+import { WeekGrid, type CalBlock } from "../components/calendar/WeekGrid";
+import { GRID_START, STEP } from "../components/calendar/model";
+import { useMyRegistrations } from "../lib/attendance";
+import type { Registration } from "../lib/types";
 import { Button } from "../components/ui/Button";
 import { CountUp } from "../components/ui/CountUp";
 import { Segmented } from "../components/ui/Segmented";
 import { useToast } from "../components/ui/Toaster";
 import { api } from "../lib/api";
-import { addDays, istToday, shortDate, weekdayIndex } from "../lib/format";
+import { addDays, formatTimeRange, isoDate, istParts, istToday, shortDate, weekdayIndex } from "../lib/format";
 import { gentle, haptic, spring } from "../lib/motion";
 import { keys, useAvailability, useFeedCount, useUpdateMe } from "../lib/queries";
 import type { Slot } from "../lib/types";
@@ -170,7 +173,8 @@ function Editor({ initial }: { initial: Slot[] }) {
     setReview({ notes: r.timetable.notes, lowConfidence: r.timetable.confidence < 0.7 });
   };
 
-  const gridProps = { state, weekDates, today, focus, onFocus: setFocus, onPaintStart, onPaint, onPaintEnd, onToggleDay: toggleDay };
+  const blocks = useCalendarBlocks(weekDates);
+  const gridProps = { blocks, state, weekDates, today, focus, onFocus: setFocus, onPaintStart, onPaint, onPaintEnd, onToggleDay: toggleDay };
   const weekLabel = weekOffset === 0 ? "This week" : weekOffset === 1 ? "Next week" : `In ${weekOffset} weeks`;
 
   return (
@@ -246,6 +250,15 @@ function Editor({ initial }: { initial: Slot[] }) {
         </div>
       ) : (
         <DayPager {...gridProps} />
+      )}
+
+      {blocks.length > 0 && (
+        <p className="footnote mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-text-2">
+          <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded-[4px] bg-accent-fill" aria-hidden />Going (counts as busy)</span>
+          {blocks.some((b) => b.kind === "waitlist") && (
+            <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded-[4px] bg-warning/30 shadow-[inset_0_0_0_1px_var(--warning)]" aria-hidden />Waitlist</span>
+          )}
+        </p>
       )}
 
       <FitPill saveState={saveState} />
@@ -363,4 +376,30 @@ function OnboardingDone() {
       </AnimatePresence>
     </>
   );
+}
+
+/** Events I'm going to (or waiting for) in the shown week, as blocks on the grid. */
+function useCalendarBlocks(weekDates: string[]): CalBlock[] {
+  const { data } = useMyRegistrations();
+  return useMemo(() => {
+    if (!data) return [];
+    const regs: Registration[] = [...data.upcoming, ...data.waitlist];
+    const out: CalBlock[] = [];
+    for (const r of regs) {
+      const kind = r.status === "registered" ? "going" : r.status === "waitlisted" || r.status === "promoted_pending" ? "waitlist" : null;
+      if (!kind) continue;
+      const s = istParts(new Date(r.event.start_at));
+      const e = istParts(new Date(r.event.end_at));
+      const day = weekDates.indexOf(isoDate(s.year, s.month, s.day));
+      if (day < 0) continue;
+      const sameDay = s.year === e.year && s.month === e.month && s.day === e.day;
+      const startMin = s.hour * 60 + s.minute;
+      const endMin = sameDay ? e.hour * 60 + e.minute : 24 * 60;
+      const startRow = Math.max(0, Math.floor((startMin - GRID_START) / STEP));
+      const endRow = Math.min(ROWS, Math.ceil((endMin - GRID_START) / STEP));
+      if (endRow <= startRow) continue; // entirely outside 6 AM to 10 PM
+      out.push({ key: r.id, day, startRow, endRow, title: r.event.title, time: formatTimeRange(r.event.start_at, r.event.end_at), kind });
+    }
+    return out;
+  }, [data, weekDates]);
 }

@@ -69,7 +69,7 @@ def page_out(db: Session, user: User, data, items, offset: int, limit: int, badg
     for i in page:
         card = event_card(i, data.counts.get(i.event.id, 0), i.event.id in saved, regs.get(i.event.id), classmates.get(i.event.id))
         if badges:
-            card["time_fit"] = fit_badge(i, user, windows)
+            card["time_fit"] = fit_badge(i, user, windows, data.going)
         out.append(card)
     return {"items": out, "next_cursor": str(offset + limit) if offset + limit < len(items) else None, "total": len(items)}
 

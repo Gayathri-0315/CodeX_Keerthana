@@ -127,3 +127,21 @@ def test_anywhere_travel_score_is_bounded():
 
     fr = check_event(user(max_distance_km=None), event(start="20:00", end="21:00", **FAR), windows((0, 1440)), NOW)
     assert 0 <= travel_score(fr, user(max_distance_km=None)) <= 100
+
+
+# ---- events I'm going to count as busy (prompt v2, item 5) ----
+
+def test_going_block_is_busy_and_explains_the_clash():
+    from app.services.matching import Going, time_fit
+
+    meetup = event(start="16:00", end="17:00", id="meetup")
+    going = [Going("meetup", meetup.start_at, meetup.end_at, "Python Meetup")]
+    other = event(start="16:30", end="17:30", id="other")
+    r = check_event(user(), other, SAT_AFTERNOON, NOW, going=going)
+    assert not r.passed and r.almost and r.reason == "You're already going to Python Meetup."
+    assert time_fit(user(), other, SAT_AFTERNOON, going) == (False, "You're already going to Python Meetup.")
+    # The event itself is never blocked by its own Going block.
+    assert check_event(user(), meetup, SAT_AFTERNOON, NOW, going=going).passed
+    # Travel time counts: leaving for an event right after another one clashes too.
+    right_after = event(start="17:05", end="18:00", id="after")
+    assert not check_event(user(), right_after, SAT_AFTERNOON, NOW, going=going).passed

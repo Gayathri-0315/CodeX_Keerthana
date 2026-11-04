@@ -4,7 +4,19 @@ import { haptic } from "../../lib/motion";
 import { DAY_SHORT, DAY_LONG } from "./days";
 import { ROWS, STEP, effective, rect, rowStart, type CalState, type Cell } from "./model";
 
+/** A registered (Going) or waitlisted event drawn over the grid. Rows are inside this week's grid. */
+export type CalBlock = {
+  key: string;
+  day: number;
+  startRow: number;
+  endRow: number; // exclusive
+  title: string;
+  time: string;
+  kind: "going" | "waitlist";
+};
+
 type Props = {
+  blocks?: CalBlock[];
   state: CalState;
   weekDates: string[];
   today: string;
@@ -170,6 +182,8 @@ export function WeekGrid(p: Props) {
   };
 
   const { state, weekDates, today, days, layout, focus } = p;
+  const blockAt = new Map((p.blocks ?? []).map((b) => [`${b.day}:${b.startRow}`, b]));
+  const inBlock = (d: number, row: number) => (p.blocks ?? []).find((b) => b.day === d && row >= b.startRow && row < b.endRow);
   const cols = layout === "week" ? `3.25rem repeat(${days.length}, minmax(0, 1fr))` : "3.25rem minmax(0, 1fr)";
 
   return (
@@ -222,6 +236,8 @@ export function WeekGrid(p: Props) {
                 joinBottom={row < ROWS - 1 && effective(state, date, d, row + 1) === 1}
                 focused={focus.day === d && focus.row === row}
                 tall={layout === "day"}
+                block={blockAt.get(`${d}:${row}`)}
+                busyWith={inBlock(d, row)?.title}
                 onFocus={p.onFocus}
               />
             );
@@ -241,12 +257,16 @@ type CellProps = {
   joinBottom: boolean;
   focused: boolean;
   tall: boolean;
+  block?: CalBlock;
+  busyWith?: string;
   onFocus: (c: Cell) => void;
 };
 
 /** Memoized: a drag re-renders only cells whose look actually changed. */
-const GridCell = memo(function GridCell({ day, row, free, override, joinTop, joinBottom, focused, tall, onFocus }: CellProps) {
-  const label = `${DAY_LONG[day]} ${formatMinutes(rowStart(row))} to ${formatMinutes(rowStart(row) + STEP)}, ${free ? "free" : "busy"}${override ? ", this week only" : ""}`;
+const GridCell = memo(function GridCell({ day, row, free, override, joinTop, joinBottom, focused, tall, block, busyWith, onFocus }: CellProps) {
+  const label = `${DAY_LONG[day]} ${formatMinutes(rowStart(row))} to ${formatMinutes(rowStart(row) + STEP)}, ${
+    busyWith ? `busy, going to ${busyWith}` : free ? "free" : "busy"
+  }${override ? ", this week only" : ""}`;
   return (
     <div
       role="gridcell"
@@ -264,6 +284,35 @@ const GridCell = memo(function GridCell({ day, row, free, override, joinTop, joi
           override ? (free ? "shadow-[inset_3px_0_0_var(--accent)]" : "bg-[repeating-linear-gradient(135deg,var(--override)_0_4px,transparent_4px_8px)]") : ""
         }`}
       />
+      {block && <Block block={block} rowPx={tall ? 28 : 22} />}
     </div>
   );
 });
+
+/** Drawn from its first cell down; ignores the pointer so painting around it keeps working. */
+function Block({ block, rowPx }: { block: CalBlock; rowPx: number }) {
+  const rows = block.endRow - block.startRow;
+  const going = block.kind === "going";
+  return (
+    <div
+      aria-hidden
+      data-calblock={block.kind}
+      className={`pointer-events-none absolute inset-x-[2px] top-[2px] z-[2] overflow-hidden rounded-[8px] px-1.5 py-1 leading-tight ${
+        going ? "bg-accent-fill text-white" : "bg-warning/20 text-warning-text shadow-[inset_0_0_0_1px_var(--warning)]"
+      }`}
+      style={{ height: rows * rowPx - 4 }}
+    >
+      {rows <= 2 ? (
+        <span className="block truncate text-[12px] font-semibold">
+          <span className="opacity-90">{going ? "Going" : "Waitlist"} · </span>{block.title}
+        </span>
+      ) : (
+        <>
+          <span className="block text-[10px] font-semibold uppercase tracking-wide opacity-90">{going ? "Going" : "Waitlist"}</span>
+          <span className="line-clamp-2 text-[12px] font-semibold">{block.title}</span>
+          {rows >= 4 && <span className="block text-[11px] opacity-90 tnum">{block.time}</span>}
+        </>
+      )}
+    </div>
+  );
+}

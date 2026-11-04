@@ -204,7 +204,7 @@ function ActionBar({ event: e }: { event: EventDetail }) {
             }}
           />
           <a href={`/api/events/${e.id}/ics`} onClick={() => setMore(false)} className="pressable flex min-h-12 items-center gap-3 rounded-[14px] px-3 body hover:bg-text/5">
-            <CalendarPlus className="size-5 text-accent" aria-hidden /> Add to calendar
+            <CalendarPlus className="size-5 text-accent" aria-hidden /> Add to my phone calendar
           </a>
           <MenuItem icon={Share} label="Share" onClick={() => { setMore(false); void share(); }} />
           <MenuItem icon={Flag} label="Report this event" tone="danger" onClick={() => { setMore(false); setReporting(true); }} />

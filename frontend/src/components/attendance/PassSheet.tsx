@@ -42,13 +42,14 @@ export function PassSheet({ reg, open, onClose }: { reg: Registration | null; op
             </button>
             <PassBody reg={reg} now={now} />
             <div className="flex flex-col gap-2 px-6 pb-6">
+              <Button size="lg" full onClick={onClose}>Done</Button>
+              {/* Secondary on purpose: it's already on the ShowUp calendar. Downloads only when tapped. */}
               <a
                 href={`/api/events/${reg.event.id}/ics`}
-                className="pressable inline-flex h-12 items-center justify-center gap-2 rounded-[14px] bg-[#0071e3]/10 font-semibold text-[#0071e3]"
+                className="pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-[14px] callout font-medium text-[#0071e3]"
               >
-                <CalendarPlus className="size-5" aria-hidden /> Add to calendar
+                <CalendarPlus className="size-4" aria-hidden /> Add to my phone calendar
               </a>
-              <Button size="lg" full onClick={onClose}>Done</Button>
             </div>
           </m.div>
         </div>

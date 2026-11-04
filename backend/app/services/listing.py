@@ -13,7 +13,7 @@ from ..schemas import EventIn
 from ..seed.venues import AREAS
 from ..timeutil import ist_to_utc, to_ist, utcnow
 from . import embeddings, extraction, spam
-from .feed import user_profile, user_windows
+from .feed import user_going, user_profile, user_windows
 from .matching import check_event
 from .ranking import score_event, tag_label
 
@@ -223,7 +223,7 @@ def reach(db: Session, event_like) -> dict:
         for u in students:
             if top_tag and any(i.tag == top_tag for i in u.interests):
                 interested += 1
-            fr = check_event(u, probe, user_windows(db, u), now)
+            fr = check_event(u, probe, user_windows(db, u), now, going=user_going(db, u))
             if not fr.passed:
                 continue
             free += 1
