@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { PageHeader } from "../components/AppShell";
 import { EventCard, EventCardSkeleton } from "../components/events/EventCard";
+import { ExploreView } from "../components/events/ExploreView";
 import { Button } from "../components/ui/Button";
 import { CountUp } from "../components/ui/CountUp";
 import { Segmented } from "../components/ui/Segmented";
@@ -11,7 +12,7 @@ import { useToast } from "../components/ui/Toaster";
 import { greeting } from "../lib/format";
 import { spring } from "../lib/motion";
 import { useCreateAlert, useDismissEvent, useFeed, useFeedCount, useMe, useSaveEvent } from "../lib/queries";
-import type { FeedItem, FeedTab } from "../lib/types";
+import type { FeedItem, FeedTab, HomeTab } from "../lib/types";
 import { usePullToRefresh } from "../lib/usePullToRefresh";
 
 const EMPTY: Record<FeedTab, { title: string; body: string }> = {
@@ -23,8 +24,9 @@ const EMPTY: Record<FeedTab, { title: string; body: string }> = {
 export default function Home() {
   const { data: me } = useMe();
   const { data: count } = useFeedCount();
-  const [tab, setTab] = useState<FeedTab>("for_you");
-  const feed = useFeed(tab);
+  const [tab, setTab] = useState<HomeTab>("for_you");
+  const feedTab: FeedTab = tab === "explore" ? "for_you" : tab;
+  const feed = useFeed(feedTab);
   const save = useSaveEvent();
   const dismiss = useDismissEvent();
   const createAlert = useCreateAlert();
@@ -56,8 +58,9 @@ export default function Home() {
       onError: (err) => toast({ tone: "error", title: "Couldn't save the alert", body: (err as Error).message }),
     });
 
-  const tabs: { value: FeedTab; label: string }[] = [
+  const tabs: { value: HomeTab; label: string }[] = [
     { value: "for_you", label: "For you" },
+    { value: "explore", label: "Explore" },
     ...(me?.show_almost !== false ? [{ value: "almost" as const, label: `Almost${count ? ` · ${count.almost}` : ""}` }] : []),
     { value: "saved", label: "Saved" },
   ];
@@ -92,7 +95,9 @@ export default function Home() {
 
       <Segmented label="Feed" value={tab} onChange={setTab} className="mb-5 w-full sm:w-auto" options={tabs} />
 
-      {feed.isError ? (
+      {tab === "explore" ? (
+        <ExploreView onToggleSave={toggleSave} />
+      ) : feed.isError ? (
         <div className="card p-6 text-center">
           <p className="headline">Couldn't load events.</p>
           <p className="callout mt-1 text-text-2">Check your connection, then try again.</p>
@@ -104,8 +109,8 @@ export default function Home() {
         </div>
       ) : items.length === 0 ? (
         <div className="card p-8 text-center">
-          <p className="headline">{EMPTY[tab].title}</p>
-          <p className="callout mt-1 text-text-2">{EMPTY[tab].body}</p>
+          <p className="headline">{EMPTY[feedTab].title}</p>
+          <p className="callout mt-1 text-text-2">{EMPTY[feedTab].body}</p>
           {tab === "for_you" && (
             <Link to="/calendar" className="pressable mt-4 inline-flex min-h-11 items-center rounded-[14px] bg-accent-fill px-5 font-semibold text-white">
               Add free time

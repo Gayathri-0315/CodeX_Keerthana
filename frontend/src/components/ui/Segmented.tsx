@@ -22,7 +22,7 @@ export function Segmented<T extends string>({ options, value, onChange, label, c
             role="tab"
             aria-selected={active}
             onClick={() => onChange(o.value)}
-            className={`relative min-h-9 flex-1 whitespace-nowrap rounded-full px-4 callout font-medium transition-colors ${active ? "text-text" : "text-text-2"}`}
+            className={`relative min-h-9 flex-1 whitespace-nowrap rounded-full px-2.5 callout sm:px-4 font-medium transition-colors ${active ? "text-text" : "text-text-2"}`}
           >
             {active && (
               <m.span

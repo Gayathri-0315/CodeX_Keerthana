@@ -16,6 +16,12 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     with engine.connect() as connection:
+        if settings.is_sqlite:
+            # SQLite batch migrations copy a table, drop the old one and rename. With foreign keys on, that
+            # DROP would cascade and delete every child row (free time, registrations...). Turn them off
+            # for the migration; the pragma only works outside a transaction, so set it first.
+            connection.exec_driver_sql("PRAGMA foreign_keys=OFF")
+            connection.commit()
         # SQLite can't ALTER most things in place; batch mode copies the table instead.
         context.configure(connection=connection, target_metadata=target_metadata, render_as_batch=settings.is_sqlite,
                           compare_type=True)

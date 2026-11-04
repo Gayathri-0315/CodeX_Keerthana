@@ -96,3 +96,19 @@ def check_event(user, event, windows, now: datetime, registered_count: int = 0) 
     # 7. Capacity never drops an event; it only marks waitlist.
     return FilterResult(True, distance_km=distance, travel_min=travel, window=window, waitlist=waitlist,
                         need_start=need_start)
+
+
+def time_fit(user, event, windows) -> tuple[bool, str | None]:
+    """Only the schedule question, whatever the other filters say: can the user be there, travel included?
+
+    Used for the "Fits your time" badge on Explore, where events failing other rules still show.
+    """
+    if event.start_at is None or event.end_at is None:
+        return False, None
+    travel = 0
+    if event.mode == "in_person" and event.lat is not None and event.lng is not None:
+        travel = travel_minutes(haversine_km(*user_home(user), event.lat, event.lng))
+    need_start = event.start_at - timedelta(minutes=travel + BUFFER_MIN)
+    if any(w[0] <= need_start and w[1] >= event.end_at for w in windows):
+        return True, None
+    return False, _schedule_conflict(event, need_start, windows)

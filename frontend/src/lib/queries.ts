@@ -164,6 +164,41 @@ export function useFeed(tab: FeedTab) {
   });
 }
 
+export type ExploreFilters = {
+  q?: string;
+  category?: string;
+  date_from?: string;
+  date_to?: string;
+  price?: "free" | "paid";
+  mode?: "online" | "in_person";
+};
+
+function toQuery(params: Record<string, string | undefined>): string {
+  const p = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v) p.set(k, v);
+  return p.toString();
+}
+
+/** Explore: every upcoming event, by date. Lives under ["feed", "list"] so saves update it too. */
+export function useExplore(filters: ExploreFilters) {
+  return useInfiniteQuery({
+    queryKey: ["feed", "list", "explore", filters] as const,
+    queryFn: ({ pageParam }) => api<FeedPage>(`/feed/explore?${toQuery({ ...filters, limit: "20", cursor: pageParam || undefined })}`),
+    initialPageParam: "",
+    getNextPageParam: (last) => last.next_cursor ?? undefined,
+    staleTime: 30_000,
+    placeholderData: (prev) => prev,
+  });
+}
+
+export function useCategories() {
+  return useQuery({
+    queryKey: ["feed", "categories"],
+    queryFn: () => api<{ categories: string[] }>("/feed/categories").then((r) => r.categories),
+    staleTime: 300_000,
+  });
+}
+
 const fetchEvent = (id: string) => api<EventDetail>(`/events/${id}`);
 
 export function useEvent(id: string) {

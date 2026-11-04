@@ -1,5 +1,5 @@
 import { animate, m, useMotionValue, useTransform, type PanInfo } from "motion/react";
-import { Bookmark, Clock, MapPin, Sparkles, TriangleAlert } from "lucide-react";
+import { Bookmark, CircleCheck, Clock, MapPin, Sparkles, TriangleAlert } from "lucide-react";
 import { useRef, type MouseEvent } from "react";
 import { Link } from "react-router-dom";
 import { Tag } from "../ui/Chip";
@@ -48,14 +48,17 @@ type Props = {
   onToggleSave: (e: FeedItem) => void;
   onDismiss?: (e: FeedItem) => void;
   onRemindSimilar?: (e: FeedItem) => void;
+  /** Explore shows every event with a time-fit badge instead of reasons and the match bar. */
+  variant?: "feed" | "explore";
 };
 
-export function EventCard({ event, index, onToggleSave, onDismiss, onRemindSimilar }: Props) {
+export function EventCard({ event, index, onToggleSave, onDismiss, onRemindSimilar, variant = "feed" }: Props) {
+  const explore = variant === "explore";
   const prefetch = usePrefetchEvent();
   const x = useMotionValue(0);
   const revealOpacity = useTransform(x, [-140, -40, 0], [1, 0.4, 0]);
   const dragged = useRef(false);
-  const muted = event.almost && !event.fits;
+  const muted = !explore && event.almost && !event.fits;
 
   const onDragEnd = (_: unknown, info: PanInfo) => {
     if (onDismiss && (info.offset.x < -120 || info.velocity.x < -700)) {
@@ -112,7 +115,16 @@ export function EventCard({ event, index, onToggleSave, onDismiss, onRemindSimil
               {event.waitlist && <Tag tone="warning">Waitlist</Tag>}
               {event.verification_label === "unverified" && <Tag tone="warning">Unverified</Tag>}
             </div>
-            {!muted && event.card_reasons.length > 0 && (
+            {explore && event.time_fit && (
+              <p className={`footnote mt-2 flex items-start gap-1.5 ${event.time_fit.fits ? "text-success-text" : "text-text-2"}`}>
+                {event.time_fit.fits ? <CircleCheck className="mt-px size-4 shrink-0" aria-hidden /> : <TriangleAlert className="mt-px size-4 shrink-0" aria-hidden />}
+                <span>
+                  <span className="font-medium">{event.time_fit.fits ? "Fits your time" : "Doesn't fit your free time"}</span>
+                  {!event.time_fit.fits && event.time_fit.reason && <span>. {event.time_fit.reason}</span>}
+                </span>
+              </p>
+            )}
+            {!explore && !muted && event.card_reasons.length > 0 && (
               <ul className="mt-2.5 flex flex-col gap-1" aria-label="Why it fits">
                 {event.card_reasons.map((r) => (
                   <li key={r} className="footnote flex items-start gap-1.5 text-text-2">
@@ -123,7 +135,7 @@ export function EventCard({ event, index, onToggleSave, onDismiss, onRemindSimil
               </ul>
             )}
             {!muted && <ClassmatesLine c={event.classmates_going} className="mt-1.5" />}
-            {event.clash && (
+            {!explore && event.clash && (
               <p className="footnote mt-2 flex items-start gap-1.5 text-warning-text">
                 <TriangleAlert className="mt-px size-4 shrink-0" aria-hidden />
                 {event.clash}
@@ -155,7 +167,7 @@ export function EventCard({ event, index, onToggleSave, onDismiss, onRemindSimil
           </div>
         )}
 
-        {event.match != null && !muted && (
+        {!explore && event.match != null && !muted && (
           <div className="h-[3px] w-full bg-text/5" role="meter" aria-valuenow={event.match} aria-valuemin={0} aria-valuemax={100} aria-label="Match">
             <m.div
               className="h-full origin-left bg-accent-fill"

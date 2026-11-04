@@ -40,6 +40,8 @@ export type Slot = {
 };
 
 export type FeedTab = "for_you" | "almost" | "saved";
+export type HomeTab = FeedTab | "explore";
+export type TimeFit = { fits: boolean; reason: string | null };
 
 export type RegStatus = "registered" | "waitlisted" | "promoted_pending" | "cancelled" | "attended" | "no_show";
 
@@ -165,6 +167,7 @@ export type FeedItem = {
   waitlist: boolean;
   saved: boolean;
   dismissed: boolean;
+  time_fit?: TimeFit; // Explore only
 };
 
 export type FeedPage = { items: FeedItem[]; next_cursor: string | null; total: number };
