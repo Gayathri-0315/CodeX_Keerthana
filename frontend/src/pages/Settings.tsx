@@ -13,7 +13,7 @@ import { Toggle } from "../components/ui/Toggle";
 import { api } from "../lib/api";
 import { INTERESTS } from "../lib/constants";
 import { formatTime } from "../lib/format";
-import { useMe, useSignOut, useUpdateInterests, useUpdateMe } from "../lib/queries";
+import { useDeleteAlert, useMe, useSavedAlerts, useSignOut, useUpdateInterests, useUpdateMe } from "../lib/queries";
 import { getTheme, setTheme, type ThemeChoice } from "../lib/theme";
 import type { User } from "../lib/types";
 
@@ -85,6 +85,7 @@ export default function Settings() {
               </Row>
             </Section>
             <AlertsSection me={me} patch={patch} />
+            <MyAlertsSection />
           </>
         )}
         <AppearanceSection />
@@ -210,6 +211,46 @@ function AlertsSection({ me, patch }: { me: User; patch: (p: Partial<User>, save
           </div>
         )}
       </Row>
+    </Section>
+  );
+}
+
+function MyAlertsSection() {
+  const { data: alerts, isPending, isError, refetch } = useSavedAlerts();
+  const remove = useDeleteAlert();
+  const toast = useToast();
+  return (
+    <Section title="My alerts">
+      {isPending ? (
+        <Row><div className="skeleton h-5 w-2/3 rounded-full" /></Row>
+      ) : isError ? (
+        <Row>
+          <div className="flex items-center justify-between gap-3">
+            <span className="callout text-text-2">Couldn't load your alerts.</span>
+            <Button size="sm" variant="secondary" onClick={() => refetch()}>Try again</Button>
+          </div>
+        </Row>
+      ) : alerts.length === 0 ? (
+        <Row>
+          <p className="callout text-text-2">No saved alerts. Tap “Remind me of similar events” on an Almost card to add one.</p>
+        </Row>
+      ) : (
+        alerts.map((a) => (
+          <div key={a.id} className="flex items-center gap-3 py-3">
+            <span className="min-w-0 flex-1">
+              <span className="body block truncate">Like {a.source_title}</span>
+              <span className="footnote block text-text-2">{a.tags.join(", ")} · {a.window}</span>
+            </span>
+            <button
+              aria-label={`Delete alert like ${a.source_title}`}
+              className="pressable grid size-11 shrink-0 place-items-center rounded-full text-danger-text"
+              onClick={() => remove.mutate(a.id, { onError: () => toast({ tone: "error", title: "Couldn't delete the alert" }) })}
+            >
+              <Trash2 className="size-5" aria-hidden />
+            </button>
+          </div>
+        ))
+      )}
     </Section>
   );
 }

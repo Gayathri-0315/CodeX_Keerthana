@@ -19,7 +19,7 @@ from .email import send_email
 
 log = logging.getLogger("showup.notify")
 
-SUGGESTION = {"match", "deadline", "seat_opened"}
+SUGGESTION = {"match", "similar", "deadline", "seat_opened"}
 URGENT = {"seat_opened", "deadline"}
 ALWAYS_NOW = {"seat_opened"}  # a 15-minute offer can't wait for quiet hours to end
 MIN_MATCH = 75
@@ -89,6 +89,12 @@ def match_copy(event: Event, distance_km: float | None) -> tuple[str, str]:
     return f"A seat that fits your {day}", _fit(f"{_short(event.title)}, {fmt_range(start, end)}. {where}, ₹{event.fee_inr}.")
 
 
+def similar_copy(event: Event, source_title: str) -> tuple[str, str]:
+    start = to_ist(event.start_at)
+    return "Something like the one you missed", _fit(
+        f"{_short(event.title)}, {DAY_NAMES[start.weekday()][:3]} {fmt_time(start)}. Like {_short(source_title, 30)}.")
+
+
 def deadline_copy(event: Event, now: datetime) -> tuple[str, str]:
     hours = max(1, round((event.registration_deadline - now).total_seconds() / 3600))
     left = f"{hours} hour{'s' if hours != 1 else ''}" if hours < 48 else "2 days"
@@ -123,7 +129,7 @@ def actions_for(n: Notification) -> list[dict]:
     p = n.payload or {}
     eid, rid = n.event_id, p.get("registration_id")
     view = {"label": "View", "kind": "view", "event_id": eid}
-    if n.type in ("match", "deadline"):
+    if n.type in ("match", "similar", "deadline"):
         return [{"label": "Register", "kind": "register", "event_id": eid}, view]
     if n.type == "seat_opened":
         return [{"label": "Confirm seat", "kind": "confirm_seat", "registration_id": rid}, view]

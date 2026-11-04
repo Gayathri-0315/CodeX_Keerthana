@@ -10,7 +10,7 @@ import { Segmented } from "../components/ui/Segmented";
 import { useToast } from "../components/ui/Toaster";
 import { greeting } from "../lib/format";
 import { spring } from "../lib/motion";
-import { useDismissEvent, useFeed, useFeedCount, useMe, useSaveEvent, useUpdateInterests } from "../lib/queries";
+import { useCreateAlert, useDismissEvent, useFeed, useFeedCount, useMe, useSaveEvent } from "../lib/queries";
 import type { FeedItem, FeedTab } from "../lib/types";
 import { usePullToRefresh } from "../lib/usePullToRefresh";
 
@@ -27,7 +27,7 @@ export default function Home() {
   const feed = useFeed(tab);
   const save = useSaveEvent();
   const dismiss = useDismissEvent();
-  const interests = useUpdateInterests();
+  const createAlert = useCreateAlert();
   const toast = useToast();
   const { pull, refreshing, ready } = usePullToRefresh(() => feed.refetch());
 
@@ -50,15 +50,11 @@ export default function Home() {
       },
     );
 
-  const remindSimilar = (e: FeedItem) => {
-    if (!me) return;
-    const weights = new Map(me.interests.map((i) => [i.tag, i.weight]));
-    for (const t of e.tags) weights.set(t, Math.min(3, (weights.get(t) ?? 1) + 1));
-    interests.mutate(
-      { interests: [...weights].map(([tag, weight]) => ({ tag, weight })) },
-      { onSuccess: () => toast({ tone: "success", title: "Got it", body: "We'll look for more events like this." }) },
-    );
-  };
+  const remindSimilar = (e: FeedItem) =>
+    createAlert.mutate(e.id, {
+      onSuccess: () => toast({ tone: "success", title: "Got it. We'll tell you about similar events." }),
+      onError: (err) => toast({ tone: "error", title: "Couldn't save the alert", body: (err as Error).message }),
+    });
 
   const tabs: { value: FeedTab; label: string }[] = [
     { value: "for_you", label: "For you" },

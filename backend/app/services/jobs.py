@@ -12,7 +12,7 @@ from ..config import settings
 from ..db import SessionLocal
 from ..models import Event, Organizer, Registration, Report, User
 from ..timeutil import utcnow
-from . import feedcache, notify, registration, together
+from . import alerts, feedcache, notify, registration, together
 from .showup_score import reminder_times
 
 log = logging.getLogger("showup.jobs")
@@ -124,6 +124,7 @@ def suggest_for_event(db: Session, event_id: str) -> None:
     event = db.get(Event, event_id)
     if event is not None:
         notify.suggest(db, event)
+        alerts.suggest_similar(db, event)
 
 
 def in_background(fn, *args) -> None:

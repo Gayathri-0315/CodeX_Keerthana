@@ -10,6 +10,7 @@ import { useToast } from "../ui/Toaster";
 
 const ICON = {
   match: Sparkles,
+  similar: Sparkles,
   deadline: CalendarClock,
   seat_opened: Ticket,
   reminder_leave_by: MapPin,

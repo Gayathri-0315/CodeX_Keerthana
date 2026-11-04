@@ -13,7 +13,7 @@ from starlette.exceptions import HTTPException
 
 from .config import settings
 from .db import Base, engine
-from .routers import admin, auth, availability, events, feed, files, notifications, organizer, registrations, together, users
+from .routers import admin, alerts, auth, availability, events, feed, files, notifications, organizer, registrations, together, users
 from .security import COOKIE_NAME, CSRF_COOKIE, CSRF_HEADER, same
 from .services import embeddings, jobs, stream
 
@@ -95,7 +95,7 @@ async def validation_error(_req: Request, exc: RequestValidationError):
 
 
 for r in (auth.router, users.router, availability.router, feed.router, events.router, organizer.router, admin.router,
-          files.router, registrations.router, notifications.router, together.router):
+          files.router, registrations.router, notifications.router, together.router, alerts.router):
     app.include_router(r, prefix="/api")
 
 

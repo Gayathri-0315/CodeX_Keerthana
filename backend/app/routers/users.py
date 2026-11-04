@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..deps import current_user
-from ..models import AvailabilitySlot, Feedback, Notification, Registration, SavedEvent, User, UserInterest
+from ..models import AvailabilitySlot, Feedback, Notification, Registration, SavedAlert, SavedEvent, User, UserInterest
 from ..schemas import InterestsPut, OrganizerOut, UserOut, UserPatch
 from ..security import COOKIE_NAME
 from ..services import feedcache
@@ -58,6 +58,7 @@ def export_me(user: User = Depends(current_user), db: Session = Depends(get_db))
         "saved": rows(SavedEvent),
         "feedback": rows(Feedback),
         "notifications": rows(Notification),
+        "saved_alerts": rows(SavedAlert),
     }
 
 

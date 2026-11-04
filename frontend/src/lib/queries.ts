@@ -228,6 +228,38 @@ export function useDismissEvent() {
   });
 }
 
+export type SavedAlert = { id: string; tags: string[]; source_title: string; window: string; created_at: string };
+
+export function useSavedAlerts(enabled = true) {
+  return useQuery({
+    queryKey: ["alerts", "saved"],
+    queryFn: () => api<{ items: SavedAlert[] }>("/alerts").then((r) => r.items),
+    enabled,
+  });
+}
+
+export function useCreateAlert() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (eventId: string) => api<SavedAlert>("/alerts", { method: "POST", body: { event_id: eventId } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["alerts", "saved"] }),
+  });
+}
+
+export function useDeleteAlert() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api<void>(`/alerts/${id}`, { method: "DELETE" }),
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: ["alerts", "saved"] });
+      const prev = qc.getQueryData<SavedAlert[]>(["alerts", "saved"]);
+      qc.setQueryData<SavedAlert[]>(["alerts", "saved"], (l) => l?.filter((a) => a.id !== id));
+      return { prev };
+    },
+    onError: (_e, _id, ctx) => qc.setQueryData(["alerts", "saved"], ctx?.prev),
+  });
+}
+
 export function useAreas(q: string) {
   return useQuery({
     queryKey: ["areas", q],

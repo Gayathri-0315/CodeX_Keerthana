@@ -279,3 +279,20 @@ class StoredFile(Base):
     content_type: Mapped[str] = mapped_column(String(40))
     data: Mapped[bytes] = mapped_column(LargeBinary)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class SavedAlert(Base):
+    """'Remind me of similar events' on an Almost card: the event's main tags plus the day/time it clashed with."""
+
+    __tablename__ = "saved_alerts"
+    __table_args__ = (UniqueConstraint("user_id", "source_event_id"), Index("ix_saved_alerts_user", "user_id"))
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    source_event_id: Mapped[str | None] = mapped_column(ForeignKey("events.id", ondelete="SET NULL"))
+    source_title: Mapped[str] = mapped_column(String(200))
+    tags: Mapped[list] = mapped_column(JSON, default=list)
+    day_of_week: Mapped[int] = mapped_column(Integer)  # IST, Monday = 0
+    start_min: Mapped[int] = mapped_column(Integer)  # IST minutes since midnight
+    end_min: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
