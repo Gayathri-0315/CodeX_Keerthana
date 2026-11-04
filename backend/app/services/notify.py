@@ -21,8 +21,17 @@ log = logging.getLogger("showup.notify")
 
 SUGGESTION = {"match", "similar", "deadline", "seat_opened"}
 URGENT = {"seat_opened", "deadline"}
-ALWAYS_NOW = {"seat_opened"}  # a 15-minute offer can't wait for quiet hours to end
+# Sent at once even in quiet hours: a 15-minute seat offer, and confirmations of something the user just did.
+ALWAYS_NOW = {"seat_opened", "registered", "waitlisted"}
 MIN_MATCH = 75
+
+# Which alerts also go out by email (when the user has email on). Each gets one line and one button.
+EMAIL_TYPES = {"match", "similar", "deadline", "registered", "waitlisted", "seat_opened", "reminder_24h",
+               "reminder_leave_by", "cancelled_event", "message", "new_message"}
+# While alerts are paused, only these still email: things the user is actively waiting on.
+PAUSE_EXEMPT = {"seat_opened", "cancelled_event", "registered", "waitlisted", "new_message"}
+# Shown as a live toast? Registration confirmations already show their own animation and toast in the app.
+NO_TOAST = {"registered", "waitlisted"}
 
 
 # ---- rules ----
@@ -154,7 +163,34 @@ def notification_out(n: Notification, event_title: str | None = None) -> dict:
     }
 
 
-def deliver(db: Session, n: Notification, user: User, now: datetime | None = None, bypass_quiet: bool = False) -> bool:
+def email_button(n: Notification) -> tuple[str, str]:
+    """(label, link) for the one primary button in the email."""
+    base = settings.public_url.rstrip("/")
+    event = f"{base}/event/{n.event_id}" if n.event_id else base
+    p = n.payload or {}
+    if n.type == "seat_opened":
+        return "Confirm seat", f"{base}/my"
+    if n.type in ("match", "similar", "deadline"):
+        return "View event", event
+    if n.type == "reminder_leave_by" and p.get("maps_url"):
+        return "Get directions", p["maps_url"]
+    if n.type == "reminder_24h":
+        return "I'm still going", f"{base}/my"
+    if n.type in ("registered", "waitlisted"):
+        return "View my pass" if n.type == "registered" else "View event", f"{base}/my" if n.type == "registered" else event
+    if n.type == "new_message":
+        return "Read and reply", f"{base}{p.get('path', '/my')}"
+    return "Open ShowUp", event
+
+
+def wants_email(user: User, n: Notification, now: datetime) -> bool:
+    if n.type not in EMAIL_TYPES or not (user.notif_channels or {}).get("email"):
+        return False
+    return n.type in PAUSE_EXEMPT or not is_paused(user, now)
+
+
+def deliver(db: Session, n: Notification, user: User, now: datetime | None = None, bypass_quiet: bool = False,
+            toast: bool = True) -> bool:
     """Send on every enabled channel, unless it's quiet hours (then a later flush sends it)."""
     now = now or utcnow()
     if n.channel_sent:
@@ -163,12 +199,12 @@ def deliver(db: Session, n: Notification, user: User, now: datetime | None = Non
         return False
     ch = user.notif_channels or {}
     sent: dict = {}
-    if ch.get("in_app"):
+    if ch.get("in_app") and toast and n.type not in NO_TOAST:
         stream.publish(user.id, "notification", notification_out(n))
         sent["in_app"] = iso_utc(now)
-    if ch.get("email"):
-        url = f"{settings.public_url}/event/{n.event_id}" if n.event_id else settings.public_url
-        if send_email(user.email, n.title, n.body, "Open in ShowUp", url):
+    if wants_email(user, n, now):
+        label, url = email_button(n)
+        if send_email(user.email, n.title, n.body, label, url):
             sent["email"] = iso_utc(now)
     n.channel_sent = sent or {"stored": iso_utc(now)}
     db.commit()
@@ -184,7 +220,7 @@ def create(db: Session, user: User, kind: str, event: Event | None, title: str, 
         return None
     n = Notification(user_id=user.id, type=kind, event_id=event_id, title=title, body=_fit(body), payload=payload or {})
     if not push:
-        n.channel_sent = {"silent": iso_utc(now)}  # the app shows its own confirmation
+        n.channel_sent = {"silent": iso_utc(now)}
     db.add(n)
     db.commit()
     if push:

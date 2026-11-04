@@ -99,7 +99,7 @@ def register(event_id: str, body: RegisterIn | None = None, user: User = Depends
         lb = registration.leave_by_for(user, event)
         title = "You're in"
         text = f"See you {day}." + (f" Leave by {fmt_time(to_ist(lb))}." if lb else "")
-    notify.create(db, user, "registered" if reg.status != "waitlisted" else "waitlisted", event, title, text, {"registration_id": reg.id}, push=False)
+    notify.create(db, user, "registered" if reg.status != "waitlisted" else "waitlisted", event, title, text, {"registration_id": reg.id})
     return {**out, "toast": {"title": title, "body": text}}
 
 

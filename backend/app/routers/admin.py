@@ -83,6 +83,24 @@ def reject(event_id: str, user: User = Depends(admin_only), db: Session = Depend
     return {"id": _decide(db, event_id, False).id, "status": "blocked"}
 
 
+@router.post("/test-email")
+def test_email(user: User = Depends(admin_only)):
+    """Send a test email to the signed-in admin, to check EMAIL_PROVIDER / EMAIL_API_KEY / EMAIL_FROM."""
+    from ..config import settings
+    from ..services.email import email_configured, send_email
+
+    if not email_configured():
+        send_email(user.email, "ShowUp test email", "If you can read this, email works.", "Open ShowUp", settings.public_url,
+                   transactional=True)
+        return {"status": "skipped", "to": user.email,
+                "message": "No email provider is set, so it went to the server log (look for 'email skipped')."}
+    ok = send_email(user.email, "ShowUp test email", "If you can read this, email works.", "Open ShowUp", settings.public_url,
+                    transactional=True)
+    if not ok:
+        raise HTTPException(502, f"The {settings.email_provider} API refused the email. Check the key and that EMAIL_FROM is a verified sender; the server log has the details.")
+    return {"status": "sent", "to": user.email, "message": f"Sent to {user.email} through {settings.email_provider}."}
+
+
 @router.post("/organizers/{organizer_id}/verify")
 def verify_organizer(organizer_id: str, user: User = Depends(admin_only), db: Session = Depends(get_db)):
     org = db.get(Organizer, organizer_id)

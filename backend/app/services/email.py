@@ -37,6 +37,10 @@ def _sender() -> tuple[str, str]:
     return (m.group(1) or "ShowUp", m.group(2)) if m else ("ShowUp", settings.email_from.strip())
 
 
+def email_configured() -> bool:
+    return bool(settings.email_api_key and settings.email_provider and settings.email_from)
+
+
 def send_email(to: str, subject: str, body: str, button_label: str | None = None, button_url: str | None = None,
                transactional: bool = False) -> bool:
     """Send one email. Returns True if the provider accepted it (or it was logged because no key is set)."""

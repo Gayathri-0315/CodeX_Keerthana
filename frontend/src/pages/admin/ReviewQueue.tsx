@@ -1,4 +1,6 @@
-import { Flag } from "lucide-react";
+import { Flag, Mail } from "lucide-react";
+import { useState } from "react";
+import { api } from "../../lib/api";
 import { PageHeader } from "../../components/AppShell";
 import { Button } from "../../components/ui/Button";
 import { Tag } from "../../components/ui/Chip";
@@ -11,7 +13,7 @@ export default function ReviewQueue() {
   const { data: items, isPending, isError, refetch } = useReviewQueue();
   return (
     <>
-      <PageHeader title="Review queue" subtitle="Events waiting for review, reported events and appeals." />
+      <PageHeader title="Review queue" subtitle="Events waiting for review, reported events and appeals." action={<TestEmailButton />} />
       {isError ? (
         <div className="card p-6 text-center">
           <p className="headline">Couldn't load the queue.</p>
@@ -91,5 +93,27 @@ function Item({ item: i }: { item: ReviewItem }) {
         </div>
       </div>
     </li>
+  );
+}
+
+/** Admin-only check that EMAIL_PROVIDER / EMAIL_API_KEY / EMAIL_FROM work. */
+function TestEmailButton() {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const run = async () => {
+    setBusy(true);
+    try {
+      const r = await api<{ status: "sent" | "skipped"; message: string }>("/admin/test-email", { method: "POST" });
+      toast({ tone: r.status === "sent" ? "success" : "info", title: r.status === "sent" ? "Test email sent" : "Email skipped", body: r.message });
+    } catch (e) {
+      toast({ tone: "error", title: "Test email failed", body: (e as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Button variant="secondary" size="sm" loading={busy} onClick={run}>
+      <Mail className="size-4" aria-hidden />Send test email to me
+    </Button>
   );
 }
