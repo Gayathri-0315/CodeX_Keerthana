@@ -53,3 +53,10 @@ Build order follows SPEC.md section 14. Each phase ends runnable, tested and com
 - **Go together** (beyond the spec): a registered student shares an invite link or QR. A friend who accepts is registered or waitlisted and joins the group. Members see each other on the pass and event page, are named in the 24 h and leave-by reminders, are told when someone joins or drops out, and get +10% in the turnout estimate. Event cards show how many classmates (same department and year) are going: a count, never names. Invite pages are public so a friend can see them before signing in; accepting needs an account, and sign-in returns them to the invite.
 - **Removed the Telegram bot** (SPEC 3, 8.7, 8.9, 9): the alert channel, account linking and poster posting. Alerts are in-app and email. This cuts a channel that couldn't be exercised without a bot token and narrows the product to its core.
 - **Removed per-student show-up scores** from the organizer view (SPEC 5.7, 8.8): rating individual students' reliability invites unfair treatment and is mostly noise at pilot scale. The aggregate expected turnout with its range stays; organizers see "With friends" instead.
+
+## Real product mode (prompt v2, item 8)
+
+- Demo mode is gone: no demo accounts, demo sign-in buttons, `/demo` panel, `DEMO_MODE` or hardcoded passwords. Earlier sections of this file describe how the pilot was built and still mention the old demo tools as history.
+- Sample data is local-only (`python manage.py seed_dev`, refuses `APP_ENV=production`); sample posters and timetables show only when `APP_ENV=dev`.
+- PostgreSQL in production through `DATABASE_URL`, Alembic migrations run on startup. Poster images moved from local disk into the `stored_files` table so redeploys can't lose them; timetable photos are no longer written anywhere.
+- Real auth: verification by code or link before registering or publishing, reset by link, 5-strike lockout, CSRF double-submit cookie, session versioning, separate student and organizer sign-up.

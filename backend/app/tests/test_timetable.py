@@ -1,3 +1,4 @@
+from .conftest import login
 from app.seed.make_samples import TIMETABLES
 from app.services.scheduling import gaps_from_periods
 
@@ -7,7 +8,7 @@ def timetable_png(name: str) -> bytes:
 
 
 def test_timetable_import_returns_free_gaps(client):
-    client.post("/api/auth/demo", json={"role": "student"})
+    login(client, "student")
     r = client.post("/api/availability/timetable", files={"file": ("it_year3.png", timetable_png("it_year3"), "image/png")}).json()
     assert r["message"] is None and len(r["timetable"]["periods"]) == 25
     slots = {(s["day_of_week"], s["start_min"], s["end_min"]) for s in r["free_slots"]}
@@ -25,7 +26,7 @@ def test_unknown_timetable_in_mock_mode_asks_to_paint(client):
 
     buf = io.BytesIO()
     Image.new("RGB", (50, 50), "white").save(buf, "PNG")
-    client.post("/api/auth/demo", json={"role": "student"})
+    login(client, "student")
     r = client.post("/api/availability/timetable", files={"file": ("mine.png", buf.getvalue(), "image/png")}).json()
     assert r["free_slots"] == [] and "Paint your free time" in r["message"]
 

@@ -11,7 +11,8 @@ import { useToast } from "../components/ui/Toaster";
 import { ApiError } from "../lib/api";
 import { INTERESTS } from "../lib/constants";
 import { spring } from "../lib/motion";
-import { useDemoSignIn, useMe, usePublicConfig, useRegister, useUpdateInterests, useUpdateMe } from "../lib/queries";
+import { useMe, useRegister, useUpdateInterests, useUpdateMe } from "../lib/queries";
+import { LegalLinks } from "../components/LegalLinks";
 import type { Area } from "../lib/types";
 
 type Step = "hero" | "account" | "interests" | "place" | "free";
@@ -106,15 +107,6 @@ function Footer({ children }: { children: ReactNode }) {
 
 function Hero({ onStart }: { onStart: () => void }) {
   const navigate = useNavigate();
-  const { data: config } = usePublicConfig();
-  const demo = useDemoSignIn();
-  const toast = useToast();
-
-  const demoAs = (role: "student" | "organizer") =>
-    demo.mutate(role, {
-      onSuccess: () => navigate("/"),
-      onError: (e) => toast({ tone: "error", title: "Couldn't sign in", body: (e as Error).message }),
-    });
 
   return (
     <>
@@ -130,16 +122,7 @@ function Hero({ onStart }: { onStart: () => void }) {
       <Footer>
         <Button size="lg" full onClick={onStart}>Get started</Button>
         <Button size="lg" variant="quiet" full onClick={() => navigate("/signin")}>Sign in</Button>
-        {config?.demo_mode && (
-          <div className="mt-2 flex flex-wrap justify-center gap-x-4 footnote text-text-2">
-            <button className="min-h-11 underline-offset-4 hover:underline" onClick={() => demoAs("student")} disabled={demo.isPending}>
-              Continue as demo student
-            </button>
-            <button className="min-h-11 underline-offset-4 hover:underline" onClick={() => demoAs("organizer")} disabled={demo.isPending}>
-              Continue as demo organizer
-            </button>
-          </div>
-        )}
+        <LegalLinks className="mt-2 justify-center" />
       </Footer>
     </>
   );
@@ -147,7 +130,7 @@ function Hero({ onStart }: { onStart: () => void }) {
 
 function Account({ onDone }: { onDone: () => void }) {
   const register = useRegister();
-  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [form, setForm] = useState({ name: "", email: "", password: "", college: "" });
   const [error, setError] = useState<string | null>(null);
 
   const submit = (e: FormEvent) => {
@@ -165,6 +148,7 @@ function Account({ onDone }: { onDone: () => void }) {
       <div className="flex flex-col gap-4">
         <Field label="Name" autoComplete="name" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
         <Field label="Email" type="email" autoComplete="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+        <Field label="College" autoComplete="organization" required maxLength={160} value={form.college} onChange={(e) => setForm({ ...form, college: e.target.value })} />
         <Field
           label="Password"
           type="password"

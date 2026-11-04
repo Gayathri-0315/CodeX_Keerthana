@@ -20,7 +20,7 @@
    "tags": ["startups", "careers"], "day": "fri", "start": "18:00", "end": "20:00", "fee": 0, "capacity": 20,
    "venue": "Hope College Startup Hub", "address": "Hope College, Coimbatore", "lat": 11.0260, "lng": 77.0170, "skill": "beginner", "seed_registrations": 20, "seed_waitlist": 3},
   {"key": "hack_night", "org": "club", "title": "Hack Night: Ship It in 4 Hours", "category": "Hackathon",
-   "description": "Pick a tiny idea, ship it by 10 PM. Pizza, mentors and a demo round at the end.",
+   "description": "Pick a tiny idea, ship it by 10 PM. Pizza, mentors and a show-and-tell round at the end.",
    "tags": ["hackathons", "web"], "day": "thu", "start": "18:00", "end": "22:00", "fee": 0, "capacity": 50,
    "venue": "Kalapatti Innovation Centre", "address": "Kalapatti, Coimbatore", "lat": 11.0750, "lng": 77.0400, "skill": "beginner", "deadline_in_hours": 6, "seed_registrations": 22},
   {"key": "design_sprint", "org": "design", "title": "UI/UX Design Sprint", "category": "Workshop",

@@ -55,6 +55,14 @@ class User(Base):
     quiet_hours_end: Mapped[str] = mapped_column(String(5), default="07:00")
     notif_paused_until: Mapped[datetime | None] = mapped_column(DateTime)
     onboarded: Mapped[bool] = mapped_column(Boolean, default=False)
+    college: Mapped[str | None] = mapped_column(String(160))
+    # Real-auth state: verified email, lockout after repeated failures, and a version that
+    # invalidates every existing session when the password changes.
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime)
+    failed_logins: Mapped[int] = mapped_column(Integer, default=0)
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime)
+    session_version: Mapped[int] = mapped_column(Integer, default=0)
+    last_active_at: Mapped[datetime | None] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     interests: Mapped[list["UserInterest"]] = relationship(
@@ -96,6 +104,8 @@ class Organizer(Base):
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), unique=True)
     org_name: Mapped[str] = mapped_column(String(160))
     org_email_domain: Mapped[str] = mapped_column(String(120), default="")
+    phone: Mapped[str | None] = mapped_column(String(32))
+    college_or_company: Mapped[str | None] = mapped_column(String(160))
     trust_level: Mapped[str] = mapped_column(String(16), default="new")  # new | verified | trusted
     verified_by: Mapped[str | None] = mapped_column(String(36))
     past_events_count: Mapped[int] = mapped_column(Integer, default=0)
@@ -240,4 +250,32 @@ class Invite(Base):
     code: Mapped[str] = mapped_column(String(12), primary_key=True)
     registration_id: Mapped[str] = mapped_column(ForeignKey("registrations.id", ondelete="CASCADE"), index=True)
     event_id: Mapped[str] = mapped_column(ForeignKey("events.id", ondelete="CASCADE"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class AuthToken(Base):
+    """One-time email codes and links: account verification and password reset. Only hashes are stored."""
+
+    __tablename__ = "auth_tokens"
+    __table_args__ = (Index("ix_auth_tokens_user_kind", "user_id", "kind"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    kind: Mapped[str] = mapped_column(String(16))  # verify | reset
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)  # sha256 of the link token
+    code_hash: Mapped[str | None] = mapped_column(String(64))  # sha256 of the 6-digit code (verify only)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    expires_at: Mapped[datetime] = mapped_column(DateTime)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class StoredFile(Base):
+    """Uploaded poster images (EXIF-free WebP). In the database so a redeploy can't lose them."""
+
+    __tablename__ = "stored_files"
+
+    name: Mapped[str] = mapped_column(String(64), primary_key=True)
+    content_type: Mapped[str] = mapped_column(String(40))
+    data: Mapped[bytes] = mapped_column(LargeBinary)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

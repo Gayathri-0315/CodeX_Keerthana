@@ -1,3 +1,4 @@
+from .conftest import login
 from datetime import timedelta
 
 from sqlalchemy import select
@@ -6,11 +7,6 @@ from app.db import SessionLocal
 from app.models import Event, Notification, Registration, User
 from app.services import jobs, together
 from app.services.showup_score import likelihood
-
-
-def login(client, email):
-    client.post("/api/auth/logout")
-    assert client.post("/api/auth/login", json={"email": email, "password": "demo1234"}).status_code == 200
 
 
 def event_id(title="Python Meetup Coimbatore"):
@@ -22,11 +18,11 @@ def free_student(eid):
     """A generated student who isn't registered for this event yet."""
     with SessionLocal() as db:
         taken = set(db.scalars(select(Registration.user_id).where(Registration.event_id == eid)))
-        return next(u.email for u in db.scalars(select(User).where(User.email.like("student%@demo.app"))) if u.id not in taken)
+        return next(u.email for u in db.scalars(select(User).where(User.email.like("student%@example.com"))) if u.id not in taken)
 
 
-def invite_for_demo_student(client, eid):
-    login(client, "student@demo.app")
+def invite_for_sample_student(client, eid):
+    login(client, "asha@example.com")
     reg = client.post(f"/api/events/{eid}/register").json()
     inv = client.post(f"/api/registrations/{reg['id']}/invite").json()
     assert len(inv["code"]) == 8 and inv["url"].endswith(f"/invite/{inv['code']}")
@@ -35,7 +31,7 @@ def invite_for_demo_student(client, eid):
 
 def test_invite_accept_pairs_registrations_and_notifies(client):
     eid = event_id()
-    reg, inv = invite_for_demo_student(client, eid)
+    reg, inv = invite_for_sample_student(client, eid)
     again = client.post(f"/api/registrations/{reg['id']}/invite").json()
     assert again["code"] == inv["code"]  # one link per registration
 
@@ -49,7 +45,7 @@ def test_invite_accept_pairs_registrations_and_notifies(client):
     assert r["status"] == "registered" and [c["name"] for c in r["companions"]] == ["Asha"]
     assert r["toast"]["title"] == "You're going with Asha"
 
-    login(client, "student@demo.app")
+    login(client, "asha@example.com")
     alerts = client.get("/api/notifications").json()["items"]
     assert alerts[0]["type"] == "buddy_joined" and alerts[0]["title"].endswith("is going with you")
     detail = client.get(f"/api/events/{eid}").json()
@@ -59,7 +55,7 @@ def test_invite_accept_pairs_registrations_and_notifies(client):
 
 def test_own_invite_and_bad_codes(client):
     eid = event_id()
-    _, inv = invite_for_demo_student(client, eid)
+    _, inv = invite_for_sample_student(client, eid)
     r = client.post(f"/api/invites/{inv['code']}/accept")
     assert r.status_code == 409 and "own invite" in r.json()["error"]["message"]
     assert client.get("/api/invites/NOPE1234").status_code == 404
@@ -67,12 +63,12 @@ def test_own_invite_and_bad_codes(client):
 
 def test_cancel_tells_the_group_and_invite_goes_stale(client):
     eid = event_id()
-    reg, inv = invite_for_demo_student(client, eid)
+    reg, inv = invite_for_sample_student(client, eid)
     login(client, free_student(eid))
     friend_reg = client.post(f"/api/invites/{inv['code']}/accept").json()
     client.post(f"/api/registrations/{friend_reg['id']}/cancel")
 
-    login(client, "student@demo.app")
+    login(client, "asha@example.com")
     alert = client.get("/api/notifications").json()["items"][0]
     assert alert["type"] == "buddy_cancelled" and alert["body"].endswith("You're still going.")
     assert client.get(f"/api/events/{eid}").json()["companions"] == []
@@ -89,22 +85,22 @@ def test_going_with_a_friend_raises_likelihood():
 
 def test_reminder_names_the_friend(client):
     eid = event_id("AI Workshop: Hands-on with LLMs")
-    _, inv = invite_for_demo_student(client, eid)
+    _, inv = invite_for_sample_student(client, eid)
     login(client, free_student(eid))
     client.post(f"/api/invites/{inv['code']}/accept")
     with SessionLocal() as db:
         e = db.get(Event, eid)
         jobs.send_reminders(db, e.start_at - timedelta(minutes=40))
-        asha = db.scalar(select(User).where(User.email == "student@demo.app"))
+        asha = db.scalar(select(User).where(User.email == "asha@example.com"))
         n = db.scalar(select(Notification).where(Notification.user_id == asha.id, Notification.type == "reminder_leave_by"))
         assert "is going too." in n.body and len(n.body) <= 90
 
 
 def test_classmates_going_is_a_count_not_names(client):
-    login(client, "student@demo.app")
+    login(client, "asha@example.com")
     items = client.get("/api/feed").json()["items"]
     with SessionLocal() as db:
-        asha = db.scalar(select(User).where(User.email == "student@demo.app"))
+        asha = db.scalar(select(User).where(User.email == "asha@example.com"))
         counts = together.classmates_going(db, asha, [i["id"] for i in items])
     for i in items:
         expected = counts.get(i["id"])
@@ -113,12 +109,20 @@ def test_classmates_going_is_a_count_not_names(client):
             assert expected["label"] == "IT, year 3" and set(expected) == {"count", "label"}
 
 
-def test_demo_friend_joins(client):
+def test_friend_joins_and_leave_by_names_them(client):
     eid = event_id()
-    login(client, "student@demo.app")
+    login(client, "asha@example.com")
     client.post(f"/api/events/{eid}/register")
-    r = client.post("/api/demo/friend-joins").json()
-    assert r["event_id"] == eid and r["friend"]
-    assert client.get("/api/notifications").json()["items"][0]["title"] == f"{r['friend']} is going with you"
-    client.post("/api/demo/leave-by")  # the demo shortcut names friends like the scheduled reminder does
-    assert client.get("/api/notifications").json()["items"][0]["body"].endswith(f"{r['friend']} is going too.")
+    with SessionLocal() as db:
+        reg = db.scalar(select(Registration).join(User, User.id == Registration.user_id)
+                        .where(Registration.event_id == eid, User.email == "asha@example.com"))
+        friend = db.scalar(select(User).where(User.email == free_student(eid)))
+        together.accept(db, friend, together.create_invite(db, reg).code)
+        name = together.first_name(friend)
+        event = db.get(Event, eid)
+        reg = db.get(Registration, reg.id)
+        assert jobs.send_reminders(db, event.start_at - timedelta(minutes=5)) > 0
+    items = client.get("/api/notifications").json()["items"]
+    assert any(i["title"] == f"{name} is going with you" for i in items)
+    leave = next(i for i in items if i["type"] == "reminder_leave_by")
+    assert leave["body"].endswith(f"{name} is going too.")

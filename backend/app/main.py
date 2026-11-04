@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -8,14 +9,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import func, select
 from starlette.exceptions import HTTPException
 
 from .config import settings
-from .db import Base, SessionLocal, engine
-from .models import User
-from .routers import admin, auth, availability, demo, events, feed, files, notifications, organizer, registrations, together, users
+from .db import Base, engine
+from .routers import admin, auth, availability, events, feed, files, notifications, organizer, registrations, together, users
+from .security import COOKIE_NAME, CSRF_COOKIE, CSRF_HEADER, same
 from .services import embeddings, jobs, stream
+
+log = logging.getLogger("showup")
 
 CODES = {400: "bad_request", 401: "unauthorized", 403: "forbidden", 404: "not_found",
          409: "conflict", 422: "invalid", 429: "rate_limited", 503: "unavailable"}
@@ -23,18 +25,16 @@ CODES = {400: "bad_request", 401: "unauthorized", 403: "forbidden", 404: "not_fo
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    Base.metadata.create_all(engine)
+    if settings.app_env == "test":
+        Base.metadata.create_all(engine)
+    else:
+        from .migrate import upgrade
+
+        upgrade()  # production starts from an empty, fully migrated database
     stream.bind_loop(asyncio.get_running_loop())
     if settings.app_env != "test":
         embeddings.start_background_load()
         jobs.start_scheduler()
-    if settings.demo_mode:
-        with SessionLocal() as db:
-            empty = db.scalar(select(func.count()).select_from(User)) == 0
-            if empty:
-                from .seed.seed import seed
-
-                seed(db)
     yield
     jobs.stop_scheduler()
 
@@ -50,12 +50,40 @@ app.add_middleware(
 )
 
 
+UNSAFE = {"POST", "PUT", "PATCH", "DELETE"}
+
+
+@app.middleware("http")
+async def csrf_and_headers(request: Request, call_next):
+    """Double-submit CSRF check for cookie sessions, plus a few safe default headers."""
+    if (request.method in UNSAFE and request.url.path.startswith("/api/") and request.cookies.get(COOKIE_NAME)
+            and not request.headers.get("authorization")):
+        if not same(request.headers.get(CSRF_HEADER), request.cookies.get(CSRF_COOKIE)):
+            return JSONResponse({"error": {"code": "csrf", "message": "Your session needs a refresh. Reload the page and try again."}},
+                                status_code=403)
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    if settings.is_production:
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
+    return response
+
+
 @app.exception_handler(HTTPException)
 async def http_error(_req: Request, exc: HTTPException):
-    return JSONResponse(
-        {"error": {"code": CODES.get(exc.status_code, "error"), "message": exc.detail}},
-        status_code=exc.status_code,
-    )
+    if isinstance(exc.detail, dict):
+        code, message = exc.detail.get("code", "error"), exc.detail.get("message", "Something went wrong.")
+    else:
+        code, message = CODES.get(exc.status_code, "error"), exc.detail
+    return JSONResponse({"error": {"code": code, "message": message}}, status_code=exc.status_code, headers=exc.headers)
+
+
+@app.exception_handler(Exception)
+async def server_error(request: Request, exc: Exception):
+    log.exception("Unhandled error on %s %s", request.method, request.url.path)
+    return JSONResponse({"error": {"code": "server_error", "message": "Something went wrong on our side. Try again in a moment."}},
+                        status_code=500)
 
 
 @app.exception_handler(RequestValidationError)
@@ -67,13 +95,15 @@ async def validation_error(_req: Request, exc: RequestValidationError):
 
 
 for r in (auth.router, users.router, availability.router, feed.router, events.router, organizer.router, admin.router,
-          files.router, registrations.router, notifications.router, together.router, demo.router):
+          files.router, registrations.router, notifications.router, together.router):
     app.include_router(r, prefix="/api")
 
 
+@app.get("/health", include_in_schema=False)
 @app.get("/api/health")
 def health():
-    return {"ok": True, "demo_mode": settings.demo_mode, "ai_live": settings.use_live_ai, "matching": embeddings.backend()}
+    """Cheap liveness check for Render and for the app's wake-up retry. Touches no database."""
+    return {"ok": True}
 
 
 # One-service deploys (Render): serve the built SPA from the same origin as the API.

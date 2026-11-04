@@ -6,6 +6,9 @@ WORKDIR /web
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY frontend/ ./
+# Optional footer contact address, baked into the build (Render passes env vars as build args).
+ARG VITE_CONTACT_EMAIL=""
+ENV VITE_CONTACT_EMAIL=$VITE_CONTACT_EMAIL
 RUN npm run build
 
 # ---- run the API ----
@@ -18,7 +21,7 @@ COPY backend/requirements.txt ./
 RUN pip install -r requirements.txt
 COPY backend/ ./
 COPY --from=web /web/dist /app/static
-ENV STATIC_DIR=/app/static APP_ENV=prod
+ENV STATIC_DIR=/app/static APP_ENV=production
 EXPOSE 8000
 # A single worker on purpose: the feed cache, live-alert hub and waitlist locks live in memory.
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips='*'"]

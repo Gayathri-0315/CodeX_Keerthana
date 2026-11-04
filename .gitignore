@@ -11,3 +11,9 @@ backend/uploads/
 .DS_Store
 backend/app/seed/posters/generated/
 backend/app/seed/timetables/generated/
+.env.*
+!.env.example
+*.pem
+*.key
+*.sqlite
+*.sqlite3

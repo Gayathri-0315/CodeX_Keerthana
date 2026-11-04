@@ -14,6 +14,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 def user_out(user: User) -> UserOut:
     out = UserOut.model_validate(user)
+    out.email_verified = user.email_verified_at is not None
     out.organizer = OrganizerOut.model_validate(user.organizer) if user.organizer else None
     return out
 

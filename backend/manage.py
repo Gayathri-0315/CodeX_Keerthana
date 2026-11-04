@@ -1,0 +1,99 @@
+"""ShowUp management commands. Run from backend/ (or via the npm scripts at the repo root).
+
+  python manage.py migrate                    Apply database migrations (safe to run any time)
+  python manage.py seed_dev                   LOCAL ONLY: wipe the database and load sample data
+  python manage.py create_admin --email X     Create an admin account (prompts for a strong password)
+"""
+
+import argparse
+import getpass
+import sys
+
+
+def cmd_migrate(_args) -> None:
+    from app.migrate import upgrade
+
+    upgrade()
+    print("Database is up to date.")
+
+
+def cmd_seed_dev(_args) -> None:
+    from app.config import settings
+
+    if settings.is_production:
+        sys.exit("Refusing to run seed_dev: APP_ENV=production. Production starts with an empty database.")
+    from app.seed.seed import dev_password, reset_and_seed
+
+    password, generated = dev_password()
+    result = reset_and_seed(password)
+    print(f"Loaded {result['users']} sample users and {result['events']} sample events (local development data).")
+    print("Sample accounts: asha@example.com (student), club@example.com (organizer), student1..30@example.com.")
+    if generated:
+        print(f"Their password for this run: {password}   (set SEED_DEV_PASSWORD in .env to choose your own)")
+    else:
+        print("Their password is your SEED_DEV_PASSWORD.")
+
+
+def ask(prompt: str) -> str:
+    # Hidden typing in a terminal; plain line reads when input is piped (scripts, CI).
+    if sys.stdin.isatty():
+        return getpass.getpass(prompt)
+    line = sys.stdin.readline()
+    if not line:
+        sys.exit("No password given.")
+    return line.rstrip("\r\n")
+
+
+def cmd_create_admin(args) -> None:
+    from sqlalchemy import select
+
+    from app.db import SessionLocal
+    from app.migrate import upgrade
+    from app.models import User
+    from app.security import hash_password, password_problem
+    from app.timeutil import utcnow
+
+    email = args.email.strip().lower()
+    if "@" not in email or "." not in email.split("@")[-1]:
+        sys.exit("That doesn't look like an email address.")
+    upgrade()
+    with SessionLocal() as db:
+        existing = db.scalar(select(User).where(User.email == email))
+        if existing and existing.role != "admin":
+            sys.exit("That email already belongs to a student or organizer account. Use a separate email for the admin.")
+        while True:
+            pw = ask("Admin password (at least 12 characters, upper and lower case, a number and a symbol): ")
+            if problem := password_problem(pw, strong=True):
+                print(problem)
+                continue
+            if ask("Type it again: ") != pw:
+                print("The two passwords don't match. Try again.")
+                continue
+            break
+        if existing:
+            existing.password_hash = hash_password(pw)
+            existing.session_version = (existing.session_version or 0) + 1
+            existing.failed_logins, existing.locked_until = 0, None
+            print(f"Updated the password for admin {email}.")
+        else:
+            db.add(User(email=email, name=args.name, role="admin", password_hash=hash_password(pw), onboarded=True,
+                        email_verified_at=utcnow()))
+            print(f"Created admin {email}.")
+        db.commit()
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(prog="manage.py", description="ShowUp management commands")
+    sub = parser.add_subparsers(dest="command", required=True)
+    sub.add_parser("migrate", help="Apply database migrations").set_defaults(func=cmd_migrate)
+    sub.add_parser("seed_dev", help="LOCAL ONLY: reset the database with sample data").set_defaults(func=cmd_seed_dev)
+    p = sub.add_parser("create_admin", help="Create or reset an admin account")
+    p.add_argument("--email", required=True)
+    p.add_argument("--name", default="Admin")
+    p.set_defaults(func=cmd_create_admin)
+    args = parser.parse_args()
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()

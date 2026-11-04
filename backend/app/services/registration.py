@@ -110,7 +110,7 @@ def _promote(db: Session, event: Event, now: datetime) -> list[Registration]:
             break
         nxt.status = "promoted_pending"
         nxt.waitlist_position = None
-        nxt.promotion_expires_at = now + timedelta(minutes=settings.effective_waitlist_minutes)
+        nxt.promotion_expires_at = now + timedelta(minutes=settings.waitlist_confirm_minutes)
         db.flush()
         promoted.append(nxt)
         free -= 1

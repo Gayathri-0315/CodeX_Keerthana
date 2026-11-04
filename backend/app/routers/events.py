@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..db import get_db
-from ..deps import current_user
+from ..deps import current_user, require_verified
 from ..models import Event, Feedback, Registration, Report, SavedEvent, User
 from ..schemas import ReportIn
 from ..seed.venues import AREAS
@@ -87,6 +87,7 @@ def register(event_id: str, body: RegisterIn | None = None, user: User = Depends
     """-> registered or waitlisted, with the confirmation copy for the toast."""
     if user.role != "student":
         raise HTTPException(403, "Only students can register for events.")
+    require_verified(user)
     event = visible_event(db, event_id, user)
     reg = registration.register(db, user, event, external=bool(body and body.external))
     out = registration.registration_out(db, reg, user)

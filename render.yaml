@@ -1,18 +1,26 @@
 # Render Blueprint: one free web service running the Dockerfile (API + built frontend).
+# The database is an external PostgreSQL (see README, "Deploy"): paste its URL as DATABASE_URL.
 services:
   - type: web
-    name: codex-keerthana
+    name: showup
     runtime: docker
     plan: free
-    healthCheckPath: /api/health
-    autoDeploy: true
+    healthCheckPath: /health
+    autoDeploy: false
     envVars:
+      - key: APP_ENV
+        value: production
       - key: JWT_SECRET
         generateValue: true
-      - key: DEMO_MODE
-        value: "true"
+      - key: DATABASE_URL
+        sync: false
+      - key: EMAIL_PROVIDER
+        sync: false
+      - key: EMAIL_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
       - key: AI_MODE
         value: auto
-      # Optional: paste a key in the Render dashboard to read real posters and timetables with Claude.
       - key: ANTHROPIC_API_KEY
         sync: false

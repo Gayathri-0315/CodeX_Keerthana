@@ -31,8 +31,13 @@ const EventEditor = lazy(() => import("../pages/organizer/EventEditor"));
 const ReviewQueue = lazy(() => import("../pages/admin/ReviewQueue"));
 const EventManager = lazy(() => import("../pages/organizer/EventManager"));
 const Checkin = lazy(() => import("../pages/organizer/Checkin"));
-const DemoPanel = lazy(() => import("../pages/DemoPanel"));
 const InvitePage = lazy(() => import("../pages/InvitePage"));
+const VerifyPage = lazy(() => import("../pages/AuthPages").then((m) => ({ default: m.VerifyPage })));
+const ForgotPage = lazy(() => import("../pages/AuthPages").then((m) => ({ default: m.ForgotPage })));
+const ResetPage = lazy(() => import("../pages/AuthPages").then((m) => ({ default: m.ResetPage })));
+const TermsPage = lazy(() => import("../pages/Legal").then((m) => ({ default: m.TermsPage })));
+const PrivacyPage = lazy(() => import("../pages/Legal").then((m) => ({ default: m.PrivacyPage })));
+const CookiesPage = lazy(() => import("../pages/Legal").then((m) => ({ default: m.CookiesPage })));
 
 
 const queryClient = new QueryClient({
@@ -99,6 +104,12 @@ export function App() {
                   <Route path="/welcome" element={<Welcome />} />
                   <Route path="/signin" element={<SignIn />} />
                   <Route path="/invite/:code" element={<InvitePage />} />
+                  <Route path="/verify" element={<VerifyPage />} />
+                  <Route path="/forgot" element={<ForgotPage />} />
+                  <Route path="/reset" element={<ResetPage />} />
+                  <Route path="/terms" element={<TermsPage />} />
+                  <Route path="/privacy" element={<PrivacyPage />} />
+                  <Route path="/cookies" element={<CookiesPage />} />
                   <Route
                     element={
                       <RequireAuth>
@@ -116,7 +127,6 @@ export function App() {
                     <Route path="organizer/event/:id/edit" element={<OnlyRole role="organizer"><EventEditor key="edit" /></OnlyRole>} />
                     <Route path="organizer/event/:id" element={<OnlyRole role="organizer"><EventManager /></OnlyRole>} />
                     <Route path="organizer/event/:id/checkin" element={<OnlyRole role="organizer"><Checkin /></OnlyRole>} />
-                    <Route path="demo" element={<DemoPanel />} />
                     <Route path="*" element={<NotFound />} />
                   </Route>
                 </Routes>

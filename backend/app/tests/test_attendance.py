@@ -1,3 +1,4 @@
+from .conftest import login
 import threading
 from datetime import datetime, timedelta
 from types import SimpleNamespace
@@ -68,7 +69,7 @@ def full_event(db):
 
 
 def student(db, n=None):
-    return db.scalar(select(User).where(User.email == ("student@demo.app" if n is None else f"student{n}@demo.app")))
+    return db.scalar(select(User).where(User.email == ("asha@example.com" if n is None else f"student{n}@example.com")))
 
 
 def waitlist(db, event):
@@ -77,7 +78,7 @@ def waitlist(db, event):
 
 
 def test_register_and_waitlist(client):
-    client.post("/api/auth/demo", json={"role": "student"})
+    login(client, "student")
     feed = client.get("/api/feed").json()["items"]
     r = client.post(f"/api/events/{feed[0]['id']}/register").json()
     assert r["status"] == "registered" and r["toast"]["title"] == "You're in" and "Leave by" in r["toast"]["body"]
@@ -144,7 +145,7 @@ def test_concurrent_cancels_never_double_promote(client):
 
 
 def test_cancel_endpoint_releases_seat(client):
-    client.post("/api/auth/demo", json={"role": "student"})
+    login(client, "student")
     eid = client.get("/api/feed").json()["items"][0]["id"]
     reg = client.post(f"/api/events/{eid}/register").json()
     assert client.post(f"/api/registrations/{reg['id']}/cancel").json()["status"] == "cancelled"
@@ -209,11 +210,30 @@ def test_quiet_hours_hold_then_flush(client):
         assert notify.flush_pending(db, morning) == 1 and db.get(Notification, n.id).channel_sent
 
 
+def publish_sample_workshop(db) -> tuple[Event, int]:
+    """Publish the AI Workshop sample poster as the trusted club, then send match alerts."""
+    import json
+
+    from app.services import listing
+    from app.services.extraction import SEED_DIR, resolve_mock_poster
+    from app.timeutil import ist_today
+
+    org = db.scalar(select(Organizer).where(Organizer.org_name == "Coimbatore AI Club"))
+    spec = resolve_mock_poster(json.loads((SEED_DIR / "posters" / "ai_workshop.json").read_text(encoding="utf-8")), ist_today())
+    event = Event(organizer_id=org.id, status="draft")
+    listing.apply_form(db, event, listing.form_from_extraction(spec, None, "web_upload"))
+    db.add(event)
+    db.flush()
+    assert listing.publish(db, org, event) == "published"  # publishing sends match alerts (inline under tests)
+    sent = db.scalar(select(func.count()).select_from(Notification).where(Notification.event_id == event.id,
+                                                                         Notification.type == "match"))
+    return event, sent
+
+
 def test_publish_sends_match_alert_to_fitting_student(client):
-    client.post("/api/auth/demo", json={"role": "organizer"})
-    r = client.post("/api/demo/publish-ai-workshop").json()
-    assert r["status"] == "published" and r["notified"] >= 1
     with SessionLocal() as db:
+        _, notified = publish_sample_workshop(db)
+        assert notified >= 1
         n = db.scalar(select(Notification).where(Notification.user_id == student(db).id, Notification.type == "match"))
         assert n.title == "A seat that fits your Saturday" and n.body.startswith("AI Workshop: Prompt to Product, 3:30 to 5:30 PM")
         assert len(n.body) <= 90
@@ -245,7 +265,7 @@ def test_reminders_go_out_once(client):
 # ---- check-in, analytics, closing (5.10) ----
 
 def test_checkin_analytics_and_close(client):
-    client.post("/api/auth/demo", json={"role": "organizer"})
+    login(client, "organizer")
     with SessionLocal() as db:
         e = db.scalar(select(Event).where(Event.title == "Python Meetup Coimbatore"))
         regs = db.scalars(select(Registration).where(Registration.event_id == e.id, Registration.status == "registered")).all()
@@ -285,16 +305,25 @@ def test_new_organizer_promoted_after_clean_event(client):
 
 
 def test_ics_download(client):
-    client.post("/api/auth/demo", json={"role": "student"})
+    login(client, "student")
     eid = client.get("/api/feed").json()["items"][0]["id"]
     r = client.get(f"/api/events/{eid}/ics")
     assert r.status_code == 200 and r.headers["content-type"].startswith("text/calendar")
     assert "BEGIN:VEVENT" in r.text and "DTSTART:" in r.text and r.text.endswith("END:VCALENDAR\r\n")
 
 
-def test_demo_release_seat_offers_it_to_demo_student(client):
-    client.post("/api/auth/demo", json={"role": "student"})
-    assert client.post("/api/demo/release-seat").json()["promoted"] == [True]
+def test_released_seat_is_offered_to_first_on_waitlist(client):
+    login(client, "student")
+    with SessionLocal() as db:
+        e, me = full_event(db), student(db)
+        for r in waitlist(db, e):
+            r.waitlist_position += 1
+        db.add(Registration(user_id=me.id, event_id=e.id, status="waitlisted", waitlist_position=1))
+        db.commit()
+        seat = db.scalar(select(Registration).where(Registration.event_id == e.id, Registration.status == "registered").limit(1))
+        promoted = registration.cancel(db, seat)
+        assert [r.user_id for r in promoted] == [me.id]
+        jobs.offer_seats(db, promoted)
     alerts = client.get("/api/notifications").json()
     assert alerts["items"][0]["type"] == "seat_opened" and alerts["unread"] >= 1
     reg_id = alerts["items"][0]["actions"][0]["registration_id"]
@@ -302,7 +331,7 @@ def test_demo_release_seat_offers_it_to_demo_student(client):
 
 
 def test_cancel_event_notifies_registrants(client):
-    client.post("/api/auth/demo", json={"role": "organizer"})
+    login(client, "organizer")
     with SessionLocal() as db:
         e = db.scalar(select(Event).where(Event.title == "Python Meetup Coimbatore"))
         n_regs = db.scalar(select(func.count()).select_from(Registration).where(Registration.event_id == e.id))

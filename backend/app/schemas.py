@@ -18,15 +18,36 @@ class RegisterIn(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
+    college: str | None = Field(None, max_length=160)
+
+
+class OrganizerRegisterIn(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    org_name: str = Field(min_length=2, max_length=160)
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+    phone: str | None = Field(None, max_length=32, pattern=r"^[0-9+()\- ]*$")
+    college_or_company: str = Field(min_length=2, max_length=160)
 
 
 class LoginIn(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(min_length=1, max_length=128)
+    role: Literal["student", "organizer"] | None = None  # the side of the sign-in popup that was used
 
 
-class DemoLoginIn(BaseModel):
-    role: Literal["student", "organizer", "admin"] = "student"
+class VerifyIn(BaseModel):
+    code: str | None = Field(None, pattern=r"^\s*\d{6}\s*$")
+    token: str | None = Field(None, max_length=200)
+
+
+class ForgotIn(BaseModel):
+    email: EmailStr
+
+
+class ResetIn(BaseModel):
+    token: str = Field(min_length=10, max_length=200)
+    password: str = Field(min_length=8, max_length=128)
 
 
 # ---- users ----
@@ -40,6 +61,7 @@ class OrganizerOut(Out):
     id: str
     org_name: str
     trust_level: str
+    college_or_company: str | None = None
 
 
 class UserOut(Out):
@@ -66,11 +88,14 @@ class UserOut(Out):
     quiet_hours_end: str
     notif_paused_until: datetime | None
     onboarded: bool
+    college: str | None = None
+    email_verified: bool = False
     organizer: OrganizerOut | None = None
 
 
 class UserPatch(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=120)
+    college: str | None = Field(None, max_length=160)
     home_area: str | None = None
     home_lat: float | None = Field(None, ge=-90, le=90)
     home_lng: float | None = Field(None, ge=-180, le=180)

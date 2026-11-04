@@ -8,6 +8,13 @@ export class ApiError extends Error {
   }
 }
 
+const UNSAFE = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+/** The server's double-submit CSRF token (a readable cookie), echoed in a header on every write. */
+function csrfToken(): string | undefined {
+  return document.cookie.split("; ").find((c) => c.startsWith("showup_csrf="))?.slice("showup_csrf=".length);
+}
+
 type Options = { method?: string; body?: unknown; form?: FormData; signal?: AbortSignal };
 
 /** Requests index.html started before the app loaded; each is used once, by the first matching GET. */
@@ -22,10 +29,15 @@ export async function api<T>(path: string, { method = "GET", body, form, signal 
   let res: Response;
   try {
     const early = method === "GET" && !form ? takeBoot(path) : undefined;
+    const verb = form ? "POST" : method;
+    const headers: Record<string, string> = {};
+    // For FormData the browser sets the multipart boundary itself.
+    if (body !== undefined) headers["Content-Type"] = "application/json";
+    const csrf = UNSAFE.has(verb) ? csrfToken() : undefined;
+    if (csrf) headers["X-CSRF-Token"] = csrf;
     res = early ? await early : await fetch(`/api${path}`, {
-      method: form ? "POST" : method,
-      // For FormData the browser sets the multipart boundary itself.
-      headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
+      method: verb,
+      headers,
       body: form ?? (body !== undefined ? JSON.stringify(body) : undefined),
       credentials: "same-origin",
       signal,

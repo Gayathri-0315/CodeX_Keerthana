@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..deps import current_user
+from ..deps import current_user, require_verified
 from ..models import Event, Registration, User
 from ..services import registration, together
 from ..timeutil import DAY_NAMES, to_ist
@@ -30,6 +30,7 @@ def get_invite(code: str, db: Session = Depends(get_db)):
 def accept_invite(code: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
     if user.role != "student":
         raise HTTPException(403, "Only students can join events.")
+    require_verified(user)
     reg = together.accept(db, user, code)
     out = registration.registration_out(db, reg, user)
     names = [c["name"] for c in out["companions"]]

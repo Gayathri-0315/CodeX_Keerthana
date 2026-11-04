@@ -24,7 +24,7 @@ def offer_seats(db: Session, promoted: list[Registration], now: datetime | None 
     """Tell each promoted person their seat is waiting (urgent, bypasses cap by one and quiet hours)."""
     for reg in promoted:
         event, user = db.get(Event, reg.event_id), db.get(User, reg.user_id)
-        title, body = notify.seat_copy(event, settings.effective_waitlist_minutes)
+        title, body = notify.seat_copy(event, settings.waitlist_confirm_minutes)
         # Not deduped: a seat can be offered to the same person more than once over an event's life.
         n = notify.Notification(user_id=user.id, type="seat_opened", event_id=event.id, title=title, body=body,
                                 payload={"registration_id": reg.id, "expires_at": reg.promotion_expires_at.isoformat() + "Z"})

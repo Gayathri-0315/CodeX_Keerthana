@@ -72,7 +72,7 @@ export function PosterDrop({ onFile, onManual, error }: Props) {
         <button onClick={onManual} className="min-h-11 callout font-medium text-accent">Fill in manually</button>
       </div>
 
-      {config?.demo_mode && samples && samples.length > 0 && (
+      {config?.dev_tools && samples && samples.length > 0 && (
         <div className="mt-8">
           <p className="footnote mb-2 font-semibold uppercase tracking-wide text-text-2">Or try a sample poster</p>
           <div className="no-scrollbar -mx-4 flex gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0">

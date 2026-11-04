@@ -51,7 +51,7 @@ def import_timetable(file: UploadFile = File(...), user: User = Depends(current_
 
 @router.get("/samples")
 def timetable_samples(user: User = Depends(current_user)):
-    if not settings.demo_mode:
+    if not settings.is_dev:  # sample timetables are a local-development aid only
         return {"timetables": []}
     from ..seed.make_samples import sample_timetables
 

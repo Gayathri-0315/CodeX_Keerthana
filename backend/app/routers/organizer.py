@@ -3,14 +3,15 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from ..config import settings
 from ..db import get_db
-from ..deps import require_role, upload_limit
+from ..deps import require_role, require_verified, upload_limit
 from ..models import Event, Notification, Organizer, Registration, User
 from ..schemas import AppealIn, EventIn
 from ..services import feedcache, listing, notify, registration, showup_score
 from ..services.extraction import extract_poster
 from ..services.feed import SEAT_STATUSES
-from ..services.uploads import public_url, read_upload
+from ..services.uploads import public_url, read_upload, store_image
 from ..timeutil import iso_utc, utcnow
 
 router = APIRouter(prefix="/organizer", tags=["organizer"])
@@ -90,6 +91,8 @@ def get_event(event_id: str, user: User = Depends(organizer_only), db: Session =
 
 @router.get("/samples")
 def samples(user: User = Depends(organizer_only)):
+    if not settings.is_dev:  # sample posters are a local-development aid only
+        return {"posters": []}
     from ..seed.make_samples import sample_posters
 
     return {"posters": [{**s, "url": f"/api/samples/posters/{s['name']}.png"} for s in sample_posters()]}
@@ -100,7 +103,7 @@ def extract(file: UploadFile = File(...), user: User = Depends(organizer_only), 
     """Poster upload -> draft fields. Never fails hard: on trouble it returns empty fields and a message."""
     my_org(user)
     upload = read_upload(file.file.read(), file.filename or "poster")
-    return {**extract_poster(db, upload), "poster_url": public_url(upload.stored_name)}
+    return {**extract_poster(db, upload), "poster_url": public_url(store_image(db, upload))}
 
 
 @router.post("/events/preview")
@@ -138,6 +141,7 @@ def save_event(body: EventIn, event_id: str | None = None, user: User = Depends(
 
 @router.post("/events/{event_id}/publish")
 def publish(event_id: str, user: User = Depends(organizer_only), db: Session = Depends(get_db)):
+    require_verified(user)
     status = listing.publish(db, my_org(user), my_event(db, user, event_id))
     return {**event_out(db, db.get(Event, event_id)), "message": STATUS_MESSAGES[status]}
 

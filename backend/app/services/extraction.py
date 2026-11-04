@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from ..config import settings
 from ..models import ExtractionCache
 from ..timeutil import ist_today
-from .uploads import UPLOAD_DIR, Upload
+from .uploads import Upload
 
 log = logging.getLogger("showup.extraction")
 SEED_DIR = Path(__file__).resolve().parent.parent / "seed"
@@ -179,8 +179,8 @@ def _content_block(upload: Upload) -> dict:
     if upload.media_type == "application/pdf":
         return {"type": "document", "source": {"type": "base64", "media_type": "application/pdf", "data": base64.standard_b64encode(upload.data).decode()}}
     # Send the smaller, EXIF-free WebP we stored rather than the raw upload.
-    data = (UPLOAD_DIR / upload.stored_name).read_bytes() if upload.stored_name else upload.data
-    media = "image/webp" if upload.stored_name else upload.media_type
+    data = upload.clean if upload.clean else upload.data
+    media = "image/webp" if upload.clean else upload.media_type
     return {"type": "image", "source": {"type": "base64", "media_type": media, "data": base64.standard_b64encode(data).decode()}}
 
 
@@ -264,7 +264,7 @@ def _sha(p: Path) -> str:
 
 
 def resolve_mock_poster(spec: dict, today: date) -> dict:
-    """Mock JSONs use relative days ("day": "sat") so the demo is always upcoming."""
+    """Mock JSONs use relative days ("day": "sat") so samples are always upcoming."""
     out = {k: v for k, v in spec.items() if k not in ("day", "deadline_days_before", "poster")}
     if spec.get("day"):
         d = next_weekday(spec["day"], today)

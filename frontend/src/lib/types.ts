@@ -24,7 +24,9 @@ export type User = {
   quiet_hours_end: string;
   notif_paused_until: string | null;
   onboarded: boolean;
-  organizer: { id: string; org_name: string; trust_level: string } | null;
+  college: string | null;
+  email_verified: boolean;
+  organizer: { id: string; org_name: string; trust_level: string; college_or_company: string | null } | null;
 };
 
 export type Slot = {

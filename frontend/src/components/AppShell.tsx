@@ -1,5 +1,5 @@
 import { m } from "motion/react";
-import { Bell, CalendarDays, Home, Ticket } from "lucide-react";
+import { Bell, CalendarDays, Home, MailCheck, Ticket } from "lucide-react";
 import { Suspense, useEffect, useRef } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { pageVariants, spring } from "../lib/motion";
@@ -105,6 +105,19 @@ export function AppShell() {
       </header>
 
       <main id="main" className={`mx-auto max-w-[1080px] px-4 pt-4 sm:px-6 md:pt-8 ${tabBar ? "pb-32 md:pb-16" : "pb-16"}`}>
+        {me && !me.email_verified && pathname !== "/verify" && (
+          <Link
+            to="/verify"
+            className="pressable mb-4 flex min-h-12 items-center gap-3 rounded-[14px] bg-accent-soft px-4 py-3 callout text-accent"
+          >
+            <MailCheck className="size-5 shrink-0" aria-hidden />
+            <span className="min-w-0 flex-1">
+              <span className="font-semibold">Verify your email</span>
+              <span className="text-text-2"> to {me.role === "organizer" ? "publish events" : "register for events"}.</span>
+            </span>
+            <span className="font-semibold">Enter code</span>
+          </Link>
+        )}
         <Suspense fallback={<div className="h-40" />}>
           {/* The first screen paints at once (it's the LCP); later navigations crossfade in. */}
           <m.div key={pathname} variants={pageVariants} initial={firstScreen.current ? false : "initial"} animate="animate">

@@ -1,7 +1,7 @@
-def test_demo_login_and_me(client):
-    r = client.post("/api/auth/demo", json={"role": "student"})
-    assert r.status_code == 200
-    assert client.get("/api/auth/me").json()["email"] == "student@demo.app"
+from .conftest import login
+def test_login_and_me(client):
+    login(client, "student")
+    assert client.get("/api/auth/me").json()["email"] == "asha@example.com"
 
 
 def test_me_requires_auth_with_error_shape(client):
@@ -12,7 +12,7 @@ def test_me_requires_auth_with_error_shape(client):
 
 def test_session_is_null_when_signed_out(client):
     assert client.get("/api/auth/session").json() == {"user": None}
-    client.post("/api/auth/demo", json={"role": "organizer"})
+    login(client, "organizer")
     user = client.get("/api/auth/session").json()["user"]
     assert user["role"] == "organizer" and user["organizer"]["trust_level"] == "trusted"
 
@@ -26,7 +26,7 @@ def test_register_then_login(client):
 
 
 def test_seeded_student_feed_matches_phase_3_acceptance(client):
-    client.post("/api/auth/demo", json={"role": "student"})
+    login(client, "student")
     for_you = client.get("/api/feed").json()["items"]
     titles = [e["title"] for e in for_you]
     assert titles[:2] == ["AI Workshop: Hands-on with LLMs", "Python Meetup Coimbatore"]
@@ -40,7 +40,7 @@ def test_seeded_student_feed_matches_phase_3_acceptance(client):
 
 
 def test_feed_pagination(client):
-    client.post("/api/auth/demo", json={"role": "student"})
+    login(client, "student")
     first = client.get("/api/feed?limit=2").json()
     assert len(first["items"]) == 2 and first["next_cursor"] == "2" and first["total"] == 4
     second = client.get("/api/feed?limit=2&cursor=2").json()
@@ -48,7 +48,7 @@ def test_feed_pagination(client):
 
 
 def test_save_dismiss_and_undo(client):
-    client.post("/api/auth/demo", json={"role": "student"})
+    login(client, "student")
     top = client.get("/api/feed").json()["items"][0]
     assert client.post(f"/api/events/{top['id']}/save").status_code == 204
     saved = client.get("/api/feed?tab=saved").json()["items"]
@@ -63,7 +63,7 @@ def test_save_dismiss_and_undo(client):
 
 
 def test_event_detail_and_visibility(client):
-    client.post("/api/auth/demo", json={"role": "student"})
+    login(client, "student")
     top = client.get("/api/feed").json()["items"][0]
     d = client.get(f"/api/events/{top['id']}").json()
     assert d["organizer"]["trust_label"] == "Trusted organizer" and d["seats_taken"] == 18 and d["maps_url"]
@@ -77,7 +77,7 @@ def test_event_detail_and_visibility(client):
 
 
 def test_availability_put_replaces_and_updates_count(client):
-    client.post("/api/auth/demo", json={"role": "student"})
+    login(client, "student")
     before = client.get("/api/feed/count").json()["fits"]
     r = client.put("/api/availability", json={"slots": [{"day_of_week": d, "start_min": 360, "end_min": 1320} for d in range(7)]})
     assert r.status_code == 200 and len(r.json()["slots"]) == 7
@@ -87,18 +87,18 @@ def test_availability_put_replaces_and_updates_count(client):
 
 
 def test_availability_rejects_bad_range(client):
-    client.post("/api/auth/demo", json={"role": "student"})
+    login(client, "student")
     r = client.put("/api/availability", json={"slots": [{"day_of_week": 1, "start_min": 600, "end_min": 600}]})
     assert r.status_code == 422 and r.json()["error"]["code"] == "invalid"
 
 
 def test_patch_profile_interests_export_delete(client):
-    client.post("/api/auth/demo", json={"role": "student"})
+    login(client, "student")
     assert client.patch("/api/users/me", json={"budget_max_inr": None, "quiet_hours_start": "23:00"}).json()["budget_max_inr"] is None
     assert client.patch("/api/users/me", json={"quiet_hours_start": "25:00"}).status_code == 422
     r = client.put("/api/users/me/interests", json={"interests": [{"tag": "Design", "weight": 3}], "interest_text": "UX"})
     assert [i["tag"] for i in r.json()["interests"]] == ["design"]
     export = client.get("/api/users/me/export").json()
-    assert export["profile"]["email"] == "student@demo.app" and len(export["availability"]) == 2
+    assert export["profile"]["email"] == "asha@example.com" and len(export["availability"]) == 2
     assert client.delete("/api/users/me").status_code == 204
     assert client.get("/api/auth/me").status_code == 401

@@ -1,12 +1,19 @@
-"""Demo data (SPEC section 12). Run: `npm run seed` (or `python -m app.seed.seed` in backend/)."""
+"""Sample data for LOCAL DEVELOPMENT ONLY. Run: `npm run seed` (python manage.py seed_dev).
+
+Refuses to run when APP_ENV=production. Account passwords come from SEED_DEV_PASSWORD, or a random
+one is generated and printed; nothing is hardcoded.
+"""
 
 import json
+import os
 import random
+import secrets
 from datetime import date, timedelta
 from pathlib import Path
 
 from sqlalchemy.orm import Session
 
+from ..config import settings
 from ..db import Base, SessionLocal, engine
 from ..models import AvailabilitySlot, Event, Organizer, Registration, User, UserInterest
 from ..security import hash_password
@@ -16,7 +23,7 @@ from .make_samples import make_posters, make_timetables
 from .venues import AREAS, find_area
 
 SEED_DIR = Path(__file__).parent
-DEMO_PASSWORD = "demo1234"
+DEV_DOMAIN = "example.com"  # reserved for documentation, so these addresses can never reach a real inbox
 DAYS = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}
 
 INTEREST_POOL = [
@@ -48,19 +55,25 @@ def slot(user_id: str, dow: int, start: str, end: str) -> AvailabilitySlot:
 
 
 def make_user(email: str, name: str, pw: str, role: str = "student", **kw) -> User:
-    return User(email=email, name=name, password_hash=pw, role=role, onboarded=True, **kw)
+    return User(email=email, name=name, password_hash=pw, role=role, onboarded=True, email_verified_at=utcnow(), **kw)
 
 
-def seed(db: Session) -> dict:
+def dev_email(local: str) -> str:
+    return f"{local}@{DEV_DOMAIN}"
+
+
+def seed(db: Session, password: str) -> dict:
+    if settings.is_production:
+        raise SystemExit("Refusing to load sample data: APP_ENV=production.")
     rng = random.Random(42)
-    pw = hash_password(DEMO_PASSWORD)
+    pw = hash_password(password)
     today = ist_today()
     now = utcnow()
 
-    # ---- demo student ----
+    # ---- main sample student ----
     home = find_area("Gandhipuram")
     student = make_user(
-        "student@demo.app", "Asha", pw,
+        dev_email("asha"), "Asha", pw, college="Sample College of Technology",
         home_area=home["name"], home_lat=home["lat"], home_lng=home["lng"],
         max_distance_km=20, budget_max_inr=200, skill_level="beginner",
         eligibility_tags=["college_student", "it_dept", "year_3"],
@@ -83,12 +96,12 @@ def seed(db: Session) -> dict:
         return o
 
     orgs = {
-        "club": organizer("organizer@demo.app", "Club lead", "Coimbatore AI Club", "kct.ac.in", "trusted", 9, 0.78),
-        "new": organizer("neworg@demo.app", "Quick Careers", "QuickCareers Hub", "gmail.com", "new"),
-        "design": organizer("design@demo.app", "Design lead", "PSG Design Society", "psgtech.ac.in", "verified", 2, 0.71),
-        "volunteers": organizer("volunteers@demo.app", "Volunteer lead", "Kovai Volunteers", "kovaivolunteers.org", "verified", 4, 0.66),
+        "club": organizer(dev_email("club"), "Club lead", "Coimbatore AI Club", "kct.ac.in", "trusted", 9, 0.78),
+        "new": organizer(dev_email("neworg"), "Quick Careers", "QuickCareers Hub", "gmail.com", "new"),
+        "design": organizer(dev_email("design"), "Design lead", "PSG Design Society", "psgtech.ac.in", "verified", 2, 0.71),
+        "volunteers": organizer(dev_email("volunteers"), "Volunteer lead", "Kovai Volunteers", "kovaivolunteers.org", "verified", 4, 0.66),
     }
-    db.add(make_user("admin@demo.app", "Admin", pw, role="admin"))
+    db.add(make_user(dev_email("admin"), "Admin", pw, role="admin"))
 
     # ---- 30 generated students (so reach preview has realistic numbers) ----
     students: list[User] = []
@@ -103,7 +116,7 @@ def seed(db: Session) -> dict:
     for i in range(30):
         area = rng.choice(AREAS)
         u = make_user(
-            f"student{i + 1}@demo.app", f"{FIRST[i]} {rng.choice(LAST)}.", pw,
+            dev_email(f"student{i + 1}"), f"{FIRST[i]} {rng.choice(LAST)}.", pw,
             home_area=area["name"], home_lat=area["lat"], home_lng=area["lng"],
             max_distance_km=rng.choice([10, 15, 20, 25]), budget_max_inr=rng.choice([0, 100, 200, 500, None]),
             skill_level=rng.choice(["beginner", "intermediate", "advanced"]),
@@ -162,13 +175,26 @@ def seed(db: Session) -> dict:
     return {"users": 1 + len(orgs) + 1 + len(students), "events": len(events)}
 
 
-def reset_and_seed() -> dict:
+def dev_password() -> tuple[str, bool]:
+    """(password, generated?) for the sample accounts."""
+    pw = (os.environ.get("SEED_DEV_PASSWORD") or settings.seed_dev_password).strip()
+    return (pw, False) if pw else (secrets.token_urlsafe(9), True)
+
+
+def reset_and_seed(password: str | None = None) -> dict:
+    """Wipe the local database and load sample data. Never runs in production."""
+    if settings.is_production:
+        raise SystemExit("Refusing to reset the database: APP_ENV=production.")
+    from sqlalchemy import text
+
     Base.metadata.drop_all(engine)
-    Base.metadata.create_all(engine)
+    with engine.begin() as conn:
+        conn.execute(text("DROP TABLE IF EXISTS alembic_version"))
+    if settings.app_env == "test":
+        Base.metadata.create_all(engine)
+    else:
+        from ..migrate import upgrade
+
+        upgrade()
     with SessionLocal() as db:
-        return seed(db)
-
-
-if __name__ == "__main__":
-    result = reset_and_seed()
-    print(f"Seeded {result['users']} users and {result['events']} events. Demo password: {DEMO_PASSWORD}")
+        return seed(db, password or dev_password()[0])

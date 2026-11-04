@@ -31,7 +31,7 @@ export function useMe() {
 export function usePublicConfig() {
   return useQuery({
     queryKey: keys.config,
-    queryFn: () => api<{ demo_mode: boolean; ai_live: boolean }>("/auth/config"),
+    queryFn: () => api<{ ai_live: boolean; dev_tools: boolean }>("/auth/config"),
     staleTime: Infinity,
   });
 }
@@ -48,15 +48,7 @@ function useResetUserData() {
 export function useSignIn() {
   const reset = useResetUserData();
   return useMutation({
-    mutationFn: (body: { email: string; password: string }) => api<User>("/auth/login", { method: "POST", body }),
-    onSuccess: reset,
-  });
-}
-
-export function useDemoSignIn() {
-  const reset = useResetUserData();
-  return useMutation({
-    mutationFn: (role: Role) => api<User>("/auth/demo", { method: "POST", body: { role } }),
+    mutationFn: (body: { email: string; password: string; role?: Role }) => api<User>("/auth/login", { method: "POST", body }),
     onSuccess: reset,
   });
 }
@@ -64,7 +56,45 @@ export function useDemoSignIn() {
 export function useRegister() {
   const reset = useResetUserData();
   return useMutation({
-    mutationFn: (body: { name: string; email: string; password: string }) => api<User>("/auth/register", { method: "POST", body }),
+    mutationFn: (body: { name: string; email: string; password: string; college?: string }) =>
+      api<User>("/auth/register", { method: "POST", body }),
+    onSuccess: reset,
+  });
+}
+
+export function useRegisterOrganizer() {
+  const reset = useResetUserData();
+  return useMutation({
+    mutationFn: (body: { name: string; org_name: string; email: string; password: string; phone?: string; college_or_company: string }) =>
+      api<User>("/auth/register-organizer", { method: "POST", body }),
+    onSuccess: reset,
+  });
+}
+
+/** Verify by the 6-digit code (signed in) or by the emailed link token. */
+export function useVerifyEmail() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { code?: string; token?: string }) => api<User>("/auth/verify", { method: "POST", body }),
+    onSuccess: (user) => {
+      const me = qc.getQueryData<User | null>(keys.me);
+      if (me && me.id === user.id) qc.setQueryData(keys.me, user);
+    },
+  });
+}
+
+export function useResendVerification() {
+  return useMutation({ mutationFn: () => api<void>("/auth/resend-verification", { method: "POST" }) });
+}
+
+export function useForgotPassword() {
+  return useMutation({ mutationFn: (email: string) => api<void>("/auth/forgot", { method: "POST", body: { email } }) });
+}
+
+export function useResetPassword() {
+  const reset = useResetUserData();
+  return useMutation({
+    mutationFn: (body: { token: string; password: string }) => api<User>("/auth/reset", { method: "POST", body }),
     onSuccess: reset,
   });
 }

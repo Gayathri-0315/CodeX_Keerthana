@@ -162,7 +162,7 @@ def form_from_extraction(fields: dict, poster_url: str | None, source: str) -> E
 
 
 def publish(db: Session, organizer: Organizer, event: Event) -> str:
-    """Run the gate and publish, review or block. Shared by the organizer API and the demo panel."""
+    """Run the gate and publish, review or block. Used by the organizer API."""
     from fastapi import HTTPException
 
     from . import feedcache, jobs

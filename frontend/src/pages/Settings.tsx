@@ -1,6 +1,7 @@
-import { Download, FlaskConical, LogOut, Minus, Plus, Trash2 } from "lucide-react";
+import { Download, LogOut, Minus, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { LegalLinks } from "../components/LegalLinks";
 import { PageHeader } from "../components/AppShell";
 import { AreaPicker, BudgetPicker, DistanceSlider } from "../components/PlaceControls";
 import { Button } from "../components/ui/Button";
@@ -12,7 +13,7 @@ import { Toggle } from "../components/ui/Toggle";
 import { api } from "../lib/api";
 import { INTERESTS } from "../lib/constants";
 import { formatTime } from "../lib/format";
-import { useMe, usePublicConfig, useSignOut, useUpdateInterests, useUpdateMe } from "../lib/queries";
+import { useMe, useSignOut, useUpdateInterests, useUpdateMe } from "../lib/queries";
 import { getTheme, setTheme, type ThemeChoice } from "../lib/theme";
 import type { User } from "../lib/types";
 
@@ -88,7 +89,7 @@ export default function Settings() {
         )}
         <AppearanceSection />
         <DataSection me={me} />
-        <DemoLink />
+        <LegalLinks className="mb-8 px-1" />
       </div>
     </>
   );
@@ -243,16 +244,6 @@ function TimeInput({ label, value, onChange }: { label: string; value: string; o
       onBlur={() => v && v !== last.current && onChange(v)}
       className="h-11 rounded-[12px] bg-surface-2 px-3 body tnum shadow-[inset_0_0_0_1px_var(--line)] outline-none focus:shadow-[inset_0_0_0_2px_var(--accent)]"
     />
-  );
-}
-
-function DemoLink() {
-  const { data: config } = usePublicConfig();
-  if (!config?.demo_mode) return null;
-  return (
-    <Link to="/demo" className="pressable card mb-8 flex min-h-12 items-center gap-3 px-5 py-4 callout font-medium text-accent">
-      <FlaskConical className="size-5" aria-hidden /> Demo panel
-    </Link>
   );
 }
 
