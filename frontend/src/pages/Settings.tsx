@@ -1,6 +1,6 @@
 import { Download, LogOut, Minus, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { LegalLinks } from "../components/LegalLinks";
 import { PageHeader } from "../components/AppShell";
 import { AreaPicker, BudgetPicker, DistanceSlider } from "../components/PlaceControls";
@@ -89,7 +89,8 @@ export default function Settings() {
           </>
         )}
         <AppearanceSection />
-        <DataSection me={me} />
+        <AccountSection me={me} />
+        <PrivacySection />
         <LegalLinks className="mb-8 px-1" />
       </div>
     </>
@@ -308,14 +309,33 @@ function AppearanceSection() {
   );
 }
 
-function DataSection({ me }: { me: User }) {
+function AccountSection({ me }: { me: User }) {
   const signOut = useSignOut();
   const navigate = useNavigate();
+  return (
+    <Section title="Account">
+      <Row>
+        <p className="body">{me.name}</p>
+        <p className="footnote text-text-2">{me.email}</p>
+      </Row>
+      <Row>
+        <Button variant="secondary" loading={signOut.isPending} onClick={() => signOut.mutate(undefined, { onSuccess: () => navigate("/welcome") })}>
+          <LogOut className="size-4" aria-hidden />Sign out
+        </Button>
+      </Row>
+    </Section>
+  );
+}
+
+function PrivacySection() {
+  const signOut = useSignOut();
   const toast = useToast();
   const [confirm, setConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
-  const exportData = async () => {
+  const download = async () => {
+    setDownloading(true);
     try {
       const data = await api<unknown>("/users/me/export");
       const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
@@ -323,7 +343,9 @@ function DataSection({ me }: { me: User }) {
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      toast({ tone: "error", title: "Couldn't export", body: (e as Error).message });
+      toast({ tone: "error", title: "Couldn't download your data", body: (e as Error).message });
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -340,17 +362,13 @@ function DataSection({ me }: { me: User }) {
   };
 
   return (
-    <Section title="Account">
+    <Section title="Privacy">
       <Row>
-        <p className="body">{me.name}</p>
-        <p className="footnote text-text-2">{me.email}</p>
-      </Row>
-      <Row>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={exportData}><Download className="size-4" aria-hidden />Export my data</Button>
-          <Button variant="secondary" loading={signOut.isPending} onClick={() => signOut.mutate(undefined, { onSuccess: () => navigate("/welcome") })}>
-            <LogOut className="size-4" aria-hidden />Sign out
-          </Button>
+        <p className="callout text-text-2">
+          Get a copy of everything ShowUp keeps about you, or delete it all. <Link to="/privacy" className="text-accent">Privacy policy</Link>
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button variant="secondary" loading={downloading} onClick={download}><Download className="size-4" aria-hidden />Download my data</Button>
           <Button variant="danger" onClick={() => setConfirm(true)}><Trash2 className="size-4" aria-hidden />Delete my data</Button>
         </div>
       </Row>
