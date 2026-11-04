@@ -73,7 +73,7 @@ class UserOut(Out):
     home_area: str | None
     home_lat: float | None
     home_lng: float | None
-    max_distance_km: int
+    max_distance_km: int | None  # None = travel anywhere
     budget_max_inr: int | None
     format_pref: str
     skill_level: str

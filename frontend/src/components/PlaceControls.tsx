@@ -54,24 +54,34 @@ export function AreaPicker({ value, onChange }: { value: Area | null; onChange: 
   );
 }
 
-export function DistanceSlider({ value, onChange, onCommit }: { value: number; onChange: (v: number) => void; onCommit?: (v: number) => void }) {
-  const pct = ((value - 5) / 45) * 100;
+// Steps of 5 km up to 50, then one more step for "Anywhere" (stored as null: no distance limit).
+const ANYWHERE_STEP = 55;
+const fromSlider = (v: number): number | null => (v >= ANYWHERE_STEP ? null : v);
+
+export function DistanceSlider({ value, onChange, onCommit }: {
+  value: number | null;
+  onChange: (v: number | null) => void;
+  onCommit?: (v: number | null) => void;
+}) {
+  const pos = value == null ? ANYWHERE_STEP : Math.min(50, Math.max(5, Math.round(value / 5) * 5));
+  const pct = ((pos - 5) / (ANYWHERE_STEP - 5)) * 100;
   return (
     <div>
       <div className="mb-1 flex items-baseline justify-between">
         <label htmlFor="distance" className="footnote font-medium text-text-2">How far will you travel?</label>
-        <span className="headline tnum">{value} km</span>
+        <span className="headline tnum">{value == null ? "Anywhere" : `${value} km`}</span>
       </div>
       <input
         id="distance"
         type="range"
         min={5}
-        max={50}
-        step={1}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        onPointerUp={(e) => onCommit?.(Number((e.target as HTMLInputElement).value))}
-        onKeyUp={(e) => onCommit?.(Number((e.target as HTMLInputElement).value))}
+        max={ANYWHERE_STEP}
+        step={5}
+        value={pos}
+        aria-valuetext={value == null ? "Anywhere" : `${value} kilometres`}
+        onChange={(e) => onChange(fromSlider(Number(e.target.value)))}
+        onPointerUp={(e) => onCommit?.(fromSlider(Number((e.target as HTMLInputElement).value)))}
+        onKeyUp={(e) => onCommit?.(fromSlider(Number((e.target as HTMLInputElement).value)))}
         className="slider"
         style={{ ["--pct" as string]: `${pct}%` }}
       />

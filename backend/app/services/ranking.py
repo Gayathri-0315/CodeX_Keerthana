@@ -21,6 +21,8 @@ NOT_FOR_ME_FLOOR = 0.5
 ALMOST_MIN_INTEREST = 40  # "interesting events that clash"
 
 
+ANYWHERE_SCALE_KM = 50  # "Anywhere": score travel as if the limit were the slider's top step
+
 def tag_label(tag: str) -> str:
     return TAG_LABELS.get(tag, tag.replace("-", " "))
 
@@ -67,7 +69,8 @@ def schedule_score(fr: FilterResult, event) -> tuple[float, float | None]:
 def travel_score(fr: FilterResult, user) -> float:
     if fr.distance_km is None:
         return 100.0
-    return max(0.0, 100 - (fr.distance_km / user.max_distance_km) * 60)
+    scale = user.max_distance_km or ANYWHERE_SCALE_KM
+    return max(0.0, 100 - (fr.distance_km / scale) * 60)
 
 
 def budget_score(event, user) -> float:

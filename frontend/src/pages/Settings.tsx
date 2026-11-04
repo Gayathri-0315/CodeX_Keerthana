@@ -142,7 +142,7 @@ function InterestsSection({ me }: { me: User }) {
 }
 
 function PlaceSection({ me, patch }: { me: User; patch: (p: Partial<User>) => void }) {
-  const [distance, setDistance] = useState(me.max_distance_km);
+  const [distance, setDistance] = useState<number | null>(me.max_distance_km);
   useEffect(() => setDistance(me.max_distance_km), [me.max_distance_km]);
   const area = me.home_area && me.home_lat != null && me.home_lng != null ? { name: me.home_area, lat: me.home_lat, lng: me.home_lng } : null;
 

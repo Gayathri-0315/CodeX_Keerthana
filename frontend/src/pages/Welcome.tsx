@@ -213,7 +213,7 @@ function Place({ onDone }: { onDone: () => void }) {
   const [area, setArea] = useState<Area | null>(
     me?.home_area && me.home_lat != null && me.home_lng != null ? { name: me.home_area, lat: me.home_lat, lng: me.home_lng } : null,
   );
-  const [distance, setDistance] = useState(me?.max_distance_km ?? 20);
+  const [distance, setDistance] = useState<number | null>(me ? me.max_distance_km : 20);
   const [budget, setBudget] = useState<number | null>(me?.budget_max_inr ?? 200);
 
   const next = () =>

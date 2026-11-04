@@ -69,12 +69,13 @@ def check_event(user, event, windows, now: datetime, registered_count: int = 0) 
     if user.budget_max_inr is not None and event.fee_inr > user.budget_max_inr:
         return FilterResult(False, "budget", "Over your budget.")
 
-    # 5. Distance, for events you must travel to.
+    # 5. Distance, for events you must travel to. Online and hybrid events ignore distance completely,
+    # and "Anywhere" (max_distance_km = None) never drops an event for distance.
     distance = None
     travel = 0
     if event.mode == "in_person" and event.lat is not None and event.lng is not None:
         distance = haversine_km(*user_home(user), event.lat, event.lng)
-        if distance > user.max_distance_km:
+        if user.max_distance_km is not None and distance > user.max_distance_km:
             return FilterResult(False, "distance", "Too far away.", distance_km=distance)
         travel = travel_minutes(distance)
 

@@ -99,3 +99,31 @@ def test_full_event_is_kept_as_waitlist():
 def test_not_free_that_day_reason():
     r = check_event(user(), event(d=SAT + timedelta(days=4)), SAT_AFTERNOON, NOW)
     assert r.reason == "You're not free on Wednesday."
+
+
+# ---- distance: "Anywhere" and online events (prompt v2, item 1) ----
+
+FAR = dict(lat=11.3410, lng=77.7172)  # Erode, about 85 km from Coimbatore
+
+
+def test_far_event_dropped_with_a_km_limit():
+    r = check_event(user(max_distance_km=50), event(start="20:00", end="21:00", **FAR), windows((0, 1440)), NOW)
+    assert not r.passed and r.failed_rule == "distance"
+
+
+def test_anywhere_keeps_far_events():
+    r = check_event(user(max_distance_km=None), event(start="20:00", end="21:00", **FAR), windows((0, 1440)), NOW)
+    assert r.passed and r.distance_km > 50
+
+
+def test_online_events_ignore_distance_completely():
+    for mode in ("online", "hybrid"):
+        r = check_event(user(max_distance_km=5), event(mode=mode, **FAR), SAT_AFTERNOON, NOW)
+        assert r.passed and r.distance_km is None and r.travel_min == 0
+
+
+def test_anywhere_travel_score_is_bounded():
+    from app.services.ranking import travel_score
+
+    fr = check_event(user(max_distance_km=None), event(start="20:00", end="21:00", **FAR), windows((0, 1440)), NOW)
+    assert 0 <= travel_score(fr, user(max_distance_km=None)) <= 100

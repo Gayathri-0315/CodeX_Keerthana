@@ -41,7 +41,7 @@ class User(Base):
     home_area: Mapped[str | None] = mapped_column(String(120))
     home_lat: Mapped[float | None] = mapped_column(Float)
     home_lng: Mapped[float | None] = mapped_column(Float)
-    max_distance_km: Mapped[int] = mapped_column(Integer, default=20)
+    max_distance_km: Mapped[int | None] = mapped_column(Integer, default=20)  # None = anywhere
     budget_max_inr: Mapped[int | None] = mapped_column(Integer, default=200)  # None = any budget
     format_pref: Mapped[str] = mapped_column(String(16), default="either")
     skill_level: Mapped[str] = mapped_column(String(16), default="beginner")

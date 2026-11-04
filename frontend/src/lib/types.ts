@@ -9,7 +9,7 @@ export type User = {
   home_area: string | null;
   home_lat: number | null;
   home_lng: number | null;
-  max_distance_km: number;
+  max_distance_km: number | null; // null = anywhere
   budget_max_inr: number | null;
   format_pref: "in_person" | "online" | "either";
   skill_level: "beginner" | "intermediate" | "advanced";
