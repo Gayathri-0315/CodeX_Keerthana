@@ -1,5 +1,6 @@
 import { AnimatePresence, m } from "motion/react";
-import { WifiOff } from "lucide-react";
+import { Loader2, WifiOff } from "lucide-react";
+import { wakeState } from "../lib/api";
 import { Component, useSyncExternalStore, type ErrorInfo, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { spring } from "../lib/motion";
@@ -30,6 +31,32 @@ export function OfflineBanner() {
         >
           <WifiOff className="size-4 text-warning" aria-hidden />
           You're offline. We'll reconnect when you're back.
+        </m.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+/** While the hosting wakes the server from sleep (first request after a quiet spell), say so. */
+export function WakeBanner() {
+  const waking = useSyncExternalStore(wakeState.subscribe, wakeState.get, () => false);
+  return (
+    <AnimatePresence>
+      {waking && (
+        <m.div
+          role="status"
+          initial={{ y: -40, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: -40, opacity: 0 }}
+          transition={spring}
+          className="glass fixed inset-x-0 z-[65] mx-auto flex w-fit max-w-[calc(100%-2rem)] items-center gap-2.5 rounded-full px-4 py-2.5 shadow-card ring-1 ring-line"
+          style={{ top: "calc(env(safe-area-inset-top, 0px) + 12px)" }}
+        >
+          <Loader2 className="size-4 shrink-0 animate-spin text-accent" aria-hidden />
+          <span className="callout">
+            <span className="font-medium">Waking up the server...</span>
+            <span className="text-text-2"> This can take up to a minute.</span>
+          </span>
         </m.div>
       )}
     </AnimatePresence>

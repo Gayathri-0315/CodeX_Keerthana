@@ -63,6 +63,13 @@ Free hosting disks are wiped on every redeploy, so production data lives in Post
 4. **Deploy.** On startup the app runs the migrations against the empty database. Check `https://<your-app>.onrender.com/health` returns `{"ok":true}`.
 5. **Create the first admin** from Render's Shell tab: `python manage.py create_admin --email you@your-domain.com`.
 
+### Sleeping server and presentations
+
+Render's free plan stops the service after about 15 minutes without visits; the next visit wakes it in 30 to 60 seconds. The app handles this: if the first request is slow or the host answers "starting" (502/503/504), it shows **"Waking up the server..."** and retries for up to 90 seconds instead of failing. `GET /health` is a cheap check that touches no database.
+
+- **Before a presentation:** open `https://<your-app>.onrender.com/health` 2 to 3 minutes before you start and wait for `{"ok":true}`, then open the app. Keep a tab on the app during the talk so it stays awake.
+- **To keep it awake all day:** add a free monitor (for example UptimeRobot or cron-job.org) that requests `/health` every 10 minutes. One always-on free service fits inside Render's free monthly hours. Your database (Neon) also sleeps when idle and wakes on the first query in about a second; nothing to do there.
+
 The app refuses to start in production with SQLite or a short `JWT_SECRET`. `render.yaml` sets `autoDeploy: false`, so nothing deploys until you click Deploy.
 
 ## Environment variables

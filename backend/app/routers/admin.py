@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..deps import require_role
+from ..errors import fail
 from ..models import Event, Organizer, Report, User
 from ..services import feedcache, jobs
 from ..timeutil import iso_utc, utcnow
@@ -97,7 +98,7 @@ def test_email(user: User = Depends(admin_only)):
     ok = send_email(user.email, "ShowUp test email", "If you can read this, email works.", "Open ShowUp", settings.public_url,
                     transactional=True)
     if not ok:
-        raise HTTPException(502, f"The {settings.email_provider} API refused the email. Check the key and that EMAIL_FROM is a verified sender; the server log has the details.")
+        fail(400, "email_failed", f"The {settings.email_provider} API refused the email. Check the key and that EMAIL_FROM is a verified sender; the server log has the details.")
     return {"status": "sent", "to": user.email, "message": f"Sent to {user.email} through {settings.email_provider}."}
 
 

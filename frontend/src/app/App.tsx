@@ -3,7 +3,7 @@ import { domMax, LazyMotion, MotionConfig } from "motion/react";
 import { lazy, Suspense, type ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
-import { ErrorBoundary, NotFound, OfflineBanner } from "../components/AppStates";
+import { ErrorBoundary, NotFound, OfflineBanner, WakeBanner } from "../components/AppStates";
 import { Toaster } from "../components/ui/Toaster";
 import { ApiError } from "../lib/api";
 import { useMe } from "../lib/queries";
@@ -98,6 +98,7 @@ export function App() {
         <MotionConfig reducedMotion="user">
           <Toaster>
             <OfflineBanner />
+            <WakeBanner />
             <BrowserRouter>
               <Suspense fallback={<Splash />}>
                 <Routes>
