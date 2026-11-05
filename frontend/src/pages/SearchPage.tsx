@@ -20,6 +20,7 @@ export type SearchFilters = {
   free_only: boolean;
   mode: string | null;
   max_distance_km: number | null;
+  near: string | null;
   keywords: string[];
 };
 type Chip = { field: keyof SearchFilters; value: string | number | boolean | null; label: string };
@@ -31,6 +32,7 @@ function without(f: SearchFilters, chip: Chip): SearchFilters {
   const v = f[chip.field];
   if (Array.isArray(v)) return { ...f, [chip.field]: v.filter((x) => x !== chip.value) };
   if (chip.field === "when") return { ...f, when: null, date_from: null, date_to: null };
+  if (chip.field === "near") return { ...f, near: null, max_distance_km: null };
   return { ...f, [chip.field]: chip.field === "free_only" ? false : null };
 }
 

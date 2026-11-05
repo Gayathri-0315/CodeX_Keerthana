@@ -54,11 +54,25 @@ def chips(f: search.SearchFilters) -> list[dict]:
         out.append({"field": "max_fee_inr", "value": f.max_fee_inr, "label": f"Up to ₹{f.max_fee_inr}"})
     if f.mode:
         out.append({"field": "mode", "value": f.mode, "label": "Online" if f.mode == "online" else "In person"})
-    if f.max_distance_km is not None:
+    if f.near:
+        place = "Near you" if f.near == "me" else f"Near {f.near}"
+        out.append({"field": "near", "value": f.near, "label": f"{place} · {f.max_distance_km or search.NEAR_KM} km"})
+    elif f.max_distance_km is not None:
         out.append({"field": "max_distance_km", "value": f.max_distance_km, "label": f"Within {f.max_distance_km} km"})
     for k in f.keywords:
         out.append({"field": "keywords", "value": k, "label": f'"{k}"'})
     return out
+
+
+def _run(data, f: search.SearchFilters, user):
+    """Explore's filters; with a place, nearest first (then soonest)."""
+    from ..services.explore import distance_from
+
+    flt = search.to_filters(f, user)
+    items = apply_filters(data, flt)
+    if flt.near is not None:
+        items.sort(key=lambda i: (round(distance_from(flt, i) or 99), i.event.start_at))
+    return items
 
 
 @router.post("/parse")
@@ -84,13 +98,15 @@ def results(body: ResultsIn, request: Request, user: User | None = Depends(optio
     f = body.filters
     if f.when:  # dates are always the server's, from the date word
         f = search.finish(f, ist_today())
-    items = apply_filters(data, search.to_filters(f))
+    if f.near == "me" and search.near_point(f, user) is None:
+        f = f.model_copy(update={"near": None, "max_distance_km": None})  # guests: we don't know where "me" is
+    items = _run(data, f, user)
     relaxed = None
     if not items and not f.is_empty():
         changes: list[str] = []
         for loose, change in search.relaxations(f):
             changes.append(change)
-            items = apply_filters(data, search.to_filters(loose))
+            items = _run(data, loose, user)
             if items:
                 relaxed = {"message": f"Nothing for {search.describe(f)}. Showing {' and '.join(changes)}.",
                            "filters": loose.model_dump(mode="json"), "chips": chips(loose)}

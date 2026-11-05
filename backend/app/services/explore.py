@@ -10,6 +10,7 @@ from datetime import date
 
 from .feed import Evaluated, FeedData
 from .matching import time_fit
+from .travel import haversine_km
 from ..timeutil import to_ist
 
 
@@ -30,6 +31,9 @@ class Filters:
     time_of_day: str | None = None  # morning | afternoon | evening | night (IST start time)
     keywords: list[str] = field(default_factory=list)  # any word in the title, tags or description
     max_distance_km: int | None = None  # only applied when we know the student's distance
+    near: tuple[float, float] | None = None  # search "near X": in-person events within near_km of this point
+    near_name: str | None = None  # the area's name, matched in the address when an event has no map point
+    near_km: int = 5
 
 
 HOURS = {"morning": (5, 12), "afternoon": (12, 17), "evening": (16, 21), "night": (19, 28)}
@@ -54,6 +58,14 @@ def _matches(ev: Evaluated, f: Filters) -> bool:
     if f.keywords:
         text = " ".join([e.title, e.description or "", " ".join(e.tags or [])]).lower()
         if not any(k in text for k in f.keywords):
+            return False
+    if f.near is not None:
+        if e.mode == "online":
+            return False
+        if e.lat is not None and e.lng is not None:
+            if haversine_km(f.near[0], f.near[1], e.lat, e.lng) > f.near_km:
+                return False
+        elif not (f.near_name and f.near_name.lower() in f"{e.venue_name or ''} {e.address or ''}".lower()):
             return False
     if f.max_distance_km is not None and e.mode != "online":
         km = getattr(ev.result, "distance_km", None)
@@ -83,6 +95,13 @@ def _matches(ev: Evaluated, f: Filters) -> bool:
 
 def apply_filters(data: FeedData, f: Filters) -> list[Evaluated]:
     return sorted((i for i in data.items if _matches(i, f)), key=lambda i: i.event.start_at)
+
+
+def distance_from(f: Filters, ev: Evaluated) -> float | None:
+    e = ev.event
+    if f.near is None or e.lat is None or e.lng is None:
+        return None
+    return haversine_km(f.near[0], f.near[1], e.lat, e.lng)
 
 
 def fit_badge(ev: Evaluated, user, windows, going=()) -> dict | None:

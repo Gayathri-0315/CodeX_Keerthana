@@ -39,10 +39,10 @@ export function Timeline({ items }: { items: FeedItem[] }) {
   let index = 0;
   return (
     <div className="flex flex-col gap-8">
-      {groups.map((g) => {
+      {groups.map((g, gi) => {
         const h = dayHeading(g.key);
         return (
-          <section key={g.key} aria-label={h.sub ? `${h.main}, ${h.sub}` : h.main} className="relative pl-5">
+          <section key={`${g.key}-${gi}`} aria-label={h.sub ? `${h.main}, ${h.sub}` : h.main} className="relative pl-5">
             <span className="absolute bottom-0 left-[3px] top-2 w-px bg-line" aria-hidden />
             <span className="absolute left-0 top-[7px] size-[7px] rounded-full bg-text/25" aria-hidden />
             <h2 className="mb-2 flex items-baseline gap-2">

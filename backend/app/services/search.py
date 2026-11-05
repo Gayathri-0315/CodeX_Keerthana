@@ -16,6 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from . import llm
 from .categories import CATEGORIES, SLUGS
 from .event_types import TYPES
+from ..seed.venues import AREAS
 
 log = logging.getLogger("showup.search")
 
@@ -23,6 +24,13 @@ MAX_TEXT = 200
 DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
 WHEN = (["today", "tonight", "tomorrow", "this_weekend", "next_weekend", "this_week", "next_week", "this_month", "next_month"]
         + DAYS + [f"next_{d}" for d in DAYS])
+AREA_NAMES = [a["name"] for a in AREAS]
+NEAR_KM = 5  # "near X" means within this many km, unless they said otherwise
+# Other ways people write the area names.
+AREA_ALIASES = {"saravanampatty": "Saravanampatti", "saravanampati": "Saravanampatti", "r.s. puram": "RS Puram",
+                "r s puram": "RS Puram", "r.s puram": "RS Puram", "racecourse": "Race Course", "townhall": "Town Hall",
+                "saibaba colony": "Saibaba Colony", "sai baba colony": "Saibaba Colony", "avinashi rd": "Avinashi Road",
+                "kalapatty": "Kalapatti", "gandhipuram bus stand": "Gandhipuram", "peelamedu psg": "Peelamedu"}
 TimeOfDay = Literal["morning", "afternoon", "evening", "night"]
 Mode = Literal["online", "in_person"]
 
@@ -43,7 +51,18 @@ class SearchFilters(BaseModel):
     free_only: bool = False
     mode: Mode | None = None
     max_distance_km: int | None = Field(None, ge=1, le=500)
+    near: str | None = None  # an area name from AREAS, or "me" (the student's home)
     keywords: list[str] = Field(default_factory=list, max_length=5)
+
+    @field_validator("near")
+    @classmethod
+    def _known_area(cls, v: str | None) -> str | None:
+        if not v:
+            return None
+        if v.lower() in ("me", "near me", "home"):
+            return "me"
+        low = v.strip().lower()
+        return next((a for a in AREA_NAMES if a.lower() == low), AREA_ALIASES.get(low))
 
     @field_validator("categories")
     @classmethod
@@ -191,10 +210,14 @@ def rule_parse(text: str, today: date) -> SearchFilters:
         mode = "in_person"
     if etype == "internship":
         cats = [c for c in cats if c != "careers"]
+    near = next((a for a in sorted(AREA_NAMES, key=len, reverse=True) if _has(t, a.lower())), None) \
+        or next((name for alias, name in AREA_ALIASES.items() if _has(t, alias)), None)
+    if near is None and any(_has(t, w) for w in ("near me", "nearby", "close to me", "around me", "near my home")):
+        near = "me"
     f = SearchFilters(
         categories=cats[:4], event_type=etype, when=when, time_of_day=tod,
         max_fee_inr=int(fee.group(1)) if fee else None, free_only=bool(FREE_RE.search(t)),
-        mode=mode, max_distance_km=int(km.group(1)) if km and int(km.group(1)) >= 1 else None,
+        mode=mode, max_distance_km=int(km.group(1)) if km and int(km.group(1)) >= 1 else None, near=near,
     )
     return finish(f, today)
 
@@ -207,6 +230,10 @@ def finish(f: SearchFilters, today: date) -> SearchFilters:
         f.max_fee_inr = None
     if f.when == "tonight" and f.time_of_day is None:
         f.time_of_day = "evening"
+    if f.near and f.mode == "online":
+        f.near = None  # "online ... near X" can't both hold; online wins
+    if f.near and f.max_distance_km is None:
+        f.max_distance_km = NEAR_KM
     return f
 
 
@@ -219,9 +246,11 @@ SYSTEM = (
     '{"categories": [category slugs], "event_type": type or null, "when": date word or null, '
     '"time_of_day": "morning"|"afternoon"|"evening"|"night"|null, "max_fee_inr": integer or null, '
     '"free_only": true|false, "mode": "online"|"in_person"|null, "max_distance_km": integer or null, '
+    '"near": one of the area names below, or "me" for near me / nearby, or null, '
     '"keywords": [up to 3 short topic words not covered by a category, else empty]}\n'
     "Category slugs: " + ", ".join(s for s, _, _ in CATEGORIES) + "\n"
     "Event types: " + ", ".join(t for t in TYPES if t != "other") + "\n"
+    "Area names (Coimbatore): " + ", ".join(AREA_NAMES) + "\n"
     "Date words (never write dates): " + ", ".join(WHEN) + "\n"
     'Examples: "AI workshop this Saturday under 200" -> {"categories":["ai-ml"],"event_type":"workshop","when":"saturday",'
     '"time_of_day":null,"max_fee_inr":200,"free_only":false,"mode":null,"max_distance_km":null,"keywords":[]}. '
@@ -237,7 +266,7 @@ def ai_parse(text: str, today: date) -> SearchFilters | None:
         return None
     try:
         allowed = {k: out[k] for k in ("categories", "event_type", "when", "time_of_day", "max_fee_inr", "free_only", "mode",
-                                       "max_distance_km", "keywords") if k in out}
+                                       "max_distance_km", "near", "keywords") if k in out}
         if not isinstance(allowed.get("free_only", False), bool):
             allowed["free_only"] = False
         f = SearchFilters.model_validate(allowed)
@@ -258,7 +287,7 @@ def parse(text: str, today: date) -> tuple[SearchFilters, str]:
     else:
         # The rules are exact about money, dates and "free"; let them fill anything the model left out.
         f, source = ai, "ai"
-        for k in ("when", "max_fee_inr", "mode", "event_type", "time_of_day", "max_distance_km"):
+        for k in ("when", "max_fee_inr", "mode", "event_type", "time_of_day", "max_distance_km", "near"):
             if getattr(f, k) is None and getattr(rules, k) is not None:
                 setattr(f, k, getattr(rules, k))
         f.free_only = f.free_only or rules.free_only
@@ -271,12 +300,25 @@ def parse(text: str, today: date) -> tuple[SearchFilters, str]:
 
 # ---- from search filters to Explore filters, and relaxing when nothing matches ----
 
-def to_filters(f: SearchFilters):
+def near_point(f: SearchFilters, user=None) -> tuple[float, float] | None:
+    """Where "near" is: an area's centre, or the student's home for "near me" (None if we don't know it)."""
+    if f.near == "me":
+        if user is not None and getattr(user, "home_lat", None) is not None:
+            return user.home_lat, user.home_lng
+        return None
+    area = next((a for a in AREAS if a["name"] == f.near), None)
+    return (area["lat"], area["lng"]) if area else None
+
+
+def to_filters(f: SearchFilters, user=None):
     from .explore import Filters
 
+    point = near_point(f, user) if f.near else None
     return Filters(categories=f.categories, event_type=f.event_type, date_from=f.date_from, date_to=f.date_to,
                    price="free" if f.free_only else None, mode=f.mode, max_fee_inr=f.max_fee_inr, tags=f.tags,
-                   time_of_day=f.time_of_day, keywords=f.keywords, max_distance_km=f.max_distance_km)
+                   time_of_day=f.time_of_day, keywords=f.keywords,
+                   max_distance_km=None if point else f.max_distance_km,
+                   near=point, near_name=f.near if f.near != "me" else None, near_km=f.max_distance_km or NEAR_KM)
 
 
 def _fee_step(n: int) -> int:
@@ -304,7 +346,12 @@ def relaxations(f: SearchFilters) -> list[tuple[SearchFilters, str]]:
     if cur.date_to is not None:
         new_to = cur.date_to + timedelta(days=7)
         step("the week after too", date_to=new_to, when=None)
-    if cur.max_distance_km is not None:
+    if cur.near:
+        for km in (10, 20):
+            if (cur.max_distance_km or NEAR_KM) < km:
+                step(f"up to {km} km away", max_distance_km=km)
+        step("anywhere in the city", near=None, max_distance_km=None)
+    elif cur.max_distance_km is not None:
         step("any distance", max_distance_km=None)
     if cur.mode:
         step("online and in person", mode=None)
@@ -333,4 +380,6 @@ def describe(f: SearchFilters) -> str:
         parts.append(f"in the {f.time_of_day}" if f.time_of_day != "night" else "at night")
     if f.max_fee_inr is not None:
         parts.append(f"under ₹{f.max_fee_inr}")
+    if f.near:
+        parts.append("near you" if f.near == "me" else f"near {f.near}")
     return " ".join(p for p in parts if p) or "that"

@@ -140,3 +140,49 @@ def test_search_rate_limit(client):
     codes = [client.post("/api/search/parse", json={"text": "ai"}).status_code for _ in range(31)]
     assert codes[-1] == 429 and codes[0] == 200
     ip_limit.reset()
+
+
+# ---- places ----
+
+@pytest.mark.parametrize("text,near,km", [
+    ("events near Saravanampatti", "Saravanampatti", 5),
+    ("workshops around saravanampatty", "Saravanampatti", 5),
+    ("hackathon in RS Puram this weekend", "RS Puram", 5),
+    ("AI events within 10 km of Gandhipuram", "Gandhipuram", 10),
+    ("something nearby", "me", 5),
+    ("online events near peelamedu", None, None),
+])
+def test_places(text, near, km):
+    f = rule_parse(text, TODAY)
+    assert (f.near, f.max_distance_km) == (near, km)
+
+
+def test_area_names_from_the_model_are_validated():
+    assert SearchFilters.model_validate({"near": "saravanampatti"}).near == "Saravanampatti"
+    assert SearchFilters.model_validate({"near": "Mars"}).near is None
+
+
+def test_near_results_are_close_in_person_and_nearest_first(client):
+    from app.seed.venues import find_area
+    from app.services.travel import haversine_km
+
+    area = find_area("Saravanampatti")
+    r = client.post("/api/search/results", json={"filters": {"near": "Saravanampatti", "max_distance_km": 5}}).json()
+    assert r["relaxed"] is None and r["items"]
+    from app.db import SessionLocal
+    from app.models import Event
+
+    with SessionLocal() as db:
+        events = [db.get(Event, i["id"]) for i in r["items"]]
+    dists = [haversine_km(area["lat"], area["lng"], e.lat, e.lng) for e in events if e.lat is not None]
+    assert dists and all(d <= 5 for d in dists) and all(e.mode != "online" for e in events)
+    rounded = [round(d) for d in dists]
+    assert rounded == sorted(rounded)  # nearest first (to the km), then soonest
+    everything = client.post("/api/search/results", json={"filters": {}}).json()["total"]
+    assert r["total"] < everything
+
+
+def test_near_relaxes_the_radius_first(client):
+    r = client.post("/api/search/results", json={"filters": {"near": "Sulur", "max_distance_km": 1, "event_type": "hackathon"}}).json()
+    if r["relaxed"]:
+        assert "km away" in r["relaxed"]["message"] or "anywhere" in r["relaxed"]["message"]
