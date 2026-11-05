@@ -119,3 +119,24 @@ def test_daily_summary_alert_once_after_8pm(client):
         n = db.scalar(select(Notification).where(Notification.type == "chat_summary", Notification.event_id == eid))
         assert n.payload["path"] == f"/event/{eid}/chat" and "questions waiting" in n.body
         assert assist.send_daily_summaries(db, evening + timedelta(minutes=30)) == 0  # once a day
+
+
+def test_missing_details_are_real_answers_and_unlisted_things_are_not(client):
+    eid = _event()
+    with SessionLocal() as db:
+        e = db.get(Event, eid)
+        e.capacity, e.eligibility = None, {}
+        db.commit()
+    ask = lambda q: client.post(f"/api/events/{eid}/ask", json={"question": q}).json()  # noqa: E731
+    assert "No seat limit" in ask("How many seats are left?")["answer"]
+    assert "No restrictions" in ask("Who can join?")["answer"]
+    assert "3 h" in ask("How long is it?")["answer"]
+    assert ask("What will we do there?")["found"]
+    assert not ask("Will there be free pizza?")["found"]
+
+
+def test_unsure_model_falls_back_to_plain_facts(client):
+    eid = _event()
+    with patch.object(assist.llm, "chat_json", return_value={"found": False, "answer": ""}):
+        r = client.post(f"/api/events/{eid}/ask", json={"question": "How much is the fee?"}).json()
+    assert r["found"] and "₹150" in r["answer"]
