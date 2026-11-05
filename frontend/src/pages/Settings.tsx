@@ -1,4 +1,4 @@
-import { LogOut, Minus, Plus, Trash2 } from "lucide-react";
+import { ChevronRight, LogOut, MessagesSquare, Minus, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -15,6 +15,7 @@ import { INTERESTS } from "../lib/constants";
 import { formatTime } from "../lib/format";
 import { useDeleteAlert, useMe, useSavedAlerts, useSignOut, useUpdateInterests, useUpdateMe } from "../lib/queries";
 import type { User } from "../lib/types";
+import { useMyChats } from "../lib/chat";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -45,6 +46,7 @@ export default function Settings() {
     <>
       <PageHeader title="Settings" />
       <div className="mx-auto max-w-2xl">
+        {me.role !== "admin" && <GroupChatsRow />}
         {me.role === "student" && (
           <>
             <InterestsSection me={me} />
@@ -327,5 +329,27 @@ function AccountSection({ me }: { me: User }) {
         </div>
       </Row>
     </Section>
+  );
+}
+
+/** Profile: every event group chat in one place, like a messaging app. */
+function GroupChatsRow() {
+  const { data } = useMyChats();
+  const chats = data?.items.length ?? 0;
+  const unread = data?.items.reduce((n, c) => n + (c.unread > 0 ? 1 : 0), 0) ?? 0;
+  return (
+    <Link to="/chats" className="card pressable mb-8 flex min-h-[64px] items-center gap-3 px-5 py-3">
+      <span className="grid size-10 shrink-0 place-items-center rounded-full bg-accent-soft text-accent"><MessagesSquare className="size-5" aria-hidden /></span>
+      <span className="min-w-0 flex-1">
+        <span className="headline block">Group chats</span>
+        <span className="footnote block text-text-2">
+          {data == null ? "Your event groups" : chats === 0 ? "Join an event to chat with the host and others going" : `${chats} group${chats === 1 ? "" : "s"}${unread ? ` · ${unread} with new messages` : ""}`}
+        </span>
+      </span>
+      {unread > 0 && (
+        <span className="grid h-6 min-w-6 place-items-center rounded-full bg-accent-fill px-1.5 text-[12px] font-semibold text-white tnum" aria-label={`${unread} chats with new messages`}>{unread}</span>
+      )}
+      <ChevronRight className="size-5 text-text-2" aria-hidden />
+    </Link>
   );
 }

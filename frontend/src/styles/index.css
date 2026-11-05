@@ -266,3 +266,12 @@ input[type="range"].slider::-moz-range-thumb { width: 28px; height: 28px; border
   .story-progress, .story-in, .story-pop, .story-tick, .story-rise, .story-bar, .story-drift { animation: none !important; }
   .story-light { animation: none !important; opacity: 1; }
 }
+
+/* ---- Group chat: each person's name in their own colour, readable in light and dark ---- */
+.chat-name { color: hsl(var(--h) 65% 38%); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .chat-name { color: hsl(var(--h) 75% 72%); }
+}
+:root[data-theme="dark"] .chat-name { color: hsl(var(--h) 75% 72%); }
+.chat-wall { background: color-mix(in srgb, var(--accent) 4%, var(--bg)); }
+.chat-avatar { background: hsl(var(--h) 55% 48%); }

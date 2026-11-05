@@ -55,7 +55,7 @@ def read_chat(event_id: str, limit: int = Query(100, ge=1, le=200), user: User =
     host = chat.is_host(user, event)
     chat.mark_read(db, user, event)
     return {
-        "event": {"id": event.id, "title": event.title, "start_at": iso_utc(event.start_at)},
+        "event": {"id": event.id, "title": event.title, "start_at": iso_utc(event.start_at), "poster_url": event.poster_url},
         "role": "host" if host else "member",
         "locked": event.chat_locked,
         "read_only": chat.read_only(event),
@@ -155,10 +155,29 @@ def summary(event_id: str, user: User = Depends(current_user), db: Session = Dep
 
 @router.get("/me/chats")
 def my_chats(user: User = Depends(current_user), db: Session = Depends(get_db)):
-    """Chats I'm in, with unread counts (for the Chat buttons)."""
+    """Chats I'm in, like a messaging app's chat list: newest activity first, with the last message and unread count."""
     if user.organizer is not None:
-        events = db.scalars(select(Event).where(Event.organizer_id == user.organizer.id, Event.status == "published")).unique().all()
+        events = db.scalars(select(Event).where(Event.organizer_id == user.organizer.id, Event.status.in_(("published", "cancelled")))).unique().all()
     else:
         events = db.scalars(select(Event).join(Registration, Registration.event_id == Event.id).where(
             Registration.user_id == user.id, Registration.status.in_(chat.MEMBER_STATUSES))).unique().all()
-    return {"items": [{"event_id": e.id, "unread": chat.unread(db, user, e.id)} for e in events if chat.is_member(db, user, e)]}
+    items = []
+    for e in events:
+        if not chat.is_member(db, user, e):
+            continue
+        last = db.execute(select(ChatMessage, User).join(User, User.id == ChatMessage.sender_id)
+                          .where(ChatMessage.event_id == e.id).order_by(ChatMessage.created_at.desc()).limit(1)).first()
+        preview = None
+        if last:
+            m, sender = last
+            out = chat.message_out(m, sender, user, e)
+            preview = {"body": out["body"] if not out["hidden"] else "Message removed", "sender": "You" if out["sender"]["is_me"] else out["sender"]["name"],
+                       "announcement": m.announcement, "at": out["created_at"]}
+        items.append({"event_id": e.id, "title": e.title, "poster_url": e.poster_url, "start_at": iso_utc(e.start_at),
+                      "unread": chat.unread(db, user, e.id), "read_only": chat.read_only(e), "last": preview,
+                      "_sort": (last[0].created_at if last else e.start_at)})
+    # Recent conversations first; chats with no messages yet follow, soonest event first.
+    items.sort(key=lambda i: (i["last"] is None, -(i["_sort"].timestamp()) if i["last"] else i["_sort"].timestamp()))
+    for i in items:
+        del i["_sort"]
+    return {"items": items}

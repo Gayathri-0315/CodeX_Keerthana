@@ -188,3 +188,20 @@ def test_reports_reach_admin_who_can_hide(client):
     assert client.get("/api/admin/chat-reports").json()["items"] == []
     login(client, "student")
     assert client.get(f"/api/events/{eid}/chat").json()["messages"][0]["hidden"]
+
+
+def test_chat_list_shows_last_message_newest_first(client):
+    a = _setup({ASHA: "registered"})
+    b = _setup({ASHA: "registered"})
+    login(client, "organizer")
+    client.post(f"/api/events/{a}/chat", json={"body": "First chat news"})
+    client.post(f"/api/events/{b}/chat", json={"body": "Second chat news"})
+    login(client, "student")
+    items = client.get("/api/me/chats").json()["items"]
+    mine = [i for i in items if i["event_id"] in (a, b)]
+    assert [i["event_id"] for i in mine] == [b, a]
+    assert mine[0]["last"]["body"] == "Second chat news" and mine[0]["last"]["sender"] == "Coimbatore AI Club"
+    assert mine[0]["unread"] == 1 and mine[0]["title"] == "Chat Test Meetup"
+    client.post(f"/api/events/{a}/chat", json={"body": "me again"})
+    first = client.get("/api/me/chats").json()["items"][0]
+    assert first["event_id"] == a and first["last"]["sender"] == "You"
