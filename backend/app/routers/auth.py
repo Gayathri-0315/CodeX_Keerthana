@@ -86,7 +86,9 @@ def register_organizer(body: OrganizerRegisterIn, response: Response, db: Sessio
     user = _new_user(db, body.name, body.email, body.password, "organizer")
     db.add(user)
     db.flush()
-    db.add(Organizer(user_id=user.id, org_name=body.org_name.strip(), org_email_domain=user.email.split("@")[-1],
+    from ..services.clubs import unique_slug
+
+    db.add(Organizer(user_id=user.id, org_name=body.org_name.strip(), slug=unique_slug(db, body.org_name), org_email_domain=user.email.split("@")[-1],
                      phone=(body.phone or "").strip() or None, college_or_company=(body.college_or_company or "").strip() or None,
                      trust_level="new"))
     db.commit()

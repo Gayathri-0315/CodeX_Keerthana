@@ -8,6 +8,7 @@ import type { FeedItem } from "../../lib/types";
 import { Tag } from "../ui/Chip";
 import { OrganizerLabel } from "../landing/PublicEventCard";
 import { Thumb } from "./EventCard";
+import { ClubName } from "./ClubName";
 
 /** IST calendar date of an event, "YYYY-MM-DD". */
 function dayKey(iso: string) {
@@ -80,7 +81,7 @@ function TimelineRow({ event: e, index }: { event: FeedItem; index: number }) {
         <div className="min-w-0 flex-1">
           <p className="footnote font-medium text-text-2 tnum">{internship ? "Apply by end of day" : formatTimeRange(e.start_at, e.end_at)}</p>
           <h3 className="headline mt-0.5 line-clamp-2">{e.title}</h3>
-          {e.organizer_name && <p className="callout text-text-2">By {e.organizer_name}</p>}
+          {e.organizer_name && <p className="callout text-text-2">By <ClubName name={e.organizer_name} slug={e.organizer_slug} /></p>}
           <p className="callout flex items-center gap-1 text-text-2">
             <MapPin className="size-3.5 shrink-0" aria-hidden />
             <span className="truncate">{e.mode === "online" ? (internship ? "Remote" : "Online") : e.venue_name ?? "In person"}</span>

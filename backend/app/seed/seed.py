@@ -90,7 +90,9 @@ def seed(db: Session, password: str) -> dict:
         u = make_user(email, name, pw, role="organizer")
         db.add(u)
         db.flush()
-        o = Organizer(user_id=u.id, org_name=org_name, org_email_domain=domain, trust_level=trust,
+        from ..services.clubs import unique_slug
+
+        o = Organizer(user_id=u.id, org_name=org_name, slug=unique_slug(db, org_name), org_email_domain=domain, trust_level=trust,
                       past_events_count=past, avg_attendance_rate=rate)
         db.add(o)
         db.flush()

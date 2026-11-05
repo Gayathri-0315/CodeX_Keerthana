@@ -5,6 +5,7 @@ import { usePrefetchEvent } from "../../lib/queries";
 import type { FeedItem } from "../../lib/types";
 import { Tag } from "../ui/Chip";
 import { Thumb } from "../events/EventCard";
+import { ClubName } from "../events/ClubName";
 
 /** A calm card for guests: no personal fit, just what, when, where and how much. */
 export function PublicEventCard({ event }: { event: FeedItem }) {
@@ -19,7 +20,7 @@ export function PublicEventCard({ event }: { event: FeedItem }) {
       <Thumb event={event} className="size-[72px] shrink-0" />
       <div className="min-w-0 flex-1">
         <h3 className="headline line-clamp-2">{event.title}</h3>
-        {event.organizer_name && <p className="footnote mt-0.5 text-text-2">{event.organizer_name}</p>}
+        {event.organizer_name && <p className="footnote mt-0.5 text-text-2"><ClubName name={event.organizer_name} slug={event.organizer_slug} /></p>}
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           <Tag tone="accent"><Clock className="size-3.5" aria-hidden />{formatWhen(event)}</Tag>
           <Tag><MapPin className="size-3.5" aria-hidden />{event.mode === "online" ? (event.event_type === "internship" ? "Remote" : "Online") : event.venue_name ?? "In person"}</Tag>

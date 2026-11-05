@@ -82,6 +82,7 @@ class UserOut(Out):
     quiet_hours_end: str
     notif_paused_until: datetime | None
     onboarded: bool
+    follow_updates: bool = True
     college: str | None = None
     organizer: OrganizerOut | None = None
 
@@ -106,6 +107,7 @@ class UserPatch(BaseModel):
     quiet_hours_end: str | None = None
     notif_paused_until: datetime | None = None
     onboarded: bool | None = None
+    follow_updates: bool | None = None
 
     @field_validator("quiet_hours_start", "quiet_hours_end")
     @classmethod

@@ -24,6 +24,7 @@ export type User = {
   quiet_hours_end: string;
   notif_paused_until: string | null;
   onboarded: boolean;
+  follow_updates: boolean;
   college: string | null;
   organizer: { id: string; org_name: string; trust_level: string; college_or_company: string | null } | null;
 };
@@ -173,6 +174,7 @@ export type FeedItem = {
   category_slug: string | null;
   guest?: boolean; // public card: no personal fit data
   event_type: EventType;
+  organizer_slug?: string | null;
 };
 
 export type FeedPage = { items: FeedItem[]; next_cursor: string | null; total: number };
@@ -189,6 +191,7 @@ export type EventDetail = FeedItem & {
   status: string;
   organizer: {
     name: string;
+    slug: string | null;
     trust_level: string;
     trust_label: string;
     logo_url: string | null;
@@ -270,7 +273,16 @@ export type Extraction = {
   poster_url: string | null;
 };
 
-export type OrgSummary = { org_name: string; trust_level: string; upcoming: number; registrations: number; attendance_rate: number | null };
+export type OrgSummary = {
+  org_name: string;
+  trust_level: string;
+  upcoming: number;
+  registrations: number;
+  attendance_rate: number | null;
+  followers: number;
+  follower_growth: number[];
+  slug: string;
+};
 
 export type ReviewItem = {
   id: string;

@@ -76,6 +76,9 @@ export function ExploreView({ source = "feed", category, eventType }: {
       </div>
 
       <div className="no-scrollbar -mx-4 mb-6 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:px-0" role="group" aria-label="Quick filters">
+        {source === "feed" && (
+          <QuickChip on={filters.following === "true"} label="Following" onClick={() => setFilters((f) => ({ ...f, following: f.following ? undefined : "true" }))} />
+        )}
         <QuickChip on={filters.price === "free"} label="Free" onClick={() => setFilters((f) => ({ ...f, price: f.price === "free" ? undefined : "free" }))} />
         <QuickChip on={filters.price === "paid"} label="Paid" onClick={() => setFilters((f) => ({ ...f, price: f.price === "paid" ? undefined : "paid" }))} />
         <QuickChip on={filters.mode === "in_person"} label="In person" onClick={() => setFilters((f) => ({ ...f, mode: f.mode === "in_person" ? undefined : "in_person" }))} />

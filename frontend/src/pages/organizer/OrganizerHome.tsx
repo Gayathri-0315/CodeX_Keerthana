@@ -31,6 +31,7 @@ export default function OrganizerHome() {
         }
       />
 
+      {summary && <Followers count={summary.followers} growth={summary.follower_growth} slug={summary.slug} />}
       <div className="mb-8 grid grid-cols-3 gap-3">
         <Tile icon={CalendarClock} label="Upcoming" value={summary?.upcoming} />
         <Tile icon={Ticket} label="Registrations" value={summary?.registrations} />
@@ -90,5 +91,20 @@ function EventRow({ event: e }: { event: OrgEvent }) {
         <ChevronRight className="size-5 shrink-0 text-text-2" aria-hidden />
       </Link>
     </li>
+  );
+}
+
+/** Follower count with an 8-week growth line. Counts only: organizers never see who follows. */
+function Followers({ count, growth, slug }: { count: number; growth: number[]; slug: string }) {
+  const max = Math.max(1, ...growth);
+  const pts = growth.map((v, i) => `${(i / Math.max(1, growth.length - 1)) * 100},${28 - (v / max) * 24}`).join(" ");
+  return (
+    <Link to={`/club/${slug}`} className="pressable -mt-2 mb-4 flex items-center gap-3 rounded-[14px] px-1 py-1 callout text-text-2">
+      <span><span className="font-semibold text-text tnum">{count}</span> {count === 1 ? "follower" : "followers"}</span>
+      <svg viewBox="0 0 100 30" className="h-6 w-24" preserveAspectRatio="none" aria-hidden>
+        <polyline points={pts} fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+      </svg>
+      <span className="text-accent">View club page</span>
+    </Link>
   );
 }

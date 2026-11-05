@@ -24,10 +24,13 @@ class Filters:
     max_fee_inr: int | None = None
     tags: list[str] = field(default_factory=list)
     event_type: str | None = None
+    organizer_ids: set[str] | None = None  # "Following": only clubs the student follows
 
 
 def _matches(ev: Evaluated, f: Filters) -> bool:
     e = ev.event
+    if f.organizer_ids is not None and e.organizer_id not in f.organizer_ids:
+        return False
     if f.event_type and e.event_type != f.event_type:
         return False
     if f.category and e.category_slug != f.category:

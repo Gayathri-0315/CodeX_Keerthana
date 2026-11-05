@@ -8,7 +8,7 @@ from ..db import get_db
 from ..deps import require_role, upload_limit
 from ..models import Event, Notification, Organizer, Registration, User
 from ..schemas import AppealIn, EventIn
-from ..services import feedcache, listing, notify, registration, showup_score
+from ..services import clubs, feedcache, listing, notify, registration, showup_score
 from ..services.extraction import extract_poster
 from ..services.feed import SEAT_STATUSES
 from ..services.uploads import public_url, read_upload, store_image
@@ -74,6 +74,9 @@ def summary(user: User = Depends(organizer_only), db: Session = Depends(get_db))
         "upcoming": sum(1 for e in events if e.status == "published" and e.start_at and e.start_at > now),
         "registrations": sum(by_status.get(s, 0) for s in SEAT_STATUSES),
         "attendance_rate": org.avg_attendance_rate,
+        "followers": clubs.follower_count(db, org.id),
+        "follower_growth": clubs.follower_growth(db, org.id),
+        "slug": clubs.ensure_slug(db, org),
     }
 
 

@@ -10,6 +10,7 @@ export type Intent =
   | { kind: "register"; eventId: string }
   | { kind: "save"; eventId: string }
   | { kind: "create_event" }
+  | { kind: "follow"; slug: string }
   | { kind: "navigate"; to: string };
 
 type State = { open: boolean; audience: Audience; mode: Mode; intent: Intent | null; seq: number };

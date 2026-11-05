@@ -60,7 +60,7 @@ export default function EventPage() {
         <h1 className="title-1 mt-3">{e.title}</h1>
         {e.organizer && (
           <p className="callout mt-1 text-text-2">
-            By {e.organizer.name}
+            By {e.organizer.slug ? <Link to={`/club/${e.organizer.slug}`} className="font-medium text-accent">{e.organizer.name}</Link> : e.organizer.name}
             {e.organizer.trust_level !== "new" && <> · {e.organizer.trust_label}</>}
           </p>
         )}

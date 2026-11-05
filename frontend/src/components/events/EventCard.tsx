@@ -10,6 +10,7 @@ import { usePrefetchEvent } from "../../lib/queries";
 import type { FeedItem } from "../../lib/types";
 import { RegisterAction } from "../attendance/RegisterAction";
 import { ClassmatesLine } from "../attendance/GoTogether";
+import { ClubName } from "./ClubName";
 
 const GRADIENTS: Record<string, [string, string]> = {
   Workshop: ["#0071e3", "#5ac8fa"],
@@ -116,7 +117,7 @@ export function EventCard({ event, index, onToggleSave, onDismiss, onRemindSimil
           <Thumb event={event} className={`size-[72px] shrink-0 ${muted ? "opacity-70 saturate-50" : ""}`} />
           <div className="min-w-0 flex-1">
             <h3 className="headline line-clamp-2">{event.title}</h3>
-            <p className="footnote mt-0.5 text-text-2">{event.organizer_name}</p>
+            <p className="footnote mt-0.5 text-text-2"><ClubName name={event.organizer_name} slug={event.organizer_slug} /></p>
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
               <Tag tone={muted ? "neutral" : "accent"}><Clock className="size-3.5" aria-hidden />{formatWhen(event)}</Tag>
               <Tag><MapPin className="size-3.5" aria-hidden />{formatKm(event.distance_km)}</Tag>

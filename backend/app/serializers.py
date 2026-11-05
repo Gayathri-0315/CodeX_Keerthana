@@ -34,6 +34,7 @@ def event_card(ev: Evaluated, seats_taken: int, saved: bool, reg: dict | None = 
         "poster_url": e.poster_url,
         "verification_label": e.verification_label,
         "organizer_name": e.organizer.org_name if e.organizer else None,
+        "organizer_slug": e.organizer.slug if e.organizer else None,
         "distance_km": None if r.distance_km is None else round(r.distance_km, 1),
         "travel_min": r.travel_min,
         "fits": r.passed,
@@ -66,7 +67,7 @@ def event_detail(ev: Evaluated, seats_taken: int, saved: bool, reg: dict | None 
         "skill_level": e.skill_level,
         "status": e.status,
         "organizer": {
-            "name": org.org_name, "trust_level": org.trust_level, "trust_label": TRUST_LABELS.get(org.trust_level),
+            "name": org.org_name, "slug": org.slug, "trust_level": org.trust_level, "trust_label": TRUST_LABELS.get(org.trust_level),
             "logo_url": org.logo_url, "bio": org.bio, "org_type": org.org_type, "college_or_company": org.college_or_company,
             "city": org.city, "website": org.website, "instagram": org.instagram, "linkedin": org.linkedin,
             "contact_email": org.user.email if org.show_official_email and org.user else None,

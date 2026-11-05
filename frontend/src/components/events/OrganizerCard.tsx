@@ -1,4 +1,5 @@
 import { Globe, Mail } from "lucide-react";
+import { Link } from "react-router-dom";
 import type { EventDetail } from "../../lib/types";
 
 const TYPE_LABEL: Record<string, string> = {
@@ -13,7 +14,7 @@ export function OrganizerCard({ org }: { org: NonNullable<EventDetail["organizer
     { href: org.instagram, label: "Instagram" },
     { href: org.linkedin, label: "LinkedIn" },
   ].filter((l): l is { href: string; label: string } => !!l.href);
-  if (!org.bio && !meta && links.length === 0 && !org.contact_email && !org.logo_url) return null;
+  if (!org.slug && !org.bio && !meta && links.length === 0 && !org.contact_email && !org.logo_url) return null;
   return (
     <section className="mt-8">
       <h2 className="title-3">About the organizer</h2>
@@ -23,7 +24,7 @@ export function OrganizerCard({ org }: { org: NonNullable<EventDetail["organizer
             {org.logo_url ? <img src={org.logo_url} alt="" width={48} height={48} className="size-full object-cover" /> : <span className="headline">{org.name[0]}</span>}
           </span>
           <div className="min-w-0">
-            <p className="headline">{org.name}</p>
+            <p className="headline">{org.slug ? <Link to={`/club/${org.slug}`} className="hover:underline">{org.name}</Link> : org.name}</p>
             <p className="footnote text-text-2">{[org.trust_level !== "new" ? org.trust_label : null, meta].filter(Boolean).join(" · ")}</p>
           </div>
         </div>

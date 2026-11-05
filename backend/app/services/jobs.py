@@ -128,6 +128,9 @@ def suggest_for_event(db: Session, event_id: str) -> None:
     if event is not None:
         notify.suggest(db, event)
         alerts.suggest_similar(db, event)
+        from . import clubs
+
+        clubs.notify_followers(db, event)
 
 
 def in_background(fn, *args) -> None:

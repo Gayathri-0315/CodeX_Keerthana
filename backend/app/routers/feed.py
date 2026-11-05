@@ -92,6 +92,7 @@ def explore(
     price: Literal["free", "paid"] | None = None,
     mode: Literal["online", "in_person"] | None = None,
     q: str | None = Query(None, max_length=100),
+    following: bool = False,
     event_type: Literal["hackathon", "competition", "internship", "workshop", "conference", "meetup", "webinar", "other"] | None = None,
     limit: int = Query(20, ge=1, le=50),
     cursor: str | None = None,
@@ -100,8 +101,13 @@ def explore(
 ):
     """Every upcoming published event, by start date, with a "Fits your time" badge. Nothing is hidden for not fitting."""
     data = evaluate(db, user)
+    followed = None
+    if following:
+        from ..models import Follow
+
+        followed = set(db.scalars(select(Follow.organizer_id).where(Follow.student_id == user.id)))
     items = apply_filters(data, Filters(category=category, date_from=date_from, date_to=date_to, price=price, mode=mode, q=q,
-                                         event_type=event_type))
+                                         event_type=event_type, organizer_ids=followed))
     return page_out(db, user, data, items, parse_cursor(cursor), limit, badges=True)
 
 

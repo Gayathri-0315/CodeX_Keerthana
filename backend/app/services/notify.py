@@ -19,14 +19,14 @@ from .email import send_email
 
 log = logging.getLogger("showup.notify")
 
-SUGGESTION = {"match", "similar", "deadline", "seat_opened"}
+SUGGESTION = {"match", "similar", "club_post", "deadline", "seat_opened"}
 URGENT = {"seat_opened", "deadline"}
 # Sent at once even in quiet hours: a 15-minute seat offer, and confirmations of something the user just did.
 ALWAYS_NOW = {"seat_opened", "registered", "waitlisted"}
 MIN_MATCH = 75
 
 # Which alerts also go out by email (when the user has email on). Each gets one line and one button.
-EMAIL_TYPES = {"match", "similar", "deadline", "registered", "waitlisted", "seat_opened", "reminder_24h",
+EMAIL_TYPES = {"match", "similar", "club_post", "deadline", "registered", "waitlisted", "seat_opened", "reminder_24h",
                "reminder_leave_by", "cancelled_event", "message", "new_message",
                "org_registration", "org_cancellation", "org_waitlist", "org_review", "org_reminder", "org_digest", "how_was"}
 # While alerts are paused, only these still email: things the user is actively waiting on.
@@ -141,6 +141,8 @@ def actions_for(n: Notification) -> list[dict]:
     view = {"label": "View", "kind": "view", "event_id": eid}
     if n.type in ("match", "similar", "deadline"):
         return [{"label": "Register", "kind": "register", "event_id": eid}, view]
+    if n.type == "club_post":
+        return [view]
     if n.type == "seat_opened":
         return [{"label": "Confirm seat", "kind": "confirm_seat", "registration_id": rid}, view]
     if n.type == "reminder_24h":
@@ -177,7 +179,7 @@ def email_button(n: Notification) -> tuple[str, str]:
     p = n.payload or {}
     if n.type == "seat_opened":
         return "Confirm seat", f"{base}/my"
-    if n.type in ("match", "similar", "deadline"):
+    if n.type in ("match", "similar", "deadline", "club_post"):
         return "View event", event
     if n.type == "reminder_leave_by" and p.get("maps_url"):
         return "Get directions", p["maps_url"]

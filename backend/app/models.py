@@ -15,7 +15,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
-from sqlalchemy import false, text
+from sqlalchemy import false, text, true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -55,6 +55,7 @@ class User(Base):
     quiet_hours_start: Mapped[str] = mapped_column(String(5), default="22:00")
     quiet_hours_end: Mapped[str] = mapped_column(String(5), default="07:00")
     notif_paused_until: Mapped[datetime | None] = mapped_column(DateTime)
+    follow_updates: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())  # "Updates from clubs I follow"
     onboarded: Mapped[bool] = mapped_column(Boolean, default=False)
     college: Mapped[str | None] = mapped_column(String(160))
     # Lockout after repeated failures, and a version that invalidates every session when the password changes.
@@ -102,6 +103,7 @@ class Organizer(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), unique=True)
     org_name: Mapped[str] = mapped_column(String(160))
+    slug: Mapped[str | None] = mapped_column(String(80), unique=True, index=True)  # /club/<slug>; stays the same after renames
     org_email_domain: Mapped[str] = mapped_column(String(120), default="")
     phone: Mapped[str | None] = mapped_column(String(32))
     college_or_company: Mapped[str | None] = mapped_column(String(160))
@@ -339,4 +341,16 @@ class OrgVerificationRequest(Base):
     status: Mapped[str] = mapped_column(String(16), default="pending")  # pending | approved | rejected
     decided_by: Mapped[str | None] = mapped_column(String(36))
     decided_at: Mapped[datetime | None] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class Follow(Base):
+    """A student following a club. Organizers only ever see the count, never who."""
+
+    __tablename__ = "follows"
+    __table_args__ = (UniqueConstraint("student_id", "organizer_id"), Index("ix_follows_organizer", "organizer_id"))
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    student_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    organizer_id: Mapped[str] = mapped_column(ForeignKey("organizers.id", ondelete="CASCADE"))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

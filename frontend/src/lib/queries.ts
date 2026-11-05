@@ -156,6 +156,7 @@ export type ExploreFilters = {
   price?: "free" | "paid";
   mode?: "online" | "in_person";
   event_type?: string;
+  following?: string; // "true": only clubs I follow (students)
 };
 
 function toQuery(params: Record<string, string | undefined>): string {

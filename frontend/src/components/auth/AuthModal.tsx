@@ -350,6 +350,13 @@ function useFinish() {
         await qc.invalidateQueries();
         return;
       }
+      if (intent?.kind === "follow") {
+        if (!student) return wrongSide("Following clubs");
+        await api(`/clubs/${intent.slug}/follow`, { method: "POST" });
+        toast({ tone: "success", title: "Following", body: "We'll tell you when they post a new event." });
+        await qc.invalidateQueries();
+        return;
+      }
       if (intent?.kind === "create_event") {
         if (student) return wrongSide("Creating events");
         navigate("/organizer/new");

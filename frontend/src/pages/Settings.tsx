@@ -1,6 +1,8 @@
 import { LogOut, Minus, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "../lib/api";
 import { PageHeader } from "../components/AppShell";
 import { DownloadMyData, OrganizerSettings } from "../components/organizer/OrganizerSettings";
 import { AreaPicker, BudgetPicker, DistanceSlider } from "../components/PlaceControls";
@@ -83,6 +85,7 @@ export default function Settings() {
             </Section>
             <AlertsSection me={me} patch={patch} />
             <MyAlertsSection />
+            <FollowingSection />
           </>
         )}
         {me.role === "organizer" && <OrganizerSettings me={me} patchMe={patch} />}
@@ -171,6 +174,7 @@ function AlertsSection({ me, patch }: { me: User; patch: (p: Partial<User>, save
     <Section title="Alerts">
       <Toggle label="In-app" checked={!!me.notif_channels.in_app} onChange={(v) => patch({ notif_channels: { ...me.notif_channels, in_app: v } })} />
       <Toggle label="Email" description={me.email} checked={!!me.notif_channels.email} onChange={(v) => patch({ notif_channels: { ...me.notif_channels, email: v } })} />
+      <Toggle label="Updates from clubs I follow" description="When a club you follow posts a new event." checked={me.follow_updates} onChange={(v) => patch({ follow_updates: v })} />
       <Row>
         <div className="flex items-center justify-between gap-4">
           <span>
@@ -245,6 +249,27 @@ function MyAlertsSection() {
               <Trash2 className="size-5" aria-hidden />
             </button>
           </div>
+        ))
+      )}
+    </Section>
+  );
+}
+
+function FollowingSection() {
+  const { data } = useQuery({ queryKey: ["me", "following"], queryFn: () => api<{ items: { slug: string; name: string; logo_url: string | null }[] }>("/me/following").then((r) => r.items) });
+  if (!data) return null;
+  return (
+    <Section title="Clubs you follow">
+      {data.length === 0 ? (
+        <Row><p className="callout text-text-2">You don't follow any clubs yet. Tap a club's name on an event to see its page.</p></Row>
+      ) : (
+        data.map((c) => (
+          <Link key={c.slug} to={`/club/${c.slug}`} className="pressable -mx-2 flex min-h-12 items-center gap-3 rounded-[12px] px-2 py-2 hover:bg-text/5">
+            <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-[10px] bg-accent-soft text-accent">
+              {c.logo_url ? <img src={c.logo_url} alt="" width={36} height={36} className="size-full object-cover" /> : <span className="headline">{c.name[0]}</span>}
+            </span>
+            <span className="body">{c.name}</span>
+          </Link>
         ))
       )}
     </Section>
