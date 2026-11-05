@@ -31,7 +31,7 @@ def enabled() -> bool:
 
 
 def chat_json(system: str, user: str, *, timeout: float = 4.0, max_tokens: int = 400, cache_seconds: int = 0,
-              temperature: float = 0.0) -> dict | None:
+              temperature: float = 0.0, model: str | None = None) -> dict | None:
     """One JSON-mode completion. Returns the parsed object, or None (no key, slow, error, not JSON)."""
     if not enabled():
         return None
@@ -45,7 +45,7 @@ def chat_json(system: str, user: str, *, timeout: float = 4.0, max_tokens: int =
         r = httpx.post(
             URL,
             headers={"Authorization": f"Bearer {settings.groq_api_key}"},
-            json={"model": settings.groq_model, "temperature": temperature, "max_tokens": max_tokens,
+            json={"model": model, "temperature": temperature, "max_tokens": max_tokens,
                   "response_format": {"type": "json_object"},
                   "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]},
             timeout=timeout,

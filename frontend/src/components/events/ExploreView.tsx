@@ -1,5 +1,6 @@
 import { Loader2, Search, SlidersHorizontal, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useCategories, useExplore, type ExploreFilters } from "../../lib/queries";
 import { Button } from "../ui/Button";
 import { Segmented } from "../ui/Segmented";
@@ -20,6 +21,7 @@ export function ExploreView({ source = "feed", category, eventType }: {
   /** Fixed category (category pages): hides the category filter. */
   category?: string;
 }) {
+  const navigate = useNavigate();
   const [text, setText] = useState("");
   const [filters, setFilters] = useState<ExploreFilters>({});
   const [sheet, setSheet] = useState(false);
@@ -29,7 +31,7 @@ export function ExploreView({ source = "feed", category, eventType }: {
 
   // Search shortly after typing stops.
   useEffect(() => {
-    const q = text.trim() || undefined;
+    const q = text.trim().slice(0, 100) || undefined;
     const t = window.setTimeout(() => setFilters((f) => (f.q === q ? f : { ...f, q })), 300);
     return () => window.clearTimeout(t);
   }, [text]);
@@ -58,11 +60,16 @@ export function ExploreView({ source = "feed", category, eventType }: {
   return (
     <>
       <div className="mb-3 flex gap-2">
-        <label className="relative flex-1">
-          <span className="sr-only">Search events by title</span>
+        <form role="search" className="relative flex-1" onSubmit={(e) => {
+          e.preventDefault();
+          if (text.trim()) navigate(`/search?q=${encodeURIComponent(text.trim())}`);
+        }}>
+          <label>
+          <span className="sr-only">Search events, or describe what you want and press Enter</span>
           <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-text-2" aria-hidden />
-          <input type="search" value={text} onChange={(e) => setText(e.target.value)} placeholder="Search events" maxLength={100} className={`${inputCls} pl-11`} />
-        </label>
+          <input type="search" enterKeyHint="search" value={text} onChange={(e) => setText(e.target.value)} placeholder='Search, or try "free hackathons this weekend"' maxLength={200} className={`${inputCls} pl-11`} />
+          </label>
+        </form>
         <button
           onClick={() => setSheet(true)}
           aria-label={active ? `Filters, ${active} on` : "Filters"}

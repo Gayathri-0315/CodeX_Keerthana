@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { CategoryGrid, CategoryGridSkeleton } from "../components/landing/CategoryGrid";
 import { PublicEventCard, PublicEventCardSkeleton } from "../components/landing/PublicEventCard";
+import { SmartSearch } from "../components/events/SmartSearch";
 import { OpportunityTabs, typeParam, type TypeTab } from "../components/events/OpportunityTabs";
 import { Button } from "../components/ui/Button";
 import { openAuth, showRoleNotice } from "../lib/authModal";
@@ -44,6 +45,7 @@ export default function Landing() {
         <div>
           <h1 className="text-[40px] font-semibold leading-[1.05] tracking-[-0.03em] sm:text-[52px]">Events that fit your week.</h1>
           <p className="body mt-4 max-w-[38ch] text-text-2">ShowUp shows only the events you can actually make, then helps you get there.</p>
+          <SmartSearch className="mt-6 max-w-[520px]" />
           <div className="mt-7 flex flex-wrap gap-3">
             <Link to="/explore" className="pressable inline-flex h-[52px] items-center gap-2 rounded-[14px] bg-accent-fill px-6 text-[17px] font-semibold text-white">
               Explore events <ArrowRight className="size-5" aria-hidden />

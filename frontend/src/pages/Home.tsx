@@ -6,6 +6,7 @@ import { PageHeader } from "../components/AppShell";
 import { EventCard, EventCardSkeleton } from "../components/events/EventCard";
 import { ExploreView } from "../components/events/ExploreView";
 import { YourWeek } from "../components/week/YourWeek";
+import { SmartSearch } from "../components/events/SmartSearch";
 import { OpportunityTabs, typeParam, type TypeTab } from "../components/events/OpportunityTabs";
 import { Button } from "../components/ui/Button";
 import { Segmented } from "../components/ui/Segmented";
@@ -81,6 +82,8 @@ export default function Home() {
       </div>
 
       <PageHeader title={`${greeting()}, ${firstName}`} />
+
+      <SmartSearch className="mb-6" />
 
       <YourWeek className="mb-6" />
 

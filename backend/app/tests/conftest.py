@@ -50,5 +50,9 @@ def client():
     auth_limit.reset()
     email_limit.reset()
     upload_limit.reset()
+    from app.routers.search import ip_limit, user_limit
+
+    ip_limit.reset()
+    user_limit.reset()
     with TestClient(app) as c:
         yield with_csrf(c)

@@ -25,6 +25,14 @@ class Filters:
     tags: list[str] = field(default_factory=list)
     event_type: str | None = None
     organizer_ids: set[str] | None = None  # "Following": only clubs the student follows
+    # From natural-language search:
+    categories: list[str] = field(default_factory=list)  # any of these
+    time_of_day: str | None = None  # morning | afternoon | evening | night (IST start time)
+    keywords: list[str] = field(default_factory=list)  # any word in the title, tags or description
+    max_distance_km: int | None = None  # only applied when we know the student's distance
+
+
+HOURS = {"morning": (5, 12), "afternoon": (12, 17), "evening": (16, 21), "night": (19, 28)}
 
 
 def _matches(ev: Evaluated, f: Filters) -> bool:
@@ -35,7 +43,23 @@ def _matches(ev: Evaluated, f: Filters) -> bool:
         return False
     if f.category and e.category_slug != f.category:
         return False
-    d = to_ist(e.start_at).date()
+    if f.categories and e.category_slug not in f.categories:
+        return False
+    start = to_ist(e.start_at)
+    if f.time_of_day in HOURS:
+        lo, hi = HOURS[f.time_of_day]
+        hour = start.hour + (24 if start.hour < 4 else 0)
+        if not lo <= hour < hi:
+            return False
+    if f.keywords:
+        text = " ".join([e.title, e.description or "", " ".join(e.tags or [])]).lower()
+        if not any(k in text for k in f.keywords):
+            return False
+    if f.max_distance_km is not None and e.mode != "online":
+        km = getattr(ev.result, "distance_km", None)
+        if km is not None and km > f.max_distance_km:
+            return False
+    d = start.date()
     if f.date_from and d < f.date_from:
         return False
     if f.date_to and d > f.date_to:

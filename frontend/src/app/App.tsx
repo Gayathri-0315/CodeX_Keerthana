@@ -40,6 +40,7 @@ const ExplorePage = lazy(() => import("../pages/ExplorePage"));
 const CategoryPage = lazy(() => import("../pages/CategoryPage"));
 const ClubPage = lazy(() => import("../pages/ClubPage"));
 const EventChat = lazy(() => import("../pages/EventChat"));
+const SearchPage = lazy(() => import("../pages/SearchPage"));
 const ForgotPage = lazy(() => import("../pages/AuthPages").then((m) => ({ default: m.ForgotPage })));
 const ResetPage = lazy(() => import("../pages/AuthPages").then((m) => ({ default: m.ResetPage })));
 const TermsPage = lazy(() => import("../pages/Legal").then((m) => ({ default: m.TermsPage })));
@@ -149,6 +150,7 @@ export function App() {
                     <Route index element={<Root />} />
                     <Route path="about" element={<Landing />} />
                     <Route path="explore" element={<ExplorePage />} />
+                    <Route path="search" element={<SearchPage />} />
                     <Route path="category/:slug" element={<CategoryPage />} />
                     <Route path="club/:slug" element={<ClubPage />} />
                     <Route path="event/:id" element={<EventPage />} />
