@@ -1,5 +1,5 @@
 import { m } from "motion/react";
-import { ArrowLeft, Download, MessageSquare, Pencil, QrCode, Search, Users, XCircle } from "lucide-react";
+import { ArrowLeft, Download, MessageSquare, MessagesSquare, Pencil, QrCode, Search, Users, XCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Button } from "../../components/ui/Button";
@@ -12,6 +12,7 @@ import { useAnalytics, useCancelEvent, useMessageRegistrants, useRegistrants } f
 import { formatDayTime, formatTime } from "../../lib/format";
 import { easeOut } from "../../lib/motion";
 import { STATUS_CHIP, useOrgEvent } from "../../lib/organizer";
+import { useChatEntry } from "../../lib/chat";
 import type { Analytics, Registrant } from "../../lib/types";
 
 type Filter = "all" | "registered" | "waitlisted" | "attended" | "no_show";
@@ -77,6 +78,7 @@ export default function EventManager() {
               <QrCode className="size-5" aria-hidden /> Check-in
             </Link>
           )}
+          {live && <ChatButton eventId={id} />}
           <Link to={`/organizer/event/${id}/edit`} className="pressable inline-flex min-h-11 items-center gap-2 rounded-[14px] bg-accent-soft px-4 font-semibold text-accent">
             <Pencil className="size-4" aria-hidden /> Edit
           </Link>
@@ -267,5 +269,20 @@ function CancelSheet({ eventId, open, onClose, onDone }: { eventId: string; open
         <Button variant="quiet" size="lg" full onClick={onClose}>Keep it</Button>
       </div>
     </Sheet>
+  );
+}
+
+function ChatButton({ eventId }: { eventId: string }) {
+  const { inChat, unread } = useChatEntry(eventId, true);
+  if (!inChat) return null;
+  return (
+    <Link to={`/event/${eventId}/chat`} className="pressable relative inline-flex min-h-11 items-center gap-2 rounded-[14px] bg-accent-soft px-4 font-semibold text-accent">
+      <MessagesSquare className="size-4" aria-hidden /> Group chat
+      {unread > 0 && (
+        <span className="absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-danger px-1 text-[11px] font-semibold text-white tnum" aria-label={`${unread} unread`}>
+          {unread > 9 ? "9+" : unread}
+        </span>
+      )}
+    </Link>
   );
 }

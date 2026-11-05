@@ -39,6 +39,7 @@ const Landing = lazy(() => import("../pages/Landing"));
 const ExplorePage = lazy(() => import("../pages/ExplorePage"));
 const CategoryPage = lazy(() => import("../pages/CategoryPage"));
 const ClubPage = lazy(() => import("../pages/ClubPage"));
+const EventChat = lazy(() => import("../pages/EventChat"));
 const ForgotPage = lazy(() => import("../pages/AuthPages").then((m) => ({ default: m.ForgotPage })));
 const ResetPage = lazy(() => import("../pages/AuthPages").then((m) => ({ default: m.ResetPage })));
 const TermsPage = lazy(() => import("../pages/Legal").then((m) => ({ default: m.TermsPage })));
@@ -165,6 +166,7 @@ export function App() {
                     <Route path="my" element={<OnlyRole role="student"><MyEvents /></OnlyRole>} />
                     <Route path="alerts" element={<Alerts />} />
                     <Route path="settings" element={<Settings />} />
+                    <Route path="event/:id/chat" element={<EventChat />} />
                     <Route path="organizer/new" element={<OnlyRole role="organizer"><EventEditor /></OnlyRole>} />
                     <Route path="organizer/event/:id/edit" element={<OnlyRole role="organizer"><EventEditor key="edit" /></OnlyRole>} />
                     <Route path="organizer/event/:id" element={<OnlyRole role="organizer"><EventManager /></OnlyRole>} />

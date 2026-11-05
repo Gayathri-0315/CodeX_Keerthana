@@ -182,3 +182,34 @@ def approve_verification(request_id: str, user: User = Depends(admin_only), db: 
 @router.post("/verification-requests/{request_id}/reject")
 def reject_verification(request_id: str, user: User = Depends(admin_only), db: Session = Depends(get_db)):
     return _decide_verification(db, request_id, user, False)
+
+
+# ---- reported group chat messages ----
+
+@router.get("/chat-reports")
+def chat_reports(user: User = Depends(admin_only), db: Session = Depends(get_db)):
+    from ..models import ChatMessage, ChatReport
+
+    rows = db.execute(select(ChatReport, ChatMessage, Event).join(ChatMessage, ChatMessage.id == ChatReport.message_id)
+                      .join(Event, Event.id == ChatMessage.event_id).where(ChatReport.status == "open")
+                      .order_by(ChatReport.created_at)).all()
+    return {"items": [{"id": r.id, "reason": r.reason, "message": m.body, "message_id": m.id, "event_title": e.title,
+                       "at": iso_utc(r.created_at)} for r, m, e in rows]}
+
+
+@router.post("/chat-reports/{report_id}/{action}")
+def decide_chat_report(report_id: str, action: str, user: User = Depends(admin_only), db: Session = Depends(get_db)):
+    from ..models import ChatMessage, ChatReport
+
+    if action not in ("hide", "dismiss"):
+        raise HTTPException(404, "Unknown action.")
+    r = db.get(ChatReport, report_id)
+    if r is None:
+        raise HTTPException(404, "That report doesn't exist.")
+    m = db.get(ChatMessage, r.message_id)
+    if action == "hide" and m:
+        m.hidden_reason, m.pinned = "Removed by ShowUp", False
+    for other in db.scalars(select(ChatReport).where(ChatReport.message_id == r.message_id, ChatReport.status == "open")):
+        other.status = "hidden" if action == "hide" else "dismissed"
+    db.commit()
+    return {"status": r.status}

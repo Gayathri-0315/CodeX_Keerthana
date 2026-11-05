@@ -1,9 +1,10 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Bell, CalendarClock, MapPin, Sparkles, Ticket, TriangleAlert, Users } from "lucide-react";
+import { Bell, CalendarClock, Megaphone, MapPin, Sparkles, Ticket, TriangleAlert, Users } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../lib/api";
 import { attKeys, refreshAfterSeatChange } from "../../lib/attendance";
+import { chatKeys } from "../../lib/chat";
 import { useMe } from "../../lib/queries";
 import type { AppNotification, NotificationAction, Registration } from "../../lib/types";
 import { useToast } from "../ui/Toaster";
@@ -18,6 +19,7 @@ const ICON = {
   cancelled_event: TriangleAlert,
   buddy_joined: Users,
   buddy_cancelled: Users,
+  chat_announcement: Megaphone,
 };
 
 /** Listens on /api/stream and turns each alert into a Dynamic-Island toast with its actions. */
@@ -37,11 +39,18 @@ export function LiveAlerts() {
       refreshAfterSeatChange(qc, d.event_id);
       showCheckinMoment(d.title);
     });
+    es.addEventListener("chat", (e) => {
+      const d: { event_id: string } = JSON.parse((e as MessageEvent).data);
+      qc.invalidateQueries({ queryKey: chatKeys.room(d.event_id) });
+      qc.invalidateQueries({ queryKey: chatKeys.mine });
+    });
     es.addEventListener("notification", (e) => {
       const n: AppNotification = JSON.parse((e as MessageEvent).data);
       qc.invalidateQueries({ queryKey: attKeys.notifications });
       if (["seat_opened", "cancelled_event", "buddy_joined", "buddy_cancelled"].includes(n.type)) refreshAfterSeatChange(qc, n.event_id ?? undefined);
       const { toast, navigate } = handlers.current;
+      // Already looking at that chat: the message is on screen, no toast needed.
+      if (n.type === "chat_announcement" && window.location.pathname === `/event/${n.event_id}/chat`) return;
       toast({
         title: n.title,
         body: n.body,
@@ -53,7 +62,7 @@ export function LiveAlerts() {
       function act(a: NotificationAction, note: AppNotification) {
         void api(`/notifications/${note.id}/read?clicked=true`, { method: "POST" }).catch(() => {});
         if (a.kind === "view" || a.kind === "register") return navigate(`/event/${a.event_id}`);
-        if (a.kind === "url") return void window.open(a.url, "_blank", "noopener");
+        if (a.kind === "url") return a.url.startsWith("/") ? navigate(a.url) : void window.open(a.url, "_blank", "noopener");
         if (a.kind === "feedback_up" || a.kind === "feedback_down") {
           return void api(`/registrations/${a.registration_id}/feedback`, { method: "POST", body: { kind: a.kind === "feedback_up" ? "as_described" : "not_as_described" } })
             .then(() =>

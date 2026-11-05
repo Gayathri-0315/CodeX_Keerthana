@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     static_dir: str = ""  # built frontend to serve from the API (one-service deploys)
     render_external_url: str = ""  # set by Render to the service's public URL
 
+    # Groq (AI helpers: chat safety, search, event Q&A, writing help). Optional; rules are used without it.
+    groq_api_key: str = ""
+    groq_model: str = "llama-3.1-8b-instant"
     seed_dev_password: str = ""  # local sample accounts only (python manage.py seed_dev)
 
     # Auth hardening

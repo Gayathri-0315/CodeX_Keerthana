@@ -1,5 +1,5 @@
 import { m } from "motion/react";
-import { ArrowLeft, Bookmark, CalendarPlus, Check, Clock, ExternalLink, Flag, MapPin, MoreHorizontal, Navigation, Share, ShieldCheck, TriangleAlert, Users } from "lucide-react";
+import { ArrowLeft, Bookmark, ChevronRight, MessagesSquare, CalendarPlus, Check, Clock, ExternalLink, Flag, MapPin, MoreHorizontal, Navigation, Share, ShieldCheck, TriangleAlert, Users } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Thumb } from "../components/events/EventCard";
@@ -17,6 +17,7 @@ import { easeOut } from "../lib/motion";
 import { useEvent, useMe, useSaveEvent } from "../lib/queries";
 import { openAuth, showRoleNotice } from "../lib/authModal";
 import type { EventDetail } from "../lib/types";
+import { useChatEntry } from "../lib/chat";
 
 const LABEL: Record<EventDetail["verification_label"], { text: string; tone: "success" | "neutral" | "warning" }> = {
   organizer_verified: { text: "Verified organizer", tone: "success" },
@@ -118,6 +119,8 @@ export default function EventPage() {
         ) : (
           <ClassmatesLine c={e.classmates_going} className="mt-4 px-1 callout" />
         )}
+
+        {e.registration && ["registered", "attended"].includes(e.registration.status) && <ChatEntry eventId={e.id} />}
 
         {(e.clash || e.why_not) && (
           <p className="callout mt-6 flex items-start gap-2 rounded-[14px] bg-warning/12 p-4 text-warning-text">
@@ -330,5 +333,26 @@ function DetailSkeleton() {
       <div className="skeleton mt-3 h-4 w-1/3 rounded-full" />
       <div className="skeleton mt-6 h-40 w-full rounded-[22px]" />
     </div>
+  );
+}
+
+/** Registered students get the event's group chat with the host and others going. */
+function ChatEntry({ eventId }: { eventId: string }) {
+  const { inChat, unread } = useChatEntry(eventId, true);
+  if (!inChat) return null;
+  return (
+    <Link to={`/event/${eventId}/chat`} className="card pressable mt-4 flex min-h-[60px] items-center gap-3 px-5 py-3">
+      <span className="grid size-10 shrink-0 place-items-center rounded-full bg-accent-soft text-accent"><MessagesSquare className="size-5" aria-hidden /></span>
+      <span className="min-w-0 flex-1">
+        <span className="headline block">Group chat</span>
+        <span className="footnote block text-text-2">Talk with the host and people going</span>
+      </span>
+      {unread > 0 && (
+        <span className="grid h-6 min-w-6 place-items-center rounded-full bg-danger px-1.5 text-[12px] font-semibold text-white tnum" aria-label={`${unread} unread`}>
+          {unread > 9 ? "9+" : unread}
+        </span>
+      )}
+      <ChevronRight className="size-5 text-text-2" aria-hidden />
+    </Link>
   );
 }
