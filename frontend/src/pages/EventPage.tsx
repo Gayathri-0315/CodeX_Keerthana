@@ -210,8 +210,11 @@ function ActionBar({ event: e }: { event: EventDetail }) {
           </button>
           {e.event_type === "internship" ? (
             e.status === "published" && e.registration_url && (
-              <a href={e.registration_url} target="_blank" rel="noopener noreferrer" className="pressable inline-flex h-[52px] items-center gap-2 rounded-[14px] bg-accent-fill px-6 text-[17px] font-semibold text-white">
-                Apply <ExternalLink className="size-4" aria-hidden />
+              <a href={e.registration_url} target="_blank" rel="noopener noreferrer"
+                aria-label={`Apply on ${siteOf(e.registration_url)} (opens in a new tab)`}
+                className="pressable inline-flex h-[52px] min-w-0 flex-col items-center justify-center rounded-[14px] bg-accent-fill px-6 text-white">
+                <span className="flex items-center gap-2 text-[17px] font-semibold leading-5">Apply <ExternalLink className="size-4" aria-hidden /></span>
+                <span className="max-w-[160px] truncate text-[11px] leading-4 text-white/80">on {siteOf(e.registration_url)}</span>
               </a>
             )
           ) : (
@@ -357,4 +360,13 @@ function ChatEntry({ eventId }: { eventId: string }) {
       <ChevronRight className="size-5 text-text-2" aria-hidden />
     </Link>
   );
+}
+
+/** "psgtech.ac.in" from a full link, so students see where Apply takes them. */
+function siteOf(url: string) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "their website";
+  }
 }

@@ -4,6 +4,7 @@ import { Chip } from "../ui/Chip";
 import { Segmented } from "../ui/Segmented";
 import { INTERESTS } from "../../lib/constants";
 import { WritingHelp } from "./WritingHelp";
+import { LinkCheck } from "./LinkCheck";
 import { useCategories } from "../../lib/queries";
 import type { EventForm } from "../../lib/types";
 
@@ -157,6 +158,7 @@ function Fields({ form, onChange, check }: Props) {
           </Field>
           <Field label="Apply link" name="registration_url" check={check} hint="Your organization's own page, not a short link.">
             <input {...text("registration_url")} type="url" inputMode="url" required maxLength={500} className={inputCls} placeholder="https://" />
+            <LinkCheck url={form.registration_url} />
           </Field>
         </Section>
       ) : (
@@ -256,6 +258,7 @@ function Fields({ form, onChange, check }: Props) {
         {!internship && (
           <Field label="External registration link (optional)" name="registration_url" check={check}>
             <input {...text("registration_url")} type="url" inputMode="url" maxLength={500} className={inputCls} placeholder="https://" />
+            <LinkCheck url={form.registration_url} />
           </Field>
         )}
       </Section>

@@ -85,7 +85,7 @@
    "description": "Help the PSG Design Society run usability studies for campus apps. Stipend paid monthly. Apply with a short portfolio or a write-up of one app you would improve.",
    "tags": ["design", "careers"], "day": "fri", "start": "23:59", "end": "23:59", "fee": 0, "capacity": null, "mode": "online",
    "venue": null, "address": null, "lat": null, "lng": null, "skill": "beginner",
-   "registration_url": "https://psgtech.ac.in/design-society/internship"},
+   "registration_url": "https://example.org/"},
   {"key": "spam_internship", "org": "new", "type": "internship", "title": "GUARANTEED INTERNSHIP AT TOP MNC", "category": "Careers",
    "description": "Guaranteed internship with certificate! Limited seats pay now. Send Rs 500 registration fee to personal UPI quickjobs@okaxis or call 98765 43210.",
    "tags": ["careers"], "day": "sat", "start": "11:00", "end": "13:00", "fee": 500, "capacity": null,
