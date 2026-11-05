@@ -3,6 +3,7 @@ import { createContext, useContext, type ReactNode } from "react";
 import { Chip } from "../ui/Chip";
 import { Segmented } from "../ui/Segmented";
 import { INTERESTS } from "../../lib/constants";
+import { WritingHelp } from "./WritingHelp";
 import { useCategories } from "../../lib/queries";
 import type { EventForm } from "../../lib/types";
 
@@ -103,6 +104,7 @@ function Fields({ form, onChange, check }: Props) {
             className={`${inputCls} h-auto py-3`}
           />
         </Field>
+        <WritingHelp form={form} onApply={onChange} typeLabel={(t) => TYPES.find((x) => x.value === t)?.label ?? t} />
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Type" name="event_type" check={check}>
             <select

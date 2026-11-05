@@ -54,7 +54,9 @@ def client():
 
     ip_limit.reset()
     user_limit.reset()
-    from app.routers.assist import ask_limit
+    from app.routers.assist import ask_limit, write_limit
+
+    write_limit.reset()
     from app.routers.chat import summary_limit
 
     ask_limit.reset()
