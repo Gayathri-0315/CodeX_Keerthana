@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..db import get_db
-from ..deps import require_role, upload_limit
+from ..deps import RateLimit, require_role, upload_limit
 from ..models import Event, Notification, Organizer, Registration, User
 from ..schemas import AppealIn, EventIn
 from ..services import clubs, feedcache, listing, notify, registration, showup_score
@@ -295,3 +295,20 @@ def appeal(event_id: str, body: AppealIn, user: User = Depends(organizer_only), 
     event.status = "pending_review"
     db.commit()
     return {**event_out(db, event), "message": "Appeal sent. An admin will review it."}
+
+
+class LinkIn(BaseModel):
+    url: str = Field(min_length=4, max_length=500)
+
+
+link_limit = RateLimit(20, 60, "Wait a moment before checking more links.")
+
+
+@router.post("/check-link")
+def check_link(body: LinkIn, user: User = Depends(organizer_only)):
+    """Does this apply / registration link open? A warning for the editor; it never blocks saving."""
+    from ..services import links
+
+    link_limit.hit(user.id)
+    reason = links.check(body.url)
+    return {"ok": reason is None, "reason": reason}
