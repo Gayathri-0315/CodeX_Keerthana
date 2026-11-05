@@ -19,6 +19,7 @@ import {
   type Mode,
 } from "../components/calendar/model";
 import { WeekGrid, type CalBlock } from "../components/calendar/WeekGrid";
+import { YourWeek } from "../components/week/YourWeek";
 import { GRID_START, STEP } from "../components/calendar/model";
 import { useMyRegistrations } from "../lib/attendance";
 import type { Registration } from "../lib/types";
@@ -39,15 +40,26 @@ export default function CalendarPage() {
   const { data: slots, isPending, isError, refetch } = useAvailability();
   const [params] = useSearchParams();
   const onboarding = params.get("onboarding") === "1";
+  // One calendar: "Your week" to look at, and the paint grid to edit free time (same data underneath).
+  const [editing, setEditing] = useState(onboarding || params.get("edit") === "1" || params.get("import") === "1");
 
   return (
     <>
       <PageHeader
         title="Your free time"
-        subtitle="Paint the hours you're free. We only show events that fit."
+        subtitle="We only show events that fit these hours."
         action={onboarding ? <OnboardingDone /> : undefined}
       />
-      {isError ? (
+      <Segmented
+        label="Calendar view"
+        className="mb-5 w-full sm:w-auto"
+        value={editing ? "edit" : "week"}
+        onChange={(v) => setEditing(v === "edit")}
+        options={[{ value: "week", label: "Your week" }, { value: "edit", label: "Edit free time" }]}
+      />
+      {!editing ? (
+        <YourWeek />
+      ) : isError ? (
         <div className="card p-6 text-center">
           <p className="headline">Couldn't load your free time.</p>
           <Button variant="secondary" className="mt-4" onClick={() => refetch()}>Try again</Button>

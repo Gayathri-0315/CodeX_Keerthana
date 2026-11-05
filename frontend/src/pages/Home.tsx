@@ -1,13 +1,13 @@
 import { AnimatePresence, m } from "motion/react";
-import { ArrowDown, CalendarDays, ChevronRight, Loader2 } from "lucide-react";
+import { ArrowDown, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { PageHeader } from "../components/AppShell";
 import { EventCard, EventCardSkeleton } from "../components/events/EventCard";
 import { ExploreView } from "../components/events/ExploreView";
+import { YourWeek } from "../components/week/YourWeek";
 import { OpportunityTabs, typeParam, type TypeTab } from "../components/events/OpportunityTabs";
 import { Button } from "../components/ui/Button";
-import { CountUp } from "../components/ui/CountUp";
 import { Segmented } from "../components/ui/Segmented";
 import { useToast } from "../components/ui/Toaster";
 import { greeting } from "../lib/format";
@@ -82,18 +82,7 @@ export default function Home() {
 
       <PageHeader title={`${greeting()}, ${firstName}`} />
 
-      <Link to="/calendar" className="pressable liftable card mb-8 flex items-center gap-4 p-5">
-        <span className="grid size-12 shrink-0 place-items-center rounded-[14px] bg-success/15 text-success-text">
-          <CalendarDays className="size-6" aria-hidden />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="title-3 block">
-            <CountUp value={count?.fits ?? 0} /> {count?.fits === 1 ? "event fits" : "events fit"} your week
-          </span>
-          <span className="callout block text-text-2">Based on your free time, distance and budget.</span>
-        </span>
-        <ChevronRight className="size-5 shrink-0 text-text-2" aria-hidden />
-      </Link>
+      <YourWeek className="mb-6" />
 
       <OpportunityTabs value={type} onChange={setType} className="mb-4" />
       <Segmented label="Feed" value={tab} onChange={setTab} className="mb-5 w-full sm:w-auto" options={tabs} />
