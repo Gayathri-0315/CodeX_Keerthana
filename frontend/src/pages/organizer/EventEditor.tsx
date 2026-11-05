@@ -80,6 +80,8 @@ export default function EventEditor() {
           title: f.title ?? "",
           description: f.description ?? "",
           category: f.category ?? "",
+          event_type: (f.event_type as EventForm["event_type"]) ?? "other",
+          category_slug: f.category_slug ?? null,
           tags: f.tags.slice(0, 4),
           date: f.date,
           start_time: f.start_time,
@@ -96,7 +98,8 @@ export default function EventEditor() {
           source: "web_upload",
           field_confidence: f.field_confidence,
         });
-        setCheck(new Set(r.low_confidence.filter((n) => !["registration_url", "organizer_name", "mode"].includes(n))));
+        // Type and category are suggestions: ask the organizer to confirm both.
+        setCheck(new Set([...r.low_confidence.filter((n) => !["registration_url", "organizer_name", "mode", "category"].includes(n)), "event_type", "category_slug"]));
         if (r.poster_url) setPosterSrc(r.poster_url);
         setNotice(r.message);
         setStep("form");

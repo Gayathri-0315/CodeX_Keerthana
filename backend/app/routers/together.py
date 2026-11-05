@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..deps import current_user, require_verified
+from ..deps import student_only
 from ..models import Event, Registration, User
 from ..services import registration, together
 from ..timeutil import DAY_NAMES, to_ist
@@ -13,7 +13,7 @@ router = APIRouter(tags=["together"])
 
 
 @router.post("/registrations/{reg_id}/invite")
-def create_invite(reg_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def create_invite(reg_id: str, user: User = Depends(student_only), db: Session = Depends(get_db)):
     reg = db.get(Registration, reg_id)
     if reg is None or reg.user_id != user.id:
         raise HTTPException(404, "That registration doesn't exist.")
@@ -27,10 +27,9 @@ def get_invite(code: str, db: Session = Depends(get_db)):
 
 
 @router.post("/invites/{code}/accept")
-def accept_invite(code: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def accept_invite(code: str, user: User = Depends(student_only), db: Session = Depends(get_db)):
     if user.role != "student":
         raise HTTPException(403, "Only students can join events.")
-    require_verified(user)
     reg = together.accept(db, user, code)
     out = registration.registration_out(db, reg, user)
     names = [c["name"] for c in out["companions"]]

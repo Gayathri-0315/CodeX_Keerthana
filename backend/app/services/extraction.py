@@ -312,7 +312,7 @@ def extract_poster(db: Session, upload: Upload) -> dict:
             result = {
                 "fields": PosterExtraction().model_dump(),
                 "source": "mock",
-                "message": "Demo mode reads only the sample posters. Fill in the details below.",
+                "message": "We couldn't read this poster automatically. Fill in the details below.",
             }
         else:
             fields = PosterExtraction.model_validate(resolve_mock_poster(spec, ist_today())).model_dump()
@@ -351,7 +351,7 @@ def extract_timetable(db: Session, upload: Upload) -> dict:
     spec = _mock_lookup("timetable", upload)
     if spec is None:
         return {"timetable": TimetableExtraction().model_dump(), "source": "mock",
-                "message": "Demo mode reads only the sample timetables. Paint your free time instead."}
+                "message": "We couldn't read this timetable automatically. Paint your free time instead."}
     return {"timetable": TimetableExtraction.model_validate(spec).model_dump(), "source": "mock", "message": None}
 
 

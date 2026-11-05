@@ -15,7 +15,7 @@ def extract(client, name: str, filename: str | None = None):
 
 
 def form_from(fields: dict, poster_url: str | None) -> dict:
-    keys = ["title", "description", "category", "tags", "date", "start_time", "end_time", "mode", "venue_name",
+    keys = ["title", "description", "category", "category_slug", "tags", "date", "start_time", "end_time", "mode", "venue_name",
             "address", "fee_inr", "registration_deadline", "eligibility_text", "eligibility_tags", "registration_url"]
     form = {k: fields[k] for k in keys if fields.get(k) is not None}
     return {**form, "poster_url": poster_url, "source": "web_upload", "field_confidence": fields["field_confidence"]}
@@ -100,10 +100,8 @@ def test_new_organizer_goes_to_review_and_admin_approves(client):
         from app.models import User
         from app.security import hash_password
 
-        from app.timeutil import utcnow
-
         u = User(email="newclub@gmail.com", name="New club", password_hash=hash_password("longenough"), role="organizer",
-                 onboarded=True, email_verified_at=utcnow())
+                 onboarded=True)
         db.add(u)
         db.flush()
         db.add(Organizer(user_id=u.id, org_name="Brand New Club", org_email_domain="gmail.com", trust_level="new"))

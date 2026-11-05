@@ -81,7 +81,12 @@
    "tags": ["product", "startups"], "day": "sat", "start": "16:00", "end": "17:30", "fee": 50, "capacity": 40,
    "venue": "Thinkspace Cowork", "address": "100 Feet Road, Gandhipuram, Coimbatore", "lat": 11.0185, "lng": 76.9700, "skill": null, "seed_registrations": 16},
 
-  {"key": "spam_internship", "org": "new", "title": "GUARANTEED INTERNSHIP AT TOP MNC", "category": "Careers",
+  {"key": "ux_internship", "org": "design", "type": "internship", "title": "UX Research Internship (3 months, remote)", "category": "Internship",
+   "description": "Help the PSG Design Society run usability studies for campus apps. Stipend paid monthly. Apply with a short portfolio or a write-up of one app you would improve.",
+   "tags": ["design", "careers"], "day": "fri", "start": "23:59", "end": "23:59", "fee": 0, "capacity": null, "mode": "online",
+   "venue": null, "address": null, "lat": null, "lng": null, "skill": "beginner",
+   "registration_url": "https://psgtech.ac.in/design-society/internship"},
+  {"key": "spam_internship", "org": "new", "type": "internship", "title": "GUARANTEED INTERNSHIP AT TOP MNC", "category": "Careers",
    "description": "Guaranteed internship with certificate! Limited seats pay now. Send Rs 500 registration fee to personal UPI quickjobs@okaxis or call 98765 43210.",
    "tags": ["careers"], "day": "sat", "start": "11:00", "end": "13:00", "fee": 500, "capacity": null,
    "venue": "Hotel Lobby", "address": "Gandhipuram, Coimbatore", "lat": 11.0168, "lng": 76.9675, "skill": null,

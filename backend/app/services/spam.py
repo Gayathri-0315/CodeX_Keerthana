@@ -19,7 +19,8 @@ URGENCY = re.compile(r"\b(hurry|last chance|act now|urgent|limited seats|only to
 COLLEGE_DOMAIN = re.compile(r"(\.ac\.in|\.edu|\.edu\.in)$", re.I)
 
 # Fees above these (₹) are "far outside the norm" for the category.
-FEE_NORMS = {"workshop": 2000, "meetup": 500, "talk": 500, "webinar": 500, "hackathon": 1000, "conference": 3000}
+FEE_NORMS = {"workshop": 2000, "meetup": 500, "talk": 500, "webinar": 500, "hackathon": 1000, "conference": 3000,
+             "competition": 1000, "internship": 0}
 DEFAULT_FEE_NORM = 3000
 
 LOW, HIGH = 30, 60
@@ -50,6 +51,7 @@ class Candidate:
     fee_inr: int
     registration_url: str | None
     has_organizer: bool = True
+    event_type: str = "other"
 
 
 def _caps_ratio(text: str) -> float:
@@ -71,16 +73,17 @@ def assess(c: Candidate, trust_level: str | None, now: datetime, duplicate: tupl
         pts += points
         reasons.append(reason)
 
+    internship = c.event_type == "internship"
     if c.start_at is None:
-        add(25, "Missing date or time")
-    if c.mode == "in_person" and not (c.venue_name or "").strip():
+        add(25, "Missing apply-by date" if internship else "Missing date or time")
+    if c.mode == "in_person" and not internship and not (c.venue_name or "").strip():
         add(25, "Missing venue for an in-person event")
     if not c.has_organizer:
         add(25, "Missing organizer")
 
     if c.start_at is not None and c.start_at < now:
-        add(40, "Start date is in the past")
-    elif c.start_at is not None and c.end_at is not None and c.end_at <= c.start_at:
+        add(40, "Apply-by date is in the past" if internship else "Start date is in the past")
+    elif not internship and c.start_at is not None and c.end_at is not None and c.end_at <= c.start_at:
         add(40, "Ends before it starts")
 
     for phrase in SCAM_PHRASES:
@@ -101,9 +104,10 @@ def assess(c: Candidate, trust_level: str | None, now: datetime, duplicate: tupl
     elif any(LOOKALIKE.search(h) for h in hosts):
         add(20, "Registration link looks like an imitation of a known site")
 
-    norm = FEE_NORMS.get((c.category or "").lower(), DEFAULT_FEE_NORM)
+    kind = c.event_type if c.event_type in FEE_NORMS else (c.category or "").lower()
+    norm = FEE_NORMS.get(kind, DEFAULT_FEE_NORM)
     if c.fee_inr > norm:
-        add(15, f"Fee of ₹{c.fee_inr:,} is unusually high for a {c.category.lower() or 'event'}")
+        add(15, f"Fee of ₹{c.fee_inr:,} is unusually high for a {kind or 'event'}")
 
     duplicate_of = None
     if duplicate:
@@ -131,10 +135,16 @@ def combine_llm(a: Assessment, llm_risk: str | None, llm_reasons: list[str]) -> 
     return Assessment(max(0, min(100, a.score + delta)), a.reasons + [f"Review: {r}" for r in llm_reasons[:3]], a.duplicate_of)
 
 
-def outcome(score: int, trust_level: str, email_domain: str, is_first_event: bool) -> tuple[str, str]:
+def outcome(score: int, trust_level: str, email_domain: str, is_first_event: bool, event_type: str = "other",
+            hard_blocks: list[str] | None = None) -> tuple[str, str]:
     """(status, verification_label) for publishing. Labels never claim a check that didn't happen."""
-    if score >= HIGH:
+    if score >= HIGH or hard_blocks:
         return "blocked", "unverified"
+    if event_type == "internship":
+        # Only verified organizers publish internships directly; every new organizer's internship is reviewed.
+        if trust_level == "new":
+            return "pending_review", "unverified"
+        return ("published", "organizer_verified") if score < LOW else ("pending_review", "unverified")
     if is_first_event and trust_level == "new" and not (score < LOW and COLLEGE_DOMAIN.search(email_domain or "")):
         return "pending_review", "unverified"
     if score >= LOW:

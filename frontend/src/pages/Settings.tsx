@@ -1,20 +1,17 @@
-import { Download, LogOut, Minus, Plus, Trash2 } from "lucide-react";
+import { LogOut, Minus, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { LegalLinks } from "../components/LegalLinks";
+import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/AppShell";
+import { DownloadMyData, OrganizerSettings } from "../components/organizer/OrganizerSettings";
 import { AreaPicker, BudgetPicker, DistanceSlider } from "../components/PlaceControls";
 import { Button } from "../components/ui/Button";
 import { Chip } from "../components/ui/Chip";
 import { Segmented } from "../components/ui/Segmented";
-import { Sheet } from "../components/ui/Sheet";
 import { useToast } from "../components/ui/Toaster";
 import { Toggle } from "../components/ui/Toggle";
-import { api } from "../lib/api";
 import { INTERESTS } from "../lib/constants";
 import { formatTime } from "../lib/format";
 import { useDeleteAlert, useMe, useSavedAlerts, useSignOut, useUpdateInterests, useUpdateMe } from "../lib/queries";
-import { getTheme, setTheme, type ThemeChoice } from "../lib/theme";
 import type { User } from "../lib/types";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -88,10 +85,8 @@ export default function Settings() {
             <MyAlertsSection />
           </>
         )}
-        <AppearanceSection />
+        {me.role === "organizer" && <OrganizerSettings me={me} patchMe={patch} />}
         <AccountSection me={me} />
-        <PrivacySection />
-        <LegalLinks className="mb-8 px-1" />
       </div>
     </>
   );
@@ -289,26 +284,6 @@ function TimeInput({ label, value, onChange }: { label: string; value: string; o
   );
 }
 
-function AppearanceSection() {
-  const [theme, set] = useState<ThemeChoice>(getTheme);
-  return (
-    <Section title="Appearance">
-      <Row>
-        <Segmented
-          label="Theme"
-          className="w-full"
-          value={theme}
-          onChange={(t) => {
-            set(t);
-            setTheme(t);
-          }}
-          options={[{ value: "system", label: "System" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }]}
-        />
-      </Row>
-    </Section>
-  );
-}
-
 function AccountSection({ me }: { me: User }) {
   const signOut = useSignOut();
   const navigate = useNavigate();
@@ -319,66 +294,13 @@ function AccountSection({ me }: { me: User }) {
         <p className="footnote text-text-2">{me.email}</p>
       </Row>
       <Row>
-        <Button variant="secondary" loading={signOut.isPending} onClick={() => signOut.mutate(undefined, { onSuccess: () => navigate("/welcome") })}>
-          <LogOut className="size-4" aria-hidden />Sign out
-        </Button>
-      </Row>
-    </Section>
-  );
-}
-
-function PrivacySection() {
-  const signOut = useSignOut();
-  const toast = useToast();
-  const [confirm, setConfirm] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [downloading, setDownloading] = useState(false);
-
-  const download = async () => {
-    setDownloading(true);
-    try {
-      const data = await api<unknown>("/users/me/export");
-      const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
-      const a = Object.assign(document.createElement("a"), { href: url, download: "showup-data.json" });
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      toast({ tone: "error", title: "Couldn't download your data", body: (e as Error).message });
-    } finally {
-      setDownloading(false);
-    }
-  };
-
-  const deleteAll = async () => {
-    setDeleting(true);
-    try {
-      await api<void>("/users/me", { method: "DELETE" });
-      signOut.reset();
-      window.location.assign("/welcome");
-    } catch (e) {
-      setDeleting(false);
-      toast({ tone: "error", title: "Couldn't delete", body: (e as Error).message });
-    }
-  };
-
-  return (
-    <Section title="Privacy">
-      <Row>
-        <p className="callout text-text-2">
-          Get a copy of everything ShowUp keeps about you, or delete it all. <Link to="/privacy" className="text-accent">Privacy policy</Link>
-        </p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Button variant="secondary" loading={downloading} onClick={download}><Download className="size-4" aria-hidden />Download my data</Button>
-          <Button variant="danger" onClick={() => setConfirm(true)}><Trash2 className="size-4" aria-hidden />Delete my data</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" loading={signOut.isPending} onClick={() => signOut.mutate(undefined, { onSuccess: () => navigate("/") })}>
+            <LogOut className="size-4" aria-hidden />Sign out
+          </Button>
+          {me.role === "organizer" && <DownloadMyData />}
         </div>
       </Row>
-      <Sheet open={confirm} onClose={() => setConfirm(false)} title="Delete your data?">
-        <p className="callout text-text-2">This removes your account, free time, registrations and alerts. It can't be undone.</p>
-        <div className="mt-6 flex flex-col gap-2">
-          <Button variant="danger" size="lg" full loading={deleting} onClick={deleteAll}>Delete everything</Button>
-          <Button variant="quiet" size="lg" full onClick={() => setConfirm(false)}>Keep my account</Button>
-        </div>
-      </Sheet>
     </Section>
   );
 }

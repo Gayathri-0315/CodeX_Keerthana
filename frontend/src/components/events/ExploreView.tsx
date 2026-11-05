@@ -1,23 +1,29 @@
-import { AnimatePresence, m } from "motion/react";
 import { Loader2, Search, SlidersHorizontal, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { spring } from "../../lib/motion";
 import { useCategories, useExplore, type ExploreFilters } from "../../lib/queries";
-import type { FeedItem } from "../../lib/types";
 import { Button } from "../ui/Button";
 import { Segmented } from "../ui/Segmented";
 import { Sheet } from "../ui/Sheet";
-import { EventCard, EventCardSkeleton } from "./EventCard";
+import { Timeline } from "./Timeline";
 
 const inputCls =
   "h-12 w-full rounded-[14px] bg-surface px-4 body text-text shadow-[inset_0_0_0_1px_var(--line)] outline-none focus:shadow-[inset_0_0_0_2px_var(--accent)]";
 
-/** Every upcoming event, by start date, with search, filters and infinite scroll. */
-export function ExploreView({ onToggleSave }: { onToggleSave: (e: FeedItem) => void }) {
+/**
+ * Every upcoming event, by start date, with search, filters and infinite scroll.
+ * Students (source "feed") get time-fit badges and saves; guests and organizers browse public cards.
+ */
+export function ExploreView({ source = "feed", category, eventType }: {
+  source?: "feed" | "public";
+  /** From the opportunity tabs. */
+  eventType?: string;
+  /** Fixed category (category pages): hides the category filter. */
+  category?: string;
+}) {
   const [text, setText] = useState("");
   const [filters, setFilters] = useState<ExploreFilters>({});
   const [sheet, setSheet] = useState(false);
-  const feed = useExplore(filters);
+  const feed = useExplore({ ...filters, ...(category ? { category } : {}), ...(eventType ? { event_type: eventType } : {}) }, source);
   const items = feed.data?.pages.flatMap((p) => p.items) ?? [];
   const active = [filters.category, filters.date_from || filters.date_to, filters.price, filters.mode].filter(Boolean).length;
 
@@ -51,7 +57,7 @@ export function ExploreView({ onToggleSave }: { onToggleSave: (e: FeedItem) => v
 
   return (
     <>
-      <div className="mb-5 flex gap-2">
+      <div className="mb-3 flex gap-2">
         <label className="relative flex-1">
           <span className="sr-only">Search events by title</span>
           <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-text-2" aria-hidden />
@@ -69,6 +75,14 @@ export function ExploreView({ onToggleSave }: { onToggleSave: (e: FeedItem) => v
         </button>
       </div>
 
+      <div className="no-scrollbar -mx-4 mb-6 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:px-0" role="group" aria-label="Quick filters">
+        <QuickChip on={filters.price === "free"} label="Free" onClick={() => setFilters((f) => ({ ...f, price: f.price === "free" ? undefined : "free" }))} />
+        <QuickChip on={filters.price === "paid"} label="Paid" onClick={() => setFilters((f) => ({ ...f, price: f.price === "paid" ? undefined : "paid" }))} />
+        <QuickChip on={filters.mode === "in_person"} label="In person" onClick={() => setFilters((f) => ({ ...f, mode: f.mode === "in_person" ? undefined : "in_person" }))} />
+        <QuickChip on={filters.mode === "online"} label="Online" onClick={() => setFilters((f) => ({ ...f, mode: f.mode === "online" ? undefined : "online" }))} />
+        <QuickChip on={!!(filters.date_from || filters.date_to)} label={filters.date_from || filters.date_to ? "Dates set" : "Dates"} onClick={() => setSheet(true)} />
+      </div>
+
       {feed.isError ? (
         <div className="card p-6 text-center">
           <p className="headline">Couldn't load events.</p>
@@ -76,7 +90,7 @@ export function ExploreView({ onToggleSave }: { onToggleSave: (e: FeedItem) => v
           <Button variant="secondary" className="mt-4" onClick={() => feed.refetch()}>Try again</Button>
         </div>
       ) : feed.isPending ? (
-        <div className="grid gap-3 md:grid-cols-2">{Array.from({ length: 4 }, (_, i) => <EventCardSkeleton key={i} />)}</div>
+        <TimelineSkeleton />
       ) : items.length === 0 ? (
         <div className="card p-8 text-center">
           <p className="headline">No events match.</p>
@@ -85,15 +99,9 @@ export function ExploreView({ onToggleSave }: { onToggleSave: (e: FeedItem) => v
         </div>
       ) : (
         <>
-          <ul className={`grid gap-3 transition-opacity md:grid-cols-2 ${feed.isPlaceholderData ? "opacity-60" : ""}`}>
-            <AnimatePresence initial={false} mode="popLayout">
-              {items.map((e, i) => (
-                <m.li key={e.id} layout="position" exit={{ opacity: 0, scale: 0.96 }} transition={spring}>
-                  <EventCard event={e} index={i} onToggleSave={onToggleSave} variant="explore" />
-                </m.li>
-              ))}
-            </AnimatePresence>
-          </ul>
+          <div className={`transition-opacity ${feed.isPlaceholderData ? "opacity-60" : ""}`}>
+            <Timeline items={items} />
+          </div>
           <div ref={sentinel} className="flex h-16 items-center justify-center">
             {feed.isFetchingNextPage && <Loader2 className="size-5 animate-spin text-text-2" aria-label="Loading more events" />}
           </div>
@@ -101,6 +109,7 @@ export function ExploreView({ onToggleSave }: { onToggleSave: (e: FeedItem) => v
       )}
 
       <FilterSheet
+        showCategory={!category}
         open={sheet}
         onClose={() => setSheet(false)}
         value={filters}
@@ -113,7 +122,8 @@ export function ExploreView({ onToggleSave }: { onToggleSave: (e: FeedItem) => v
   );
 }
 
-function FilterSheet({ open, onClose, value, onApply }: {
+function FilterSheet({ open, onClose, value, onApply, showCategory }: {
+  showCategory: boolean;
   open: boolean;
   onClose: () => void;
   value: ExploreFilters;
@@ -129,13 +139,15 @@ function FilterSheet({ open, onClose, value, onApply }: {
   return (
     <Sheet open={open} onClose={onClose} title="Filters">
       <div className="flex flex-col gap-5">
-        <div>
-          <label htmlFor="f-category" className="footnote mb-1.5 block font-medium text-text-2">Category</label>
-          <select id="f-category" value={draft.category ?? ""} onChange={(e) => set({ category: e.target.value || undefined })} className={inputCls}>
-            <option value="">All categories</option>
-            {categories?.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </div>
+        {showCategory && (
+          <div>
+            <label htmlFor="f-category" className="footnote mb-1.5 block font-medium text-text-2">Category</label>
+            <select id="f-category" value={draft.category ?? ""} onChange={(e) => set({ category: e.target.value || undefined })} className={inputCls}>
+              <option value="">All categories</option>
+              {categories?.map((c) => <option key={c.slug} value={c.slug}>{c.emoji} {c.name}</option>)}
+            </select>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label htmlFor="f-from" className="footnote mb-1.5 block font-medium text-text-2">From</label>
@@ -162,5 +174,39 @@ function FilterSheet({ open, onClose, value, onApply }: {
         </div>
       </div>
     </Sheet>
+  );
+}
+
+function QuickChip({ on, label, onClick }: { on: boolean; label: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={on}
+      className={`pressable min-h-9 shrink-0 rounded-full px-3.5 callout font-medium transition-colors ${on ? "bg-accent-fill text-white" : "bg-surface text-text shadow-[inset_0_0_0_1px_var(--line)]"}`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function TimelineSkeleton() {
+  return (
+    <div className="flex flex-col gap-6 pl-5" aria-hidden>
+      {[0, 1].map((g) => (
+        <div key={g}>
+          <div className="skeleton mb-3 h-4 w-28 rounded-full" />
+          {[0, 1].map((r) => (
+            <div key={r} className="flex gap-4 py-3">
+              <div className="flex-1 space-y-2">
+                <div className="skeleton h-3 w-20 rounded-full" />
+                <div className="skeleton h-4 w-3/4 rounded-full" />
+                <div className="skeleton h-3 w-1/2 rounded-full" />
+              </div>
+              <div className="skeleton size-[76px] rounded-[16px]" />
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
   );
 }

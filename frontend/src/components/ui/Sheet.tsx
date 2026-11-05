@@ -2,6 +2,7 @@ import { AnimatePresence, m } from "motion/react";
 import { useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { spring } from "../../lib/motion";
+import { InOverlay } from "./overlay";
 
 type Props = {
   open: boolean;
@@ -52,7 +53,7 @@ export function Sheet({ open, onClose, title, children }: Props) {
           >
             <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-text/15 sm:hidden" aria-hidden />
             <h2 className="title-3 mb-3">{title}</h2>
-            {children}
+            <InOverlay.Provider value>{children}</InOverlay.Provider>
           </m.div>
         </div>
       )}

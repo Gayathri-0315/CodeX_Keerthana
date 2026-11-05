@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..deps import current_user
+from ..deps import student_only
 from ..models import Registration, SavedEvent, User
 from ..serializers import event_card, registration_brief
 from ..services.explore import Filters, apply_filters, fit_badge
@@ -24,9 +24,10 @@ def saved_ids(db: Session, user: User) -> set[str]:
 @router.get("")
 def feed(
     tab: Literal["for_you", "almost", "saved"] = "for_you",
+    event_type: Literal["hackathon", "competition", "internship", "workshop", "conference", "meetup", "webinar", "other"] | None = None,
     limit: int = Query(20, ge=1, le=50),
     cursor: str | None = None,
-    user: User = Depends(current_user),
+    user: User = Depends(student_only),
     db: Session = Depends(get_db),
 ):
     data = evaluate(db, user)
@@ -37,6 +38,8 @@ def feed(
         items = data.almost() if user.show_almost else []
     else:
         items = sorted((i for i in data.items if i.event.id in saved), key=lambda i: i.event.start_at)
+    if event_type:
+        items = [i for i in items if i.event.event_type == event_type]
 
     try:
         offset = int(cursor) if cursor else 0
@@ -89,26 +92,29 @@ def explore(
     price: Literal["free", "paid"] | None = None,
     mode: Literal["online", "in_person"] | None = None,
     q: str | None = Query(None, max_length=100),
+    event_type: Literal["hackathon", "competition", "internship", "workshop", "conference", "meetup", "webinar", "other"] | None = None,
     limit: int = Query(20, ge=1, le=50),
     cursor: str | None = None,
-    user: User = Depends(current_user),
+    user: User = Depends(student_only),
     db: Session = Depends(get_db),
 ):
     """Every upcoming published event, by start date, with a "Fits your time" badge. Nothing is hidden for not fitting."""
     data = evaluate(db, user)
-    items = apply_filters(data, Filters(category=category, date_from=date_from, date_to=date_to, price=price, mode=mode, q=q))
+    items = apply_filters(data, Filters(category=category, date_from=date_from, date_to=date_to, price=price, mode=mode, q=q,
+                                         event_type=event_type))
     return page_out(db, user, data, items, parse_cursor(cursor), limit, badges=True)
 
 
 @router.get("/categories")
-def categories(user: User = Depends(current_user), db: Session = Depends(get_db)):
-    """Categories that have upcoming events, for the Explore filter."""
-    data = evaluate(db, user)
-    return {"categories": sorted({i.event.category for i in data.items if i.event.category})}
+def categories(user: User = Depends(student_only), db: Session = Depends(get_db)):
+    """Every category with its count of upcoming events, for the Explore filter."""
+    from ..services.categories import with_counts
+
+    return {"categories": with_counts(db, [i.event for i in evaluate(db, user).items])}
 
 
 @router.get("/count")
-def feed_count(user: User = Depends(current_user), db: Session = Depends(get_db)):
+def feed_count(user: User = Depends(student_only), db: Session = Depends(get_db)):
     """Events that fit the user's free time right now (drives the live calendar pill)."""
     data = evaluate(db, user)
     return {"fits": len(data.for_you()), "almost": len(data.almost())}

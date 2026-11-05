@@ -181,3 +181,61 @@ input[type="range"].slider::-moz-range-thumb { width: 28px; height: 28px; border
 .safe-top { padding-top: env(safe-area-inset-top, 0px); }
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* ---- Category cards (item 11): pastel tint per category, tiny looping emoji, CSS only ---- */
+.cat-card {
+  background: hsl(var(--h) 90% 95%);
+  border-radius: 22px;
+  transition: transform 0.25s var(--ease-out-soft), box-shadow 0.25s var(--ease-out-soft);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .cat-card { background: hsl(var(--h) 30% 16%); }
+}
+:root[data-theme="dark"] .cat-card { background: hsl(var(--h) 30% 16%); }
+@media (hover: hover) {
+  .cat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-card); }
+}
+.cat-card:active { transform: scale(0.97); }
+
+.cat-emoji { animation-duration: 3.2s; animation-iteration-count: infinite; animation-timing-function: ease-in-out; }
+.cat-emoji[data-motion="float"] { animation-name: cat-float; }
+.cat-emoji[data-motion="wiggle"] { animation-name: cat-wiggle; }
+.cat-emoji[data-motion="pulse"] { animation-name: cat-pulse; }
+.cat-emoji[data-motion="spin"] { animation-name: cat-spin; animation-duration: 6s; animation-timing-function: linear; }
+/* Stronger on hover: same motion, bigger and quicker. */
+.cat-card:hover .cat-emoji, .cat-card:focus-visible .cat-emoji { animation-duration: 1.4s; --amp: 2; }
+.cat-card:hover .cat-emoji[data-motion="spin"] { animation-duration: 2.4s; }
+
+@keyframes cat-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(calc(-3px * var(--amp, 1))); } }
+@keyframes cat-wiggle { 0%, 100% { transform: rotate(0deg); } 25% { transform: rotate(calc(-7deg * var(--amp, 1))); } 75% { transform: rotate(calc(7deg * var(--amp, 1))); } }
+@keyframes cat-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(calc(1 + 0.08 * var(--amp, 1))); } }
+@keyframes cat-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+/* ---- Landing hero: the free-time grid fills in green ---- */
+.hero-cell { background: var(--line); border-radius: 5px; }
+.hero-cell[data-free] { animation: hero-fill 4.8s var(--ease-out-soft) infinite; }
+@keyframes hero-fill {
+  0%, 12% { background: var(--line); }
+  24%, 86% { background: var(--free-edge); }
+  100% { background: var(--line); }
+}
+.hero-fit { animation: hero-fit 4.8s var(--ease-out-soft) infinite; }
+@keyframes hero-fit {
+  0%, 30% { opacity: 0; transform: translateY(8px); }
+  40%, 86% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(8px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cat-emoji, .hero-cell[data-free], .hero-fit { animation: none !important; }
+  .hero-cell[data-free] { background: var(--free-edge); }
+  .hero-fit { opacity: 1; }
+  .cat-card, .cat-card:hover, .cat-card:active { transform: none; }
+}
+
+/* ---- Sign-in popup: switching panels and tabs (plain CSS, see AuthModal) ---- */
+.auth-fade { animation: auth-fade 0.15s var(--ease-out-soft) both; }
+.auth-rise { animation: auth-rise 0.18s var(--ease-out-soft) both; }
+@keyframes auth-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes auth-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .auth-fade, .auth-rise { animation: none; } }

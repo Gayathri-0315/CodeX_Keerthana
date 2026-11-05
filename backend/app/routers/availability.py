@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..db import get_db
-from ..deps import current_user, upload_limit
+from ..deps import student_only, upload_limit
 from ..models import AvailabilitySlot, User
 from ..schemas import AvailabilityOut, AvailabilityPut
 from ..services import feedcache
@@ -30,7 +30,7 @@ DAY_INDEX = {"Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 
 
 
 @router.post("/timetable", dependencies=[Depends(upload_limit)])
-def import_timetable(file: UploadFile = File(...), user: User = Depends(current_user), db: Session = Depends(get_db)):
+def import_timetable(file: UploadFile = File(...), user: User = Depends(student_only), db: Session = Depends(get_db)):
     """Timetable photo -> class periods -> free gaps (SPEC 5.1, 6.1). Nothing is saved: the student reviews first."""
     upload = read_upload(file.file.read(), file.filename or "timetable")
     result = extract_timetable(db, upload)
@@ -50,7 +50,7 @@ def import_timetable(file: UploadFile = File(...), user: User = Depends(current_
 
 
 @router.get("/samples")
-def timetable_samples(user: User = Depends(current_user)):
+def timetable_samples(user: User = Depends(student_only)):
     if not settings.is_dev:  # sample timetables are a local-development aid only
         return {"timetables": []}
     from ..seed.make_samples import sample_timetables
@@ -64,12 +64,12 @@ def _minutes(hhmm: str) -> int:
 
 
 @router.get("", response_model=AvailabilityOut)
-def get_availability(user: User = Depends(current_user), db: Session = Depends(get_db)):
+def get_availability(user: User = Depends(student_only), db: Session = Depends(get_db)):
     return _list(db, user)
 
 
 @router.put("", response_model=AvailabilityOut)
-def put_availability(body: AvailabilityPut, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def put_availability(body: AvailabilityPut, user: User = Depends(student_only), db: Session = Depends(get_db)):
     """Replaces the user's whole slot set in one batched write."""
     db.execute(delete(AvailabilitySlot).where(AvailabilitySlot.user_id == user.id))
     for s in body.slots:

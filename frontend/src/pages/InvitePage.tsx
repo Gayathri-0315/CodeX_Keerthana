@@ -7,7 +7,8 @@ import { Button } from "../components/ui/Button";
 import { Tag } from "../components/ui/Chip";
 import { useToast } from "../components/ui/Toaster";
 import { ApiError } from "../lib/api";
-import { returnTo, useAcceptInvite, useInvite } from "../lib/attendance";
+import { useAcceptInvite, useInvite } from "../lib/attendance";
+import { openAuth } from "../lib/authModal";
 import { formatDayTime, formatFee } from "../lib/format";
 import { haptic, spring } from "../lib/motion";
 import { useMe } from "../lib/queries";
@@ -23,8 +24,7 @@ export default function InvitePage() {
 
   const join = () => {
     if (!me) {
-      returnTo.set(`/invite/${code}`);
-      navigate("/welcome");
+      openAuth({ audience: "student", mode: "signup", intent: { kind: "navigate", to: `/invite/${code}` } });
       return;
     }
     accept.mutate(code, {

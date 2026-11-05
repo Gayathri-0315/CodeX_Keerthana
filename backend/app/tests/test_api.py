@@ -42,9 +42,9 @@ def test_seeded_student_feed_matches_phase_3_acceptance(client):
 def test_feed_pagination(client):
     login(client, "student")
     first = client.get("/api/feed?limit=2").json()
-    assert len(first["items"]) == 2 and first["next_cursor"] == "2" and first["total"] == 4
+    assert len(first["items"]) == 2 and first["next_cursor"] == "2" and first["total"] == 5  # 4 events + 1 internship
     second = client.get("/api/feed?limit=2&cursor=2").json()
-    assert second["next_cursor"] is None and {e["id"] for e in second["items"]}.isdisjoint({e["id"] for e in first["items"]})
+    assert second["next_cursor"] == "4" and {e["id"] for e in second["items"]}.isdisjoint({e["id"] for e in first["items"]})
 
 
 def test_save_dismiss_and_undo(client):
@@ -83,7 +83,7 @@ def test_availability_put_replaces_and_updates_count(client):
     assert r.status_code == 200 and len(r.json()["slots"]) == 7
     assert client.get("/api/feed/count").json()["fits"] > before
     client.put("/api/availability", json={"slots": []})
-    assert client.get("/api/feed/count").json()["fits"] == 0
+    assert client.get("/api/feed/count").json()["fits"] == 1  # only the internship: it has no session to fit
 
 
 def test_availability_rejects_bad_range(client):
@@ -92,13 +92,12 @@ def test_availability_rejects_bad_range(client):
     assert r.status_code == 422 and r.json()["error"]["code"] == "invalid"
 
 
-def test_patch_profile_interests_export_delete(client):
+def test_patch_profile_and_interests(client):
     login(client, "student")
     assert client.patch("/api/users/me", json={"budget_max_inr": None, "quiet_hours_start": "23:00"}).json()["budget_max_inr"] is None
     assert client.patch("/api/users/me", json={"quiet_hours_start": "25:00"}).status_code == 422
     r = client.put("/api/users/me/interests", json={"interests": [{"tag": "Design", "weight": 3}], "interest_text": "UX"})
     assert [i["tag"] for i in r.json()["interests"]] == ["design"]
-    export = client.get("/api/users/me/export").json()
-    assert export["profile"]["email"] == "asha@example.com" and len(export["availability"]) == 2
-    assert client.delete("/api/users/me").status_code == 204
-    assert client.get("/api/auth/me").status_code == 401
+    # Download and delete of personal data were removed from the student profile.
+    assert client.get("/api/users/me/export").status_code in (404, 405)
+    assert client.delete("/api/users/me").status_code in (404, 405)

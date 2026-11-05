@@ -1,9 +1,10 @@
 import { m } from "motion/react";
-import { ArrowLeft, Bookmark, CalendarPlus, Check, Clock, Flag, MapPin, MoreHorizontal, Navigation, Share, ShieldCheck, TriangleAlert, Users } from "lucide-react";
+import { ArrowLeft, Bookmark, CalendarPlus, Check, Clock, ExternalLink, Flag, MapPin, MoreHorizontal, Navigation, Share, ShieldCheck, TriangleAlert, Users } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Thumb } from "../components/events/EventCard";
 import { Button } from "../components/ui/Button";
+import { OrganizerCard } from "../components/events/OrganizerCard";
 import { Tag } from "../components/ui/Chip";
 import { Sheet } from "../components/ui/Sheet";
 import { useToast } from "../components/ui/Toaster";
@@ -13,7 +14,8 @@ import { RegisterAction } from "../components/attendance/RegisterAction";
 import { ClassmatesLine, GoTogetherCard } from "../components/attendance/GoTogether";
 import { formatFee, formatLongDate, formatTimeRange } from "../lib/format";
 import { easeOut } from "../lib/motion";
-import { useEvent, useSaveEvent } from "../lib/queries";
+import { useEvent, useMe, useSaveEvent } from "../lib/queries";
+import { openAuth, showRoleNotice } from "../lib/authModal";
 import type { EventDetail } from "../lib/types";
 
 const LABEL: Record<EventDetail["verification_label"], { text: string; tone: "success" | "neutral" | "warning" }> = {
@@ -64,13 +66,20 @@ export default function EventPage() {
         )}
 
         <dl className="card mt-6 divide-y divide-line px-5">
-          <Row icon={Clock} label="When">
-            <span className="body">{formatLongDate(e.start_at)}</span>
-            <span className="callout block text-text-2 tnum">{formatTimeRange(e.start_at, e.end_at)}</span>
-          </Row>
+          {e.event_type === "internship" ? (
+            <Row icon={Clock} label="Apply by">
+              <span className="body">Apply by {formatLongDate(e.start_at)}</span>
+              <span className="callout block text-text-2">Applications go to the organizer's own site.</span>
+            </Row>
+          ) : (
+            <Row icon={Clock} label="When">
+              <span className="body">{formatLongDate(e.start_at)}</span>
+              <span className="callout block text-text-2 tnum">{formatTimeRange(e.start_at, e.end_at)}</span>
+            </Row>
+          )}
           <Row icon={MapPin} label="Where">
             {e.mode === "online" ? (
-              <span className="body">Online</span>
+              <span className="body">{e.event_type === "internship" ? "Remote" : "Online"}</span>
             ) : (
               <>
                 <span className="body">{e.venue_name}</span>
@@ -139,6 +148,7 @@ export default function EventPage() {
             <p className="body mt-2 max-w-[65ch] whitespace-pre-line text-text-2">{e.description}</p>
           </section>
         )}
+        {e.organizer && <OrganizerCard org={e.organizer} />}
       </m.div>
 
       <ActionBar event={e} />
@@ -160,6 +170,9 @@ function Row({ icon: Icon, label, children }: { icon: typeof Clock; label: strin
 }
 
 function ActionBar({ event: e }: { event: EventDetail }) {
+  const { data: me } = useMe();
+  const guest = !me;
+  const student = me?.role === "student";
   const save = useSaveEvent();
   const toast = useToast();
   const [reporting, setReporting] = useState(false);
@@ -183,31 +196,61 @@ function ActionBar({ event: e }: { event: EventDetail }) {
     <div className="glass safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-line">
       <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
         <div>
-          <p className="headline tnum">{formatFee(e.fee_inr)}</p>
+          <p className="headline tnum">{e.event_type === "internship" ? "Internship" : formatFee(e.fee_inr)}</p>
           {e.match != null && <p className="footnote text-text-2 tnum">{e.match}% match</p>}
         </div>
         <div className="flex min-w-0 items-center gap-2">
           <button onClick={() => setMore(true)} aria-label="More actions" aria-haspopup="dialog" className="pressable grid size-11 shrink-0 place-items-center rounded-full bg-text/6 text-accent">
             <MoreHorizontal className="size-5" />
           </button>
-          {e.status === "published" && (e.fits || e.registration || !e.why_not) && <RegisterAction event={e} />}
+          {e.event_type === "internship" ? (
+            e.status === "published" && e.registration_url && (
+              <a href={e.registration_url} target="_blank" rel="noopener noreferrer" className="pressable inline-flex h-[52px] items-center gap-2 rounded-[14px] bg-accent-fill px-6 text-[17px] font-semibold text-white">
+                Apply <ExternalLink className="size-4" aria-hidden />
+              </a>
+            )
+          ) : (
+            <>
+              {guest && e.status === "published" && (
+                <Button size="lg" onClick={() => openAuth({ audience: "student", intent: { kind: "register", eventId: e.id } })}>Register</Button>
+              )}
+              {student && e.status === "published" && (e.fits || e.registration || !e.why_not) && <RegisterAction event={e} />}
+              {me?.role === "organizer" && e.status === "published" && (
+                <Button size="lg" onClick={() => showRoleNotice("organizer_cannot_register")}>Register</Button>
+              )}
+            </>
+          )}
         </div>
       </div>
       <Sheet open={more} onClose={() => setMore(false)} title={e.title}>
         <div className="flex flex-col gap-1">
+          {(guest || student) && (
+            <MenuItem
+              icon={Bookmark}
+              label={e.saved ? "Remove from saved" : "Save"}
+              onClick={() => {
+                setMore(false);
+                if (guest) return openAuth({ audience: "student", intent: { kind: "save", eventId: e.id } });
+                save.mutate({ id: e.id, saved: !e.saved }, { onSuccess: () => toast({ tone: "success", title: e.saved ? "Removed from saved" : "Saved" }) });
+              }}
+            />
+          )}
+          {student && (
+            <a href={`/api/events/${e.id}/ics`} onClick={() => setMore(false)} className="pressable flex min-h-12 items-center gap-3 rounded-[14px] px-3 body hover:bg-text/5">
+              <CalendarPlus className="size-5 text-accent" aria-hidden /> Add to my phone calendar
+            </a>
+          )}
+          <MenuItem icon={Share} label="Share" onClick={() => { setMore(false); void share(); }} />
           <MenuItem
-            icon={Bookmark}
-            label={e.saved ? "Remove from saved" : "Save"}
+            icon={Flag}
+            label="Report this event"
+            tone="danger"
             onClick={() => {
               setMore(false);
-              save.mutate({ id: e.id, saved: !e.saved }, { onSuccess: () => toast({ tone: "success", title: e.saved ? "Removed from saved" : "Saved" }) });
+              if (guest) return openAuth({ audience: "student", intent: { kind: "navigate", to: `/event/${e.id}` } });
+              setReporting(true);
             }}
           />
-          <a href={`/api/events/${e.id}/ics`} onClick={() => setMore(false)} className="pressable flex min-h-12 items-center gap-3 rounded-[14px] px-3 body hover:bg-text/5">
-            <CalendarPlus className="size-5 text-accent" aria-hidden /> Add to my phone calendar
-          </a>
-          <MenuItem icon={Share} label="Share" onClick={() => { setMore(false); void share(); }} />
-          <MenuItem icon={Flag} label="Report this event" tone="danger" onClick={() => { setMore(false); setReporting(true); }} />
         </div>
       </Sheet>
       <ReportSheet eventId={e.id} open={reporting} onClose={() => setReporting(false)} />

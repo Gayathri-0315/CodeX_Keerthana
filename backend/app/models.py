@@ -15,6 +15,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
+from sqlalchemy import false, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -56,9 +57,7 @@ class User(Base):
     notif_paused_until: Mapped[datetime | None] = mapped_column(DateTime)
     onboarded: Mapped[bool] = mapped_column(Boolean, default=False)
     college: Mapped[str | None] = mapped_column(String(160))
-    # Real-auth state: verified email, lockout after repeated failures, and a version that
-    # invalidates every existing session when the password changes.
-    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime)
+    # Lockout after repeated failures, and a version that invalidates every session when the password changes.
     failed_logins: Mapped[int] = mapped_column(Integer, default=0)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime)
     session_version: Mapped[int] = mapped_column(Integer, default=0)
@@ -106,6 +105,21 @@ class Organizer(Base):
     org_email_domain: Mapped[str] = mapped_column(String(120), default="")
     phone: Mapped[str | None] = mapped_column(String(32))
     college_or_company: Mapped[str | None] = mapped_column(String(160))
+    # Organizer profile (settings group 1)
+    org_type: Mapped[str | None] = mapped_column(String(20))  # college_club | department | company | community | independent
+    city: Mapped[str | None] = mapped_column(String(80))
+    bio: Mapped[str | None] = mapped_column(String(500))
+    logo_url: Mapped[str | None] = mapped_column(String(200))
+    website: Mapped[str | None] = mapped_column(String(300))
+    instagram: Mapped[str | None] = mapped_column(String(300))
+    linkedin: Mapped[str | None] = mapped_column(String(300))
+    show_official_email: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())  # default: in-app messages only
+    # Trust (group 2)
+    faculty_name: Mapped[str | None] = mapped_column(String(120))
+    faculty_email: Mapped[str | None] = mapped_column(String(255))
+    # Notifications (group 3): which organizer alerts to get, and one daily digest instead of one per registration
+    notif_prefs: Mapped[dict] = mapped_column(JSON, default=dict, server_default=text("'{}'"))
+    daily_digest: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     trust_level: Mapped[str] = mapped_column(String(16), default="new")  # new | verified | trusted
     verified_by: Mapped[str | None] = mapped_column(String(36))
     past_events_count: Mapped[int] = mapped_column(Integer, default=0)
@@ -123,7 +137,11 @@ class Event(Base):
     organizer_id: Mapped[str | None] = mapped_column(ForeignKey("organizers.id", ondelete="SET NULL"))
     title: Mapped[str] = mapped_column(String(200))
     description: Mapped[str] = mapped_column(Text, default="")
-    category: Mapped[str] = mapped_column(String(60), default="")
+    category: Mapped[str] = mapped_column(String(60), default="")  # free text from the poster or form
+    # hackathon | competition | internship | workshop | conference | meetup | webinar | other (item 12).
+    # Internships have an apply-by deadline instead of a time: start_at = end_at = registration_deadline.
+    event_type: Mapped[str] = mapped_column(String(16), default="other", server_default="other", index=True)
+    category_slug: Mapped[str | None] = mapped_column(ForeignKey("categories.slug", ondelete="SET NULL"), index=True)
     tags: Mapped[list] = mapped_column(JSON, default=list)
     mode: Mapped[str] = mapped_column(String(16), default="in_person")
     venue_name: Mapped[str | None] = mapped_column(String(200))
@@ -254,17 +272,15 @@ class Invite(Base):
 
 
 class AuthToken(Base):
-    """One-time email codes and links: account verification and password reset. Only hashes are stored."""
+    """One-time password-reset links. Only hashes are stored."""
 
     __tablename__ = "auth_tokens"
     __table_args__ = (Index("ix_auth_tokens_user_kind", "user_id", "kind"),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    kind: Mapped[str] = mapped_column(String(16))  # verify | reset
+    kind: Mapped[str] = mapped_column(String(16))  # reset
     token_hash: Mapped[str] = mapped_column(String(64), unique=True)  # sha256 of the link token
-    code_hash: Mapped[str | None] = mapped_column(String(64))  # sha256 of the 6-digit code (verify only)
-    attempts: Mapped[int] = mapped_column(Integer, default=0)
     expires_at: Mapped[datetime] = mapped_column(DateTime)
     used_at: Mapped[datetime | None] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
@@ -295,4 +311,32 @@ class SavedAlert(Base):
     day_of_week: Mapped[int] = mapped_column(Integer)  # IST, Monday = 0
     start_min: Mapped[int] = mapped_column(Integer)  # IST minutes since midnight
     end_min: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class Category(Base):
+    """Browse-by-category cards (prompt v2, item 11). Rows are created by migration 0006."""
+
+    __tablename__ = "categories"
+
+    slug: Mapped[str] = mapped_column(String(40), primary_key=True)
+    name: Mapped[str] = mapped_column(String(60))
+    emoji: Mapped[str] = mapped_column(String(16))
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class OrgVerificationRequest(Base):
+    """'Verify organization': a college ID, faculty letter or company proof, sent to admin review."""
+
+    __tablename__ = "org_verification_requests"
+    __table_args__ = (Index("ix_org_verif_org", "organizer_id"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    organizer_id: Mapped[str] = mapped_column(ForeignKey("organizers.id", ondelete="CASCADE"))
+    document_name: Mapped[str] = mapped_column(String(64))  # a stored_files row; never served publicly
+    document_type: Mapped[str] = mapped_column(String(24))  # college_id | faculty_letter | company_proof | other
+    note: Mapped[str] = mapped_column(String(500), default="")
+    status: Mapped[str] = mapped_column(String(16), default="pending")  # pending | approved | rejected
+    decided_by: Mapped[str | None] = mapped_column(String(36))
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

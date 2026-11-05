@@ -75,13 +75,20 @@ def _decide(db: Session, event_id: str, approve: bool) -> Event:
 @router.post("/events/{event_id}/approve")
 def approve(event_id: str, user: User = Depends(admin_only), db: Session = Depends(get_db)):
     event = _decide(db, event_id, True)
+    from ..services import org_alerts
+
+    org_alerts.review_result(db, event, True)
     jobs.in_background(jobs.suggest_for_event, event.id)
     return {"id": event.id, "status": "published"}
 
 
 @router.post("/events/{event_id}/reject")
 def reject(event_id: str, user: User = Depends(admin_only), db: Session = Depends(get_db)):
-    return {"id": _decide(db, event_id, False).id, "status": "blocked"}
+    event = _decide(db, event_id, False)
+    from ..services import org_alerts
+
+    org_alerts.review_result(db, event, False)
+    return {"id": event.id, "status": "blocked"}
 
 
 @router.post("/test-email")
@@ -113,3 +120,65 @@ def verify_organizer(organizer_id: str, user: User = Depends(admin_only), db: Se
     db.commit()
     feedcache.invalidate_all()
     return {"id": org.id, "trust_level": org.trust_level}
+
+
+# ---- organizer verification requests (organizer settings: "Verify organization") ----
+
+@router.get("/verification-requests")
+def verification_requests(user: User = Depends(admin_only), db: Session = Depends(get_db)):
+    from ..models import OrgVerificationRequest
+
+    rows = db.scalars(select(OrgVerificationRequest).where(OrgVerificationRequest.status == "pending")
+                      .order_by(OrgVerificationRequest.created_at)).all()
+    out = []
+    for r in rows:
+        org = db.get(Organizer, r.organizer_id)
+        owner = db.get(User, org.user_id) if org else None
+        out.append({
+            "id": r.id, "document_type": r.document_type, "note": r.note, "submitted_at": iso_utc(r.created_at),
+            "organizer": {"id": org.id, "name": org.org_name, "email": owner.email if owner else None,
+                          "college_or_company": org.college_or_company, "faculty_name": org.faculty_name,
+                          "faculty_email": org.faculty_email, "trust_level": org.trust_level} if org else None,
+        })
+    return {"items": out}
+
+
+@router.get("/verification-requests/{request_id}/document")
+def verification_document(request_id: str, user: User = Depends(admin_only), db: Session = Depends(get_db)):
+    """The uploaded proof. Admins only; never served on a public URL."""
+    from fastapi.responses import Response
+
+    from ..models import OrgVerificationRequest, StoredFile
+
+    r = db.get(OrgVerificationRequest, request_id)
+    f = db.get(StoredFile, r.document_name) if r else None
+    if f is None:
+        raise HTTPException(404, "That document doesn't exist.")
+    return Response(f.data, media_type=f.content_type, headers={"Cache-Control": "no-store", "X-Robots-Tag": "noindex"})
+
+
+def _decide_verification(db: Session, request_id: str, admin: User, approve: bool) -> dict:
+    from ..models import OrgVerificationRequest
+    from ..services import org_alerts
+
+    r = db.get(OrgVerificationRequest, request_id)
+    if r is None or r.status != "pending":
+        raise HTTPException(404, "That request isn't waiting for review.")
+    org = db.get(Organizer, r.organizer_id)
+    r.status, r.decided_by, r.decided_at = ("approved" if approve else "rejected"), admin.id, utcnow()
+    if approve and org.trust_level == "new":
+        org.trust_level, org.verified_by = "verified", admin.id
+    db.commit()
+    feedcache.invalidate_all()
+    org_alerts.verification_result(db, org, approve)
+    return {"id": r.id, "status": r.status, "trust_level": org.trust_level}
+
+
+@router.post("/verification-requests/{request_id}/approve")
+def approve_verification(request_id: str, user: User = Depends(admin_only), db: Session = Depends(get_db)):
+    return _decide_verification(db, request_id, user, True)
+
+
+@router.post("/verification-requests/{request_id}/reject")
+def reject_verification(request_id: str, user: User = Depends(admin_only), db: Session = Depends(get_db)):
+    return _decide_verification(db, request_id, user, False)

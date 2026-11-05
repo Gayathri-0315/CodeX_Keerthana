@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { PageHeader } from "../components/AppShell";
 import { EventCard, EventCardSkeleton } from "../components/events/EventCard";
 import { ExploreView } from "../components/events/ExploreView";
+import { OpportunityTabs, typeParam, type TypeTab } from "../components/events/OpportunityTabs";
 import { Button } from "../components/ui/Button";
 import { CountUp } from "../components/ui/CountUp";
 import { Segmented } from "../components/ui/Segmented";
@@ -25,8 +26,9 @@ export default function Home() {
   const { data: me } = useMe();
   const { data: count } = useFeedCount();
   const [tab, setTab] = useState<HomeTab>("for_you");
+  const [type, setType] = useState<TypeTab>("all");
   const feedTab: FeedTab = tab === "explore" ? "for_you" : tab;
-  const feed = useFeed(feedTab);
+  const feed = useFeed(feedTab, typeParam(type));
   const save = useSaveEvent();
   const dismiss = useDismissEvent();
   const createAlert = useCreateAlert();
@@ -93,10 +95,11 @@ export default function Home() {
         <ChevronRight className="size-5 shrink-0 text-text-2" aria-hidden />
       </Link>
 
+      <OpportunityTabs value={type} onChange={setType} className="mb-4" />
       <Segmented label="Feed" value={tab} onChange={setTab} className="mb-5 w-full sm:w-auto" options={tabs} />
 
       {tab === "explore" ? (
-        <ExploreView onToggleSave={toggleSave} />
+        <ExploreView eventType={typeParam(type)} />
       ) : feed.isError ? (
         <div className="card p-6 text-center">
           <p className="headline">Couldn't load events.</p>
@@ -119,7 +122,7 @@ export default function Home() {
         </div>
       ) : (
         <>
-          <ul className="grid gap-3 md:grid-cols-2" key={tab}>
+          <ul className="grid gap-3 md:grid-cols-2" key={`${tab}-${type}`}>
             <AnimatePresence initial={false} mode="popLayout">
               {items.map((e, i) => (
                 <m.li key={e.id} layout="position" exit={{ opacity: 0, scale: 0.96 }} transition={spring}>

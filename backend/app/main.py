@@ -12,8 +12,8 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException
 
 from .config import settings
-from .db import Base, engine
-from .routers import admin, alerts, auth, availability, events, feed, files, notifications, organizer, registrations, together, users
+from .db import Base, SessionLocal, engine
+from .routers import admin, alerts, auth, org_profile, public, availability, events, feed, files, notifications, organizer, registrations, together, users
 from .security import COOKIE_NAME, CSRF_COOKIE, CSRF_HEADER, same
 from .services import embeddings, jobs, stream
 
@@ -27,6 +27,10 @@ CODES = {400: "bad_request", 401: "unauthorized", 403: "forbidden", 404: "not_fo
 async def lifespan(_app: FastAPI):
     if settings.app_env == "test":
         Base.metadata.create_all(engine)
+        from .services.categories import ensure_rows
+
+        with SessionLocal() as db:
+            ensure_rows(db)
     else:
         from .migrate import upgrade
 
@@ -95,7 +99,7 @@ async def validation_error(_req: Request, exc: RequestValidationError):
 
 
 for r in (auth.router, users.router, availability.router, feed.router, events.router, organizer.router, admin.router,
-          files.router, registrations.router, notifications.router, together.router, alerts.router):
+          files.router, registrations.router, notifications.router, together.router, alerts.router, public.router, org_profile.router):
     app.include_router(r, prefix="/api")
 
 

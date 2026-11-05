@@ -18,7 +18,6 @@ class RegisterIn(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
-    college: str | None = Field(None, max_length=160)
 
 
 class OrganizerRegisterIn(BaseModel):
@@ -27,18 +26,13 @@ class OrganizerRegisterIn(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     phone: str | None = Field(None, max_length=32, pattern=r"^[0-9+()\- ]*$")
-    college_or_company: str = Field(min_length=2, max_length=160)
+    college_or_company: str | None = Field(None, max_length=160)
 
 
 class LoginIn(BaseModel):
     email: EmailStr
     password: str = Field(min_length=1, max_length=128)
     role: Literal["student", "organizer"] | None = None  # the side of the sign-in popup that was used
-
-
-class VerifyIn(BaseModel):
-    code: str | None = Field(None, pattern=r"^\s*\d{6}\s*$")
-    token: str | None = Field(None, max_length=200)
 
 
 class ForgotIn(BaseModel):
@@ -89,7 +83,6 @@ class UserOut(Out):
     notif_paused_until: datetime | None
     onboarded: bool
     college: str | None = None
-    email_verified: bool = False
     organizer: OrganizerOut | None = None
 
 
@@ -171,6 +164,8 @@ class EventIn(BaseModel):
     title: str = Field("", max_length=200)
     description: str = Field("", max_length=4000)
     category: str = Field("", max_length=60)
+    category_slug: str | None = Field(None, max_length=40)
+    event_type: Literal["hackathon", "competition", "internship", "workshop", "conference", "meetup", "webinar", "other"] = "other"
     tags: list[str] = Field(default_factory=list, max_length=8)
     date: dt.date | None = None
     start_time: str | None = None

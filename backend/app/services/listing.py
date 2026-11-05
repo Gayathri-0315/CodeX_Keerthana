@@ -29,7 +29,16 @@ def _minutes(hhmm: str) -> int:
 
 
 def form_times(form: EventIn) -> tuple[datetime | None, datetime | None, datetime | None]:
-    """IST form date/times -> naive UTC start, end and registration deadline (end of that day)."""
+    """IST form date/times -> naive UTC start, end and registration deadline (end of that day).
+
+    Internships have no session time: the apply-by date (end of that day) is start, end and deadline.
+    """
+    if form.event_type == "internship":
+        day = form.registration_deadline or form.date
+        if day is None:
+            return None, None, None
+        due = ist_to_utc(day, 23 * 60 + 59)
+        return due, due, due
     if form.date is None or not form.start_time:
         return None, None, None
     start = ist_to_utc(form.date, _minutes(form.start_time))
@@ -59,6 +68,10 @@ def apply_form(db: Session, event: Event, form: EventIn) -> None:
     event.title = form.title.strip()
     event.description = form.description.strip()
     event.category = form.category.strip()
+    event.event_type = form.event_type
+    from .categories import SLUGS
+
+    event.category_slug = form.category_slug if form.category_slug in SLUGS else None
     event.tags = form.tags
     event.mode = form.mode
     event.venue_name = (form.venue_name or "").strip() or None
@@ -82,7 +95,8 @@ def event_form(e: Event) -> dict:
     end = to_ist(e.end_at) if e.end_at else None
     area = next((a["name"] for a in AREAS if e.lat is not None and abs(a["lat"] - e.lat) < 1e-6 and abs(a["lng"] - e.lng) < 1e-6), None)
     return {
-        "title": e.title, "description": e.description, "category": e.category, "tags": e.tags or [],
+        "title": e.title, "description": e.description, "category": e.category, "event_type": e.event_type, "tags": e.tags or [],
+        "category_slug": e.category_slug,
         "date": start.date().isoformat() if start else None,
         "start_time": start.strftime("%H:%M") if start else None,
         "end_time": end.strftime("%H:%M") if end else None,
@@ -132,9 +146,12 @@ def run_gate(db: Session, organizer: Organizer, event_like, exclude_id: str | No
         title=event_like.title or "", description=event_like.description or "", category=event_like.category or "",
         mode=event_like.mode, venue_name=event_like.venue_name, start_at=event_like.start_at, end_at=event_like.end_at,
         fee_inr=event_like.fee_inr or 0, registration_url=event_like.registration_url, has_organizer=organizer is not None,
+        event_type=getattr(event_like, "event_type", "other") or "other",
     )
     assessment = spam.assess(candidate, organizer.trust_level if organizer else None, utcnow(),
                              find_duplicate(db, event_like, exclude_id))
+    if blocks := internship_reasons(event_like):
+        assessment = spam.Assessment(max(assessment.score, spam.HIGH), blocks + assessment.reasons, assessment.duplicate_of)
     judgement = extraction.judge_spam(f"{candidate.title}\n{candidate.description}\nFee: ₹{candidate.fee_inr}\nLink: {candidate.registration_url or '-'}")
     if judgement:
         assessment = spam.combine_llm(assessment, judgement.risk, judgement.reasons)
@@ -148,15 +165,33 @@ def is_first_event(db: Session, organizer: Organizer, exclude_id: str | None) ->
     return other is None
 
 
-def predicted_outcome(db: Session, organizer: Organizer, assessment: spam.Assessment, exclude_id: str | None) -> tuple[str, str]:
+def predicted_outcome(db: Session, organizer: Organizer, assessment: spam.Assessment, exclude_id: str | None,
+                      event_like=None) -> tuple[str, str]:
+    kind = getattr(event_like, "event_type", "other") or "other"
     return spam.outcome(assessment.score, organizer.trust_level, organizer.org_email_domain,
-                        is_first_event(db, organizer, exclude_id))
+                        is_first_event(db, organizer, exclude_id), kind, internship_reasons(event_like))
+
+
+def internship_reasons(event_like) -> list[str]:
+    if event_like is None or getattr(event_like, "event_type", None) != "internship":
+        return []
+    from .event_types import internship_blocks
+
+    return internship_blocks(event_like.title or "", event_like.description or "", event_like.fee_inr or 0, event_like.registration_url)
 
 
 def form_from_extraction(fields: dict, poster_url: str | None, source: str) -> EventIn:
     """AI-extracted poster fields -> the organizer form (unknowns stay empty for the organizer to fill)."""
     known = {k: v for k, v in fields.items() if k in EventIn.model_fields and v not in (None, "", [])}
     known["tags"] = (known.get("tags") or [])[:4]
+    if not known.get("event_type"):
+        from .event_types import suggest as suggest_type
+
+        known["event_type"] = suggest_type(fields.get("title") or "", fields.get("category") or "", " ".join(known["tags"]))
+    if not known.get("category_slug"):
+        from .categories import suggest
+
+        known["category_slug"] = suggest(known["tags"], f'{fields.get("title") or ""} {fields.get("category") or ""}')
     return EventIn.model_validate({**known, "poster_url": poster_url, "source": source,
                                    "field_confidence": fields.get("field_confidence") or {}})
 
@@ -169,15 +204,21 @@ def publish(db: Session, organizer: Organizer, event: Event) -> str:
 
     if event.status in ("published", "cancelled"):
         raise HTTPException(409, "This event is already " + ("live." if event.status == "published" else "cancelled."))
-    missing = [name for name, ok in (("a title", event.title), ("a date and start time", event.start_at)) if not ok]
-    if event.mode == "in_person" and not event.venue_name:
+    internship = event.event_type == "internship"
+    missing = [name for name, ok in (("a title", event.title),
+                                     ("an apply-by date" if internship else "a date and start time", event.start_at)) if not ok]
+    if event.mode == "in_person" and not internship and not event.venue_name:
         missing.append("a venue")
+    if internship and not event.registration_url:
+        missing.append("an apply link")
+    if not event.category_slug:
+        missing.append("a category")
     if missing:
         raise HTTPException(422, f"Add {' and '.join(missing)} before publishing.")
 
     assessment = run_gate(db, organizer, event, event.id)
     event.risk_score, event.risk_reasons, event.duplicate_of = assessment.score, assessment.reasons, assessment.duplicate_of
-    status, label = predicted_outcome(db, organizer, assessment, event.id)
+    status, label = predicted_outcome(db, organizer, assessment, event.id, event)
     event.status, event.verification_label = status, label
     if status == "published":
         event.published_at = utcnow()
@@ -194,6 +235,7 @@ def draft_from_form(db: Session, form: EventIn, organizer: Organizer) -> SimpleN
     lat, lng = form_coords(db, form)
     return SimpleNamespace(
         id="preview", organizer=organizer, title=form.title, description=form.description, category=form.category,
+        event_type=form.event_type, category_slug=form.category_slug,
         tags=form.tags, mode=form.mode, venue_name=form.venue_name, address=form.address, lat=lat, lng=lng,
         start_at=start, end_at=end, registration_deadline=deadline, fee_inr=form.fee_inr, capacity=form.capacity,
         eligibility={"required_tags": form.eligibility_tags, "text": form.eligibility_text or ""},

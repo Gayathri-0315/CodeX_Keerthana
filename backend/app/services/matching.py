@@ -98,6 +98,10 @@ def check_event(user, event, windows, now: datetime, registered_count: int = 0, 
             return FilterResult(False, "distance", "Too far away.", distance_km=distance)
         travel = travel_minutes(distance)
 
+    # Internships have an apply-by date, not a session: no schedule check, never "Almost".
+    if getattr(event, "event_type", None) == "internship":
+        return FilterResult(True, distance_km=distance, travel_min=travel)
+
     waitlist = event.capacity is not None and registered_count >= event.capacity
 
     # 6. Schedule fit.

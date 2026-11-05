@@ -3,9 +3,19 @@ import { createContext, useContext, type ReactNode } from "react";
 import { Chip } from "../ui/Chip";
 import { Segmented } from "../ui/Segmented";
 import { INTERESTS } from "../../lib/constants";
+import { useCategories } from "../../lib/queries";
 import type { EventForm } from "../../lib/types";
 
-const CATEGORIES = ["Workshop", "Meetup", "Hackathon", "Talk", "Conference", "Webinar", "Careers", "Volunteering", "Music", "Sports", "Photography", "Other"];
+export const TYPES: { value: EventForm["event_type"]; label: string }[] = [
+  { value: "workshop", label: "Workshop" },
+  { value: "meetup", label: "Meetup" },
+  { value: "hackathon", label: "Hackathon" },
+  { value: "competition", label: "Competition" },
+  { value: "conference", label: "Conference" },
+  { value: "webinar", label: "Webinar" },
+  { value: "internship", label: "Internship" },
+  { value: "other", label: "Other" },
+];
 const ELIGIBILITY = [
   { id: "college_student", label: "College students" },
   { id: "year_4", label: "Final year only" },
@@ -68,6 +78,8 @@ export function EventFormFields(props: Props) {
 }
 
 function Fields({ form, onChange, check }: Props) {
+  const { data: categories } = useCategories();
+  const internship = form.event_type === "internship";
   const text = (name: keyof EventForm) => ({
     id: `ev-${name}`,
     value: (form[name] as string | null) ?? "",
@@ -91,12 +103,33 @@ function Fields({ form, onChange, check }: Props) {
             className={`${inputCls} h-auto py-3`}
           />
         </Field>
-        <Field label="Category" name="category" check={check}>
-          <select id="ev-category" value={form.category} onChange={(e) => onChange({ category: e.target.value }, "category")} className={inputCls}>
-            <option value="">Choose a category</option>
-            {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
-          </select>
-        </Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Type" name="event_type" check={check}>
+            <select
+              id="ev-event_type"
+              value={form.event_type}
+              onChange={(e) => {
+                const t = TYPES.find((x) => x.value === e.target.value)!;
+                onChange({ event_type: t.value, category: t.label }, "event_type");
+              }}
+              className={inputCls}
+            >
+              {TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </select>
+          </Field>
+          <Field label="Category" name="category_slug" check={check}>
+            <select id="ev-category_slug" value={form.category_slug ?? ""} required onChange={(e) => onChange({ category_slug: e.target.value || null }, "category_slug")} className={inputCls}>
+              <option value="">Choose a category</option>
+              {categories?.map((c) => <option key={c.slug} value={c.slug}>{c.emoji} {c.name}</option>)}
+            </select>
+          </Field>
+        </div>
+        {internship && (
+          <p className="callout rounded-[14px] bg-accent-soft p-3 text-text">
+            Internships are checked more strictly: they can't charge applicants, the apply link must be your own site,
+            and new organizers' internships are reviewed before they go live.
+          </p>
+        )}
         <div>
           <p className="footnote mb-1.5 font-medium text-text-2">Topics (up to 4)</p>
           <div className="flex flex-wrap gap-2">
@@ -115,6 +148,16 @@ function Fields({ form, onChange, check }: Props) {
         </div>
       </Section>
 
+      {internship ? (
+        <Section title="Applications">
+          <Field label="Apply by" name="registration_deadline" check={check}>
+            <input type="date" {...text("registration_deadline")} required className={`${inputCls} tnum`} />
+          </Field>
+          <Field label="Apply link" name="registration_url" check={check} hint="Your organization's own page, not a short link.">
+            <input {...text("registration_url")} type="url" inputMode="url" required maxLength={500} className={inputCls} placeholder="https://" />
+          </Field>
+        </Section>
+      ) : (
       <Section title="When">
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Date" name="date" check={check}>
@@ -131,6 +174,7 @@ function Fields({ form, onChange, check }: Props) {
           <input type="date" {...text("registration_deadline")} className={`${inputCls} tnum`} />
         </Field>
       </Section>
+      )}
 
       <Section title="Where">
         <Field label="Format" name="mode" check={check}>
@@ -139,7 +183,7 @@ function Fields({ form, onChange, check }: Props) {
             className="w-full"
             value={form.mode}
             onChange={(mode) => onChange({ mode }, "mode")}
-            options={[{ value: "in_person", label: "In person" }, { value: "online", label: "Online" }, { value: "hybrid", label: "Hybrid" }]}
+            options={[{ value: "in_person", label: "In person" }, { value: "online", label: internship ? "Remote" : "Online" }, { value: "hybrid", label: "Hybrid" }]}
           />
         </Field>
         {form.mode !== "online" && (
@@ -161,6 +205,7 @@ function Fields({ form, onChange, check }: Props) {
       </Section>
 
       <Section title="Entry">
+        {!internship && (
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Fee (₹)" name="fee_inr" check={check} hint="0 means free.">
             <input
@@ -185,6 +230,7 @@ function Fields({ form, onChange, check }: Props) {
             />
           </Field>
         </div>
+        )}
         <Field label="Who can join" name="eligibility_text" check={check}>
           <input {...text("eligibility_text")} maxLength={200} className={inputCls} placeholder="e.g. Open to all college students" />
         </Field>
@@ -205,16 +251,18 @@ function Fields({ form, onChange, check }: Props) {
             options={[{ value: "any", label: "Any" }, { value: "beginner", label: "Beginner" }, { value: "intermediate", label: "Intermediate" }, { value: "advanced", label: "Advanced" }]}
           />
         </Field>
-        <Field label="External registration link (optional)" name="registration_url" check={check}>
-          <input {...text("registration_url")} type="url" inputMode="url" maxLength={500} className={inputCls} placeholder="https://" />
-        </Field>
+        {!internship && (
+          <Field label="External registration link (optional)" name="registration_url" check={check}>
+            <input {...text("registration_url")} type="url" inputMode="url" maxLength={500} className={inputCls} placeholder="https://" />
+          </Field>
+        )}
       </Section>
     </>
   );
 }
 
 export const EMPTY_FORM: EventForm = {
-  title: "", description: "", category: "", tags: [], date: null, start_time: null, end_time: null, mode: "in_person",
+  title: "", description: "", category: "", event_type: "other", category_slug: null, tags: [], date: null, start_time: null, end_time: null, mode: "in_person",
   venue_name: null, address: null, area: null, fee_inr: 0, capacity: null, registration_deadline: null,
   eligibility_text: null, eligibility_tags: [], skill_level: null, registration_url: null, poster_url: null,
   source: "form", field_confidence: {},

@@ -15,7 +15,7 @@ os.environ["JWT_SECRET"] = "test-secret-that-is-long-enough-for-hs256-0123456789
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
-from app.deps import auth_limit, email_limit  # noqa: E402
+from app.deps import auth_limit, email_limit, upload_limit  # noqa: E402
 from app.main import app  # noqa: E402
 from app.seed.seed import reset_and_seed  # noqa: E402
 
@@ -49,5 +49,6 @@ def client():
     reset_and_seed()
     auth_limit.reset()
     email_limit.reset()
+    upload_limit.reset()
     with TestClient(app) as c:
         yield with_csrf(c)

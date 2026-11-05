@@ -1,4 +1,4 @@
-import { CalendarClock, ChevronRight, Plus, Ticket, TrendingUp } from "lucide-react";
+import { Bell, CalendarClock, ChevronRight, Plus, Ticket, TrendingUp } from "lucide-react";
 import { Link } from "react-router-dom";
 import { PageHeader } from "../../components/AppShell";
 import { Thumb } from "../../components/events/EventCard";
@@ -20,9 +20,14 @@ export default function OrganizerHome() {
         title={summary?.org_name ?? "Your events"}
         subtitle={summary ? TRUST[summary.trust_level] : undefined}
         action={
+          <>
+          <Link to="/alerts" aria-label="Alerts" className="pressable grid size-11 place-items-center rounded-full text-accent md:hidden">
+            <Bell className="size-6" aria-hidden />
+          </Link>
           <Link to="/organizer/new" aria-label="New event" className="pressable inline-flex min-h-11 items-center gap-1.5 rounded-[14px] bg-accent-fill px-4 font-semibold text-white">
             <Plus className="size-5" aria-hidden /> <span className="hidden sm:inline">New event</span>
           </Link>
+          </>
         }
       />
 

@@ -57,7 +57,9 @@ def test_explore_filters(client):
     found = all_explore(client, q="python")
     assert found and all("python" in i["title"].lower() for i in found)
     cats = client.get("/api/feed/categories").json()["categories"]
-    one = all_explore(client, category=cats[0])
-    assert one and all(i["category"] == cats[0] for i in one)
+    assert [c["slug"] for c in cats][:3] == ["ai-ml", "cyber-security", "web-app"]
+    ai = next(c for c in cats if c["slug"] == "ai-ml")
+    one = all_explore(client, category="ai-ml")
+    assert ai["count"] == len(one) > 0 and all(i["category_slug"] == "ai-ml" for i in one)
     first = all_explore(client)[0]["start_at"][:10]
     assert all(i["start_at"][:10] >= first for i in all_explore(client, date_from=first))

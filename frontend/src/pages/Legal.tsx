@@ -29,7 +29,7 @@ export function TermsPage() {
         <ul>
           <li>Use your real name and an email you can read. Keep your password to yourself.</li>
           <li>Student and organizer accounts are separate. Don't use one to act as the other.</li>
-          <li>You can delete your account at any time in Settings, Privacy.</li>
+          <li>To close your account, write to us (see Questions below).</li>
         </ul>
       </section>
       <section>
@@ -94,7 +94,7 @@ export function PrivacyPage() {
       <section>
         <h2>Your choices</h2>
         <ul>
-          <li><strong>Download my data</strong> and <strong>Delete my data</strong> are in Settings, Privacy. Deleting removes your account, free time, registrations and alerts.</li>
+          <li>To get a copy of your data or have your account deleted, write to us (see Questions below).</li>
           <li>You can turn alerts off, pause them, or set quiet hours in Settings.</li>
         </ul>
       </section>
@@ -112,7 +112,7 @@ export function CookiesPage() {
           <li><strong>showup_csrf</strong>: protects your account from forged requests from other sites. Needed.</li>
           <li><strong>showup_vid</strong>: a random visitor ID used only to count visits (see the privacy policy). It isn't linked to your account.</li>
         </ul>
-        <p>We also remember your light or dark theme choice in your browser's local storage. We don't use advertising or third-party tracking cookies.</p>
+        <p>The app follows your device's light or dark setting and stores nothing for it. We don't use advertising or third-party tracking cookies.</p>
       </section>
     </Doc>
   );

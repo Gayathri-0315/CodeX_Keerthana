@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..db import get_db
-from ..deps import current_user, require_verified
+from ..deps import current_user, optional_user, student_only
 from ..models import Event, Feedback, Registration, Report, SavedEvent, User
 from ..schemas import ReportIn
 from ..seed.venues import AREAS
@@ -17,20 +17,33 @@ from ..timeutil import DAY_NAMES, fmt_time, to_ist
 router = APIRouter(tags=["events"])
 
 
-def visible_event(db: Session, event_id: str, user: User) -> Event:
+def visible_event(db: Session, event_id: str, user: User | None) -> Event:
     """Published and cancelled events are public; drafts and flagged ones only to their organizer or admins."""
     event = db.get(Event, event_id)
     if event is None:
         raise HTTPException(404, "That event doesn't exist or was removed.")
-    owner = user.organizer is not None and event.organizer_id == user.organizer.id
-    if event.status not in ("published", "cancelled") and not owner and user.role != "admin":
+    owner = user is not None and user.organizer is not None and event.organizer_id == user.organizer.id
+    if event.status not in ("published", "cancelled") and not owner and (user is None or user.role != "admin"):
         raise HTTPException(404, "That event doesn't exist or was removed.")
     return event
 
 
+def public_detail(db: Session, event: Event) -> dict:
+    from ..services.feed import Evaluated
+    from ..services.matching import FilterResult
+
+    ev = Evaluated(event, FilterResult(False, "guest"), None, False)
+    out = event_detail(ev, registered_counts(db, [event.id]).get(event.id, 0), False)
+    out.update({"fits": None, "why_not": None, "guest": True})
+    return out
+
+
 @router.get("/events/{event_id}")
-def get_event(event_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def get_event(event_id: str, user: User | None = Depends(optional_user), db: Session = Depends(get_db)):
+    """Public: guests and organizers get the event without personal fit; students get their reasons too."""
     event = visible_event(db, event_id, user)
+    if user is None or user.role != "student":
+        return public_detail(db, event)
     ev = evaluate_one(db, user, event)
     saved = db.get(SavedEvent, (user.id, event.id)) is not None
     reg = registration.active_registration(db, user.id, event.id)
@@ -47,7 +60,7 @@ def get_event(event_id: str, user: User = Depends(current_user), db: Session = D
 
 
 @router.post("/events/{event_id}/save", status_code=204)
-def save_event(event_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def save_event(event_id: str, user: User = Depends(student_only), db: Session = Depends(get_db)):
     visible_event(db, event_id, user)
     if db.get(SavedEvent, (user.id, event_id)) is None:
         db.add(SavedEvent(user_id=user.id, event_id=event_id))
@@ -55,13 +68,13 @@ def save_event(event_id: str, user: User = Depends(current_user), db: Session = 
 
 
 @router.delete("/events/{event_id}/save", status_code=204)
-def unsave_event(event_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def unsave_event(event_id: str, user: User = Depends(student_only), db: Session = Depends(get_db)):
     db.execute(delete(SavedEvent).where(SavedEvent.user_id == user.id, SavedEvent.event_id == event_id))
     db.commit()
 
 
 @router.post("/events/{event_id}/dismiss", status_code=204)
-def dismiss_event(event_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def dismiss_event(event_id: str, user: User = Depends(student_only), db: Session = Depends(get_db)):
     """"Not for me": hides the event and lowers the weight of its tags for this user."""
     visible_event(db, event_id, user)
     exists = db.scalar(select(Feedback).where(Feedback.user_id == user.id, Feedback.event_id == event_id, Feedback.kind == "not_for_me"))
@@ -72,7 +85,7 @@ def dismiss_event(event_id: str, user: User = Depends(current_user), db: Session
 
 
 @router.delete("/events/{event_id}/dismiss", status_code=204)
-def undo_dismiss(event_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def undo_dismiss(event_id: str, user: User = Depends(student_only), db: Session = Depends(get_db)):
     db.execute(delete(Feedback).where(Feedback.user_id == user.id, Feedback.event_id == event_id, Feedback.kind == "not_for_me"))
     db.commit()
     feedcache.invalidate(user.id)
@@ -83,12 +96,13 @@ class RegisterIn(BaseModel):
 
 
 @router.post("/events/{event_id}/register")
-def register(event_id: str, body: RegisterIn | None = None, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def register(event_id: str, body: RegisterIn | None = None, user: User = Depends(student_only), db: Session = Depends(get_db)):
     """-> registered or waitlisted, with the confirmation copy for the toast."""
     if user.role != "student":
         raise HTTPException(403, "Only students can register for events.")
-    require_verified(user)
     event = visible_event(db, event_id, user)
+    if event.event_type == "internship":
+        raise HTTPException(409, "Apply for internships on the organizer's site, using the Apply button.")
     reg = registration.register(db, user, event, external=bool(body and body.external))
     out = registration.registration_out(db, reg, user)
     start = to_ist(event.start_at)
@@ -104,7 +118,7 @@ def register(event_id: str, body: RegisterIn | None = None, user: User = Depends
 
 
 @router.get("/events/{event_id}/ics")
-def event_calendar(event_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def event_calendar(event_id: str, user: User = Depends(student_only), db: Session = Depends(get_db)):
     event = visible_event(db, event_id, user)
     body = ics.event_ics(event, f"{settings.public_url}/event/{event.id}")
     filename = "".join(c if c.isalnum() else "-" for c in event.title.lower()).strip("-")[:40] or "event"

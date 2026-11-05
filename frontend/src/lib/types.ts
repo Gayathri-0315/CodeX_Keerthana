@@ -25,7 +25,6 @@ export type User = {
   notif_paused_until: string | null;
   onboarded: boolean;
   college: string | null;
-  email_verified: boolean;
   organizer: { id: string; org_name: string; trust_level: string; college_or_company: string | null } | null;
 };
 
@@ -157,7 +156,7 @@ export type FeedItem = {
   organizer_name: string | null;
   distance_km: number | null;
   travel_min: number;
-  fits: boolean;
+  fits: boolean | null; // null for guests and organizers
   almost: boolean;
   clash: string | null;
   match: number | null;
@@ -167,7 +166,10 @@ export type FeedItem = {
   waitlist: boolean;
   saved: boolean;
   dismissed: boolean;
-  time_fit?: TimeFit; // Explore only
+  time_fit?: TimeFit | null; // Explore only; null for internships (no session to fit)
+  category_slug: string | null;
+  guest?: boolean; // public card: no personal fit data
+  event_type: EventType;
 };
 
 export type FeedPage = { items: FeedItem[]; next_cursor: string | null; total: number };
@@ -182,7 +184,20 @@ export type EventDetail = FeedItem & {
   eligibility_text: string | null;
   skill_level: string | null;
   status: string;
-  organizer: { name: string; trust_level: string; trust_label: string } | null;
+  organizer: {
+    name: string;
+    trust_level: string;
+    trust_label: string;
+    logo_url: string | null;
+    bio: string | null;
+    org_type: string | null;
+    college_or_company: string | null;
+    city: string | null;
+    website: string | null;
+    instagram: string | null;
+    linkedin: string | null;
+    contact_email: string | null;
+  } | null;
   why_not: string | null;
   maps_url: string | null;
   next_waitlist_position?: number;
@@ -193,10 +208,14 @@ export type Area = { name: string; lat: number; lng: number };
 
 // ---- organizer ----
 
+export type EventType = "hackathon" | "competition" | "internship" | "workshop" | "conference" | "meetup" | "webinar" | "other";
+
 export type EventForm = {
   title: string;
   description: string;
   category: string;
+  event_type: EventType;
+  category_slug: string | null;
   tags: string[];
   date: string | null;
   start_time: string | null;

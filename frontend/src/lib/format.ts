@@ -99,3 +99,13 @@ export function greeting() {
   const h = istParts(new Date()).hour;
   return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
 }
+
+/** "Apply by Fri, 7 Nov" (internships have a deadline, not a session time). */
+export function formatApplyBy(iso: string) {
+  return `Apply by ${new Date(iso).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: TZ })}`;
+}
+
+/** The time chip for any card: a session time, or the apply-by date for an internship. */
+export function formatWhen(e: { event_type?: string; start_at: string; end_at: string }) {
+  return e.event_type === "internship" ? formatApplyBy(e.start_at) : formatDayTime(e.start_at, e.end_at);
+}

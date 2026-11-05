@@ -145,6 +145,10 @@ def register(db: Session, user: User, event: Event, external: bool = False, now:
         reg.showup_likelihood = compute_likelihood(db, user, event, reg).p
         db.commit()
     feedcache.invalidate_all()  # seat counts changed for everyone
+    if not external:
+        from . import org_alerts
+
+        org_alerts.registered(db, event, reg.status == "waitlisted", user.name)
     return reg
 
 
@@ -162,6 +166,10 @@ def cancel(db: Session, reg: Registration, now: datetime | None = None) -> list[
         _renumber(db, event.id)
         db.commit()
     feedcache.invalidate_all()
+    from . import org_alerts
+
+    who = db.get(User, reg.user_id)
+    org_alerts.cancelled(db, event, who.name if who else "A student", len(promoted))
     return promoted
 
 
@@ -178,6 +186,10 @@ def confirm_seat(db: Session, reg: Registration, now: datetime | None = None) ->
         reg.status, reg.promotion_expires_at = "registered", None
         db.commit()
     feedcache.invalidate_all()
+    from . import org_alerts
+
+    who = db.get(User, reg.user_id)
+    org_alerts.seat_confirmed(db, db.get(Event, reg.event_id), who.name if who else "A student")
     return reg
 
 

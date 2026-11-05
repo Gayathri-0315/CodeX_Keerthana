@@ -27,9 +27,10 @@ MIN_MATCH = 75
 
 # Which alerts also go out by email (when the user has email on). Each gets one line and one button.
 EMAIL_TYPES = {"match", "similar", "deadline", "registered", "waitlisted", "seat_opened", "reminder_24h",
-               "reminder_leave_by", "cancelled_event", "message", "new_message"}
+               "reminder_leave_by", "cancelled_event", "message", "new_message",
+               "org_registration", "org_cancellation", "org_waitlist", "org_review", "org_reminder", "org_digest"}
 # While alerts are paused, only these still email: things the user is actively waiting on.
-PAUSE_EXEMPT = {"seat_opened", "cancelled_event", "registered", "waitlisted", "new_message"}
+PAUSE_EXEMPT = {"seat_opened", "cancelled_event", "registered", "waitlisted", "new_message", "org_review"}
 # Shown as a live toast? Registration confirmations already show their own animation and toast in the app.
 NO_TOAST = {"registered", "waitlisted"}
 
@@ -146,6 +147,8 @@ def actions_for(n: Notification) -> list[dict]:
         return [{"label": "Yes", "kind": "confirm_reminder", "registration_id": rid}, {"label": "Can't make it", "kind": "cancel", "registration_id": rid}]
     if n.type == "reminder_leave_by" and p.get("maps_url"):
         return [{"label": "Directions", "kind": "url", "url": p["maps_url"]}, view]
+    if n.type.startswith("org_"):
+        return [{"label": "Open event", "kind": "url", "url": f"/organizer/event/{eid}"}] if eid else []
     return [view] if eid else []
 
 
@@ -180,6 +183,8 @@ def email_button(n: Notification) -> tuple[str, str]:
         return "View my pass" if n.type == "registered" else "View event", f"{base}/my" if n.type == "registered" else event
     if n.type == "new_message":
         return "Read and reply", f"{base}{p.get('path', '/my')}"
+    if n.type.startswith("org_"):
+        return ("Open event", f"{base}/organizer/event/{n.event_id}") if n.event_id else ("Open dashboard", f"{base}/")
     return "Open ShowUp", event
 
 

@@ -1,4 +1,5 @@
 from alembic import context
+from sqlalchemy import create_engine, event
 
 from app.config import settings
 from app.db import Base, engine
@@ -14,19 +15,36 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
+def sqlite_migration_engine():
+    """SQLite with real transactions, so a migration that fails part-way leaves nothing behind.
+
+    Python's sqlite3 driver doesn't wrap DDL in a transaction by default; this takes over BEGIN.
+    Foreign keys are off: batch migrations copy a table, drop the old one and rename, and with foreign
+    keys on that DROP would cascade and delete every child row (free time, registrations...).
+    """
+    eng = create_engine(settings.database_url)
+
+    @event.listens_for(eng, "connect")
+    def _connect(dbapi_conn, _record):
+        dbapi_conn.isolation_level = None
+        dbapi_conn.execute("PRAGMA foreign_keys=OFF")
+
+    @event.listens_for(eng, "begin")
+    def _begin(conn):
+        conn.exec_driver_sql("BEGIN")
+
+    return eng
+
+
 def run_migrations_online() -> None:
-    with engine.connect() as connection:
-        if settings.is_sqlite:
-            # SQLite batch migrations copy a table, drop the old one and rename. With foreign keys on, that
-            # DROP would cascade and delete every child row (free time, registrations...). Turn them off
-            # for the migration; the pragma only works outside a transaction, so set it first.
-            connection.exec_driver_sql("PRAGMA foreign_keys=OFF")
-            connection.commit()
-        # SQLite can't ALTER most things in place; batch mode copies the table instead.
+    eng = sqlite_migration_engine() if settings.is_sqlite else engine
+    with eng.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata, render_as_batch=settings.is_sqlite,
-                          compare_type=True)
+                          compare_type=True, transactional_ddl=True)
         with context.begin_transaction():
             context.run_migrations()
+    if eng is not engine:
+        eng.dispose()
 
 
 if context.is_offline_mode():

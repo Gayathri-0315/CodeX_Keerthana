@@ -6,63 +6,44 @@ import pytest
 from sqlalchemy import select
 
 from app.db import SessionLocal
-from app.models import AuthToken, Event, User
-from app.security import password_problem, sha256
+from app.models import Event, User
+from app.security import password_problem
 
 from .conftest import PASSWORD, login
 
-STUDENT = {"name": "Ravi", "email": "ravi@example.org", "password": "longenough1", "college": "PSG Tech"}
+STUDENT = {"name": "Ravi", "email": "ravi@example.org", "password": "longenough1"}
 ORGANIZER = {"name": "Meena", "org_name": "Robotics Club", "email": "meena@psgtech.ac.in", "password": "longenough1",
              "phone": "+91 98765 43210", "college_or_company": "PSG Tech"}
-
-
-def latest_code(caplog) -> str:
-    return re.findall(r"Your ShowUp code is (\d{6})", caplog.text)[-1]
 
 
 def latest_link(caplog, kind: str) -> str:
     return re.findall(rf"/{kind}\?token=([\w-]+)", caplog.text)[-1]
 
 
-def test_student_signup_needs_verified_email_to_register(client, caplog):
+def test_student_signup_is_name_email_password_and_can_register_at_once(client, caplog):
     me = client.post("/api/auth/register", json=STUDENT).json()
-    assert me["role"] == "student" and me["email_verified"] is False and me["college"] == "PSG Tech"
+    assert me["role"] == "student" and me["name"] == "Ravi" and me["email"] == "ravi@example.org"
+    assert "email skipped" not in caplog.text  # no verification code is sent
     with SessionLocal() as db:
         eid = db.scalar(select(Event.id).where(Event.title == "Python Meetup Coimbatore"))
-    r = client.post(f"/api/events/{eid}/register")
-    assert r.status_code == 403 and r.json()["error"]["code"] == "unverified"
-
-    assert client.post("/api/auth/verify", json={"code": "000000"}).json()["error"]["code"] == "bad_code"
-    me = client.post("/api/auth/verify", json={"code": latest_code(caplog)}).json()
-    assert me["email_verified"] is True
-    assert client.post(f"/api/events/{eid}/register").status_code == 200
+    assert client.post(f"/api/events/{eid}/register").json()["status"] == "registered"
+    assert client.post("/api/auth/verify", json={"code": "123456"}).status_code in (404, 405)
 
 
-def test_verify_by_emailed_link_works_without_signing_in(client, caplog):
-    client.post("/api/auth/register", json=STUDENT)
-    token = latest_link(caplog, "verify")
-    client.post("/api/auth/logout")
-    assert client.post("/api/auth/verify", json={"token": token}).json()["email_verified"] is True
-    assert client.post("/api/auth/verify", json={"token": token}).json()["error"]["code"] == "bad_token"  # one use only
-
-
-def test_only_hashes_of_codes_are_stored(client, caplog):
-    client.post("/api/auth/register", json=STUDENT)
-    code = latest_code(caplog)
-    with SessionLocal() as db:
-        t = db.scalar(select(AuthToken).where(AuthToken.kind == "verify"))
-        assert t.code_hash == sha256(code) and code not in (t.token_hash, t.code_hash)
-
-
-def test_organizer_signup_starts_new_and_cannot_publish_until_verified(client):
+def test_organizer_signup_starts_new_and_can_publish(client):
     me = client.post("/api/auth/register-organizer", json=ORGANIZER).json()
     assert me["role"] == "organizer" and me["organizer"]["trust_level"] == "new" and me["onboarded"] is True
     with SessionLocal() as db:
         u = db.scalar(select(User).where(User.email == ORGANIZER["email"]))
-        assert u.organizer.org_email_domain == "psgtech.ac.in" and u.organizer.phone == "+91 98765 43210"
+        assert u.organizer.org_email_domain == "psgtech.ac.in"
     saved = client.post("/api/organizer/events", json={"title": "Robot build night"}).json()
     r = client.post(f"/api/organizer/events/{saved['id']}/publish")
-    assert r.status_code == 403 and r.json()["error"]["code"] == "unverified"
+    assert r.status_code == 422  # missing date and venue, not an email check
+
+
+def test_organizer_signup_needs_only_name_org_email_password(client):
+    minimal = {"name": "Meena", "org_name": "Robotics Club", "email": "meena2@example.org", "password": "longenough1"}
+    assert client.post("/api/auth/register-organizer", json=minimal).status_code == 200
 
 
 def test_duplicate_email_and_weak_password(client):
@@ -149,6 +130,9 @@ def test_seed_dev_refuses_in_production(monkeypatch):
         seed.reset_and_seed("whatever-pass")
 
 
-def test_no_demo_routes_remain(client):
-    assert client.post("/api/auth/demo", json={"role": "student"}).status_code in (404, 405)
-    assert client.post("/api/demo/reset").status_code in (404, 405)
+
+def test_admin_can_sign_in_from_either_side_until_the_admin_page_exists(client):
+    for side in ("student", "organizer"):
+        r = client.post("/api/auth/login", json={"email": "admin@example.com", "password": PASSWORD, "role": side})
+        assert r.status_code == 200 and r.json()["role"] == "admin"
+        client.post("/api/auth/logout")

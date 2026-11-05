@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..db import get_db
-from ..deps import require_role, require_verified, upload_limit
+from ..deps import require_role, upload_limit
 from ..models import Event, Notification, Organizer, Registration, User
 from ..schemas import AppealIn, EventIn
 from ..services import feedcache, listing, notify, registration, showup_score
@@ -103,7 +103,18 @@ def extract(file: UploadFile = File(...), user: User = Depends(organizer_only), 
     """Poster upload -> draft fields. Never fails hard: on trouble it returns empty fields and a message."""
     my_org(user)
     upload = read_upload(file.file.read(), file.filename or "poster")
-    return {**extract_poster(db, upload), "poster_url": public_url(store_image(db, upload))}
+    result = extract_poster(db, upload)
+    fields = result.get("fields") or {}
+    if isinstance(fields, dict) and not fields.get("category_slug"):
+        from ..services.categories import suggest
+
+        # The AI reads the poster; the category is suggested from what it found. The organizer confirms it.
+        fields["category_slug"] = suggest(fields.get("tags"), f'{fields.get("title") or ""} {fields.get("category") or ""}')
+    if isinstance(fields, dict) and not fields.get("event_type"):
+        from ..services.event_types import suggest as suggest_type
+
+        fields["event_type"] = suggest_type(fields.get("title") or "", fields.get("category") or "", " ".join(fields.get("tags") or []))
+    return {**result, "poster_url": public_url(store_image(db, upload))}
 
 
 @router.post("/events/preview")
@@ -112,7 +123,7 @@ def preview(body: EventIn, user: User = Depends(organizer_only), db: Session = D
     org = my_org(user)
     draft = listing.draft_from_form(db, body, org)
     assessment = listing.run_gate(db, org, draft, None)
-    status, label = listing.predicted_outcome(db, org, assessment, None)
+    status, label = listing.predicted_outcome(db, org, assessment, None, draft)
     return {"risk": risk_out(assessment), "outcome": {"status": status, "label": label}, "reach": listing.reach(db, draft)}
 
 
@@ -132,7 +143,7 @@ def save_event(body: EventIn, event_id: str | None = None, user: User = Depends(
     assessment = listing.run_gate(db, org, event, event.id)
     event.risk_score, event.risk_reasons, event.duplicate_of = assessment.score, assessment.reasons, assessment.duplicate_of
     if event.status == "published":
-        status, label = listing.predicted_outcome(db, org, assessment, event.id)
+        status, label = listing.predicted_outcome(db, org, assessment, event.id, event)
         event.status, event.verification_label = ("blocked", "unverified") if status == "blocked" else ("published", label)
     db.commit()
     feedcache.invalidate_all()
@@ -141,7 +152,6 @@ def save_event(body: EventIn, event_id: str | None = None, user: User = Depends(
 
 @router.post("/events/{event_id}/publish")
 def publish(event_id: str, user: User = Depends(organizer_only), db: Session = Depends(get_db)):
-    require_verified(user)
     status = listing.publish(db, my_org(user), my_event(db, user, event_id))
     return {**event_out(db, db.get(Event, event_id)), "message": STATUS_MESSAGES[status]}
 

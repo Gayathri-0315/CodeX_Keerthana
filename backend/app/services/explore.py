@@ -15,7 +15,7 @@ from ..timeutil import to_ist
 
 @dataclass
 class Filters:
-    category: str | None = None  # category name (case-insensitive)
+    category: str | None = None  # category slug (see services/categories.py)
     date_from: date | None = None  # IST dates, inclusive
     date_to: date | None = None
     price: str | None = None  # free | paid
@@ -23,11 +23,14 @@ class Filters:
     q: str | None = None  # title search
     max_fee_inr: int | None = None
     tags: list[str] = field(default_factory=list)
+    event_type: str | None = None
 
 
 def _matches(ev: Evaluated, f: Filters) -> bool:
     e = ev.event
-    if f.category and (e.category or "").lower() != f.category.lower():
+    if f.event_type and e.event_type != f.event_type:
+        return False
+    if f.category and e.category_slug != f.category:
         return False
     d = to_ist(e.start_at).date()
     if f.date_from and d < f.date_from:
@@ -55,7 +58,9 @@ def apply_filters(data: FeedData, f: Filters) -> list[Evaluated]:
     return sorted((i for i in data.items if _matches(i, f)), key=lambda i: i.event.start_at)
 
 
-def fit_badge(ev: Evaluated, user, windows, going=()) -> dict:
+def fit_badge(ev: Evaluated, user, windows, going=()) -> dict | None:
+    if ev.event.event_type == "internship":
+        return None  # no session to fit; cards show "Apply by <date>" instead
     r = ev.result
     if r.passed and r.window is not None:
         return {"fits": True, "reason": None}

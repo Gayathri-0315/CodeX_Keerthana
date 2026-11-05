@@ -1,7 +1,6 @@
 import { AnimatePresence, m } from "motion/react";
 import { Check, ExternalLink, Ticket } from "lucide-react";
 import { useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { ApiError } from "../../lib/api";
 import { mmss, useCancelRegistration, useConfirmSeat, useMyRegistrations, useRegister } from "../../lib/attendance";
 import { haptic, snappy, spring } from "../../lib/motion";
@@ -29,7 +28,6 @@ export function RegisterAction({ event, compact = false }: { event: FeedItem | E
   const cancel = useCancelRegistration();
   const mine = useMyRegistrations();
   const toast = useToast();
-  const navigate = useNavigate();
   const [pass, setPass] = useState<Registration | null>(null);
   const [celebrating, setCelebrating] = useState<"registered" | "waitlisted" | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
@@ -57,11 +55,7 @@ export function RegisterAction({ event, compact = false }: { event: FeedItem | E
       void celebrate(r, button);
       return true;
     } catch (e) {
-      if (e instanceof ApiError && e.code === "unverified") {
-        toast({ tone: "error", title: "Verify your email first", body: "We sent you a 6-digit code.", action: { label: "Enter code", onClick: () => navigate("/verify") } });
-      } else {
-        toast({ tone: "error", title: "Couldn't register", body: e instanceof ApiError && e.status !== 0 ? e.message : "Check your connection and try again." });
-      }
+      toast({ tone: "error", title: "Couldn't register", body: e instanceof ApiError && e.status !== 0 ? e.message : "Check your connection and try again." });
       return false;
     }
   };

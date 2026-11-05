@@ -21,6 +21,8 @@ def event_card(ev: Evaluated, seats_taken: int, saved: bool, reg: dict | None = 
         "id": e.id,
         "title": e.title,
         "category": e.category,
+        "category_slug": e.category_slug,
+        "event_type": e.event_type,
         "tags": e.tags,
         "mode": e.mode,
         "venue_name": e.venue_name,
@@ -63,7 +65,12 @@ def event_detail(ev: Evaluated, seats_taken: int, saved: bool, reg: dict | None 
         "eligibility_text": (e.eligibility or {}).get("text") or None,
         "skill_level": e.skill_level,
         "status": e.status,
-        "organizer": {"name": org.org_name, "trust_level": org.trust_level, "trust_label": TRUST_LABELS.get(org.trust_level)} if org else None,
+        "organizer": {
+            "name": org.org_name, "trust_level": org.trust_level, "trust_label": TRUST_LABELS.get(org.trust_level),
+            "logo_url": org.logo_url, "bio": org.bio, "org_type": org.org_type, "college_or_company": org.college_or_company,
+            "city": org.city, "website": org.website, "instagram": org.instagram, "linkedin": org.linkedin,
+            "contact_email": org.user.email if org.show_official_email and org.user else None,
+        } if org else None,
         "why_not": None if r.passed or r.almost else r.reason,
         "maps_url": f"https://www.google.com/maps/dir/?api=1&destination={e.lat},{e.lng}" if e.lat is not None and e.lng is not None else None,
     })

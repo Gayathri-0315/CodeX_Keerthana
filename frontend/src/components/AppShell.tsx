@@ -1,5 +1,5 @@
 import { m } from "motion/react";
-import { Bell, CalendarDays, Home, MailCheck, Ticket } from "lucide-react";
+import { Bell, CalendarDays, Home, Ticket } from "lucide-react";
 import { Suspense, useEffect, useRef } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { pageVariants, spring } from "../lib/motion";
@@ -16,18 +16,19 @@ const TABS = [
 // Organizers and admins have few destinations; they get desktop links and in-page buttons, no tab bar.
 const DESKTOP_TABS: Record<string, { to: string; label: string }[]> = {
   student: TABS,
-  organizer: [{ to: "/", label: "Dashboard" }, { to: "/organizer/new", label: "New event" }],
+  organizer: [{ to: "/", label: "Dashboard" }, { to: "/organizer/new", label: "New event" }, { to: "/alerts", label: "Alerts" }],
   admin: [{ to: "/", label: "Review queue" }],
 };
 
-export function Logo() {
+/** `compact`: on the narrowest phones (under 380px) show only the mark, so the top bar fits on one line. */
+export function Logo({ compact = false }: { compact?: boolean }) {
   return (
     <span className="inline-flex items-center gap-2 headline">
       <svg viewBox="0 0 32 32" className="size-7" aria-hidden>
         <rect width="32" height="32" rx="9" fill="var(--accent)" />
         <path d="M10 16.5l4 4 8-9" stroke="#fff" strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
-      ShowUp
+      <span className={compact ? "max-[379px]:sr-only" : undefined}>ShowUp</span>
     </span>
   );
 }
@@ -65,7 +66,7 @@ export function AppShell() {
   }, [me, navigate]);
   // Event detail has its own sticky action bar, so the tab bar steps aside there.
   const tabBar = student && !pathname.startsWith("/event/");
-  const { data: alerts } = useNotifications(student);
+  const { data: alerts } = useNotifications(student || me?.role === "organizer");
   const unread = alerts?.unread ?? 0;
   const badge = (to: string) =>
     to === "/alerts" && unread > 0 ? (
@@ -84,7 +85,7 @@ export function AppShell() {
       {/* Desktop: top glass nav */}
       <header className="glass safe-top sticky top-0 z-40 hidden border-b border-line md:block">
         <nav className="mx-auto flex h-14 max-w-[1080px] items-center justify-between px-6" aria-label="Main">
-          <Link to="/" aria-label="ShowUp home"><Logo /></Link>
+          <Link to="/about" aria-label="About ShowUp"><Logo /></Link>
           {me && (
             <ul className="flex items-center gap-1">
               {DESKTOP_TABS[me.role].map((t) => {
@@ -105,19 +106,6 @@ export function AppShell() {
       </header>
 
       <main id="main" className={`mx-auto max-w-[1080px] px-4 pt-4 sm:px-6 md:pt-8 ${tabBar ? "pb-32 md:pb-16" : "pb-16"}`}>
-        {me && !me.email_verified && pathname !== "/verify" && (
-          <Link
-            to="/verify"
-            className="pressable mb-4 flex min-h-12 items-center gap-3 rounded-[14px] bg-accent-soft px-4 py-3 callout text-accent"
-          >
-            <MailCheck className="size-5 shrink-0" aria-hidden />
-            <span className="min-w-0 flex-1">
-              <span className="font-semibold">Verify your email</span>
-              <span className="text-text-2"> to {me.role === "organizer" ? "publish events" : "register for events"}.</span>
-            </span>
-            <span className="font-semibold">Enter code</span>
-          </Link>
-        )}
         <Suspense fallback={<div className="h-40" />}>
           {/* The first screen paints at once (it's the LCP); later navigations crossfade in. */}
           <m.div key={pathname} variants={pageVariants} initial={firstScreen.current ? false : "initial"} animate="animate">

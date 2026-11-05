@@ -13,7 +13,7 @@ export const keys = {
   me: ["me"] as const,
   availability: ["availability"] as const,
   feedCount: ["feed", "count"] as const,
-  feed: (tab: FeedTab) => ["feed", "list", tab] as const,
+  feed: (tab: FeedTab, type?: string) => ["feed", "list", tab, type ?? "all"] as const,
   /** Everything that depends on the user's free time or profile. */
   feedAll: ["feed"] as const,
   event: (id: string) => ["event", id] as const,
@@ -56,7 +56,7 @@ export function useSignIn() {
 export function useRegister() {
   const reset = useResetUserData();
   return useMutation({
-    mutationFn: (body: { name: string; email: string; password: string; college?: string }) =>
+    mutationFn: (body: { name: string; email: string; password: string }) =>
       api<User>("/auth/register", { method: "POST", body }),
     onSuccess: reset,
   });
@@ -65,26 +65,10 @@ export function useRegister() {
 export function useRegisterOrganizer() {
   const reset = useResetUserData();
   return useMutation({
-    mutationFn: (body: { name: string; org_name: string; email: string; password: string; phone?: string; college_or_company: string }) =>
+    mutationFn: (body: { name: string; org_name: string; email: string; password: string }) =>
       api<User>("/auth/register-organizer", { method: "POST", body }),
     onSuccess: reset,
   });
-}
-
-/** Verify by the 6-digit code (signed in) or by the emailed link token. */
-export function useVerifyEmail() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (body: { code?: string; token?: string }) => api<User>("/auth/verify", { method: "POST", body }),
-    onSuccess: (user) => {
-      const me = qc.getQueryData<User | null>(keys.me);
-      if (me && me.id === user.id) qc.setQueryData(keys.me, user);
-    },
-  });
-}
-
-export function useResendVerification() {
-  return useMutation({ mutationFn: () => api<void>("/auth/resend-verification", { method: "POST" }) });
 }
 
 export function useForgotPassword() {
@@ -154,10 +138,10 @@ export function useFeedCount() {
   });
 }
 
-export function useFeed(tab: FeedTab) {
+export function useFeed(tab: FeedTab, type?: string) {
   return useInfiniteQuery({
-    queryKey: keys.feed(tab),
-    queryFn: ({ pageParam }) => api<FeedPage>(`/feed?tab=${tab}&limit=20${pageParam ? `&cursor=${pageParam}` : ""}`),
+    queryKey: keys.feed(tab, type),
+    queryFn: ({ pageParam }) => api<FeedPage>(`/feed?tab=${tab}&limit=20${type ? `&event_type=${type}` : ""}${pageParam ? `&cursor=${pageParam}` : ""}`),
     initialPageParam: "",
     getNextPageParam: (last) => last.next_cursor ?? undefined,
     staleTime: 30_000,
@@ -171,6 +155,7 @@ export type ExploreFilters = {
   date_to?: string;
   price?: "free" | "paid";
   mode?: "online" | "in_person";
+  event_type?: string;
 };
 
 function toQuery(params: Record<string, string | undefined>): string {
@@ -179,11 +164,15 @@ function toQuery(params: Record<string, string | undefined>): string {
   return p.toString();
 }
 
-/** Explore: every upcoming event, by date. Lives under ["feed", "list"] so saves update it too. */
-export function useExplore(filters: ExploreFilters) {
+/**
+ * Explore: every upcoming event, by date. Students get time-fit badges from /feed/explore; guests and
+ * organizers browse /public/events. Lives under ["feed", "list"] so saves update it too.
+ */
+export function useExplore(filters: ExploreFilters, source: "feed" | "public" = "feed") {
+  const path = source === "feed" ? "/feed/explore" : "/public/events";
   return useInfiniteQuery({
-    queryKey: ["feed", "list", "explore", filters] as const,
-    queryFn: ({ pageParam }) => api<FeedPage>(`/feed/explore?${toQuery({ ...filters, limit: "20", cursor: pageParam || undefined })}`),
+    queryKey: ["feed", "list", "explore", source, filters] as const,
+    queryFn: ({ pageParam }) => api<FeedPage>(`${path}?${toQuery({ ...filters, limit: "20", cursor: pageParam || undefined })}`),
     initialPageParam: "",
     getNextPageParam: (last) => last.next_cursor ?? undefined,
     staleTime: 30_000,
@@ -191,11 +180,24 @@ export function useExplore(filters: ExploreFilters) {
   });
 }
 
+export type Category = { slug: string; name: string; emoji: string; count: number };
+
+/** All 13 categories with live counts of upcoming events (public; same list for everyone). */
 export function useCategories() {
   return useQuery({
-    queryKey: ["feed", "categories"],
-    queryFn: () => api<{ categories: string[] }>("/feed/categories").then((r) => r.categories),
-    staleTime: 300_000,
+    queryKey: ["categories"],
+    queryFn: () => api<{ categories: Category[] }>("/public/categories").then((r) => r.categories),
+    staleTime: 60_000,
+  });
+}
+
+/** A few upcoming events for the landing page. */
+export function useHappeningSoon(limit = 8, type?: string) {
+  return useQuery({
+    queryKey: ["public", "soon", limit, type ?? "all"],
+    queryFn: () => api<FeedPage>(`/public/events?limit=${limit}${type ? `&event_type=${type}` : ""}`).then((r) => r.items),
+    placeholderData: (prev) => prev,
+    staleTime: 60_000,
   });
 }
 
@@ -243,7 +245,7 @@ export function useSaveEvent() {
       ctx?.snapshot.forEach(([key, data]) => qc.setQueryData(key, data));
       qc.setQueryData(keys.event(id), ctx?.detail);
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: keys.feed("saved") }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["feed", "list", "saved"] }),
   });
 }
 

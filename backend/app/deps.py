@@ -6,7 +6,6 @@ from fastapi import Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from .db import get_db
-from .errors import fail
 from .models import User
 from .security import COOKIE_NAME, decode_token
 from .timeutil import utcnow
@@ -38,10 +37,15 @@ def require_role(*roles: str):
     return dep
 
 
-def require_verified(user: User = Depends(current_user)) -> User:
-    if user.email_verified_at is None:
-        fail(403, "unverified", "Verify your email first. We sent you a 6-digit code.")
-    return user
+student_only = require_role("student")
+
+
+def optional_user(request: Request, db: Session = Depends(get_db)) -> User | None:
+    """The signed-in user, or None for a guest (public pages)."""
+    try:
+        return current_user(request, db)
+    except HTTPException:
+        return None
 
 
 def client_ip(request: Request) -> str:

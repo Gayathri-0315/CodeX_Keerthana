@@ -72,10 +72,6 @@ def new_link_token() -> str:
     return secrets.token_urlsafe(32)
 
 
-def new_code() -> str:
-    return f"{secrets.randbelow(1_000_000):06d}"
-
-
 def new_csrf() -> str:
     return secrets.token_urlsafe(24)
 

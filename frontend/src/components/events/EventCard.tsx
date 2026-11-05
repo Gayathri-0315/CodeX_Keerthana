@@ -3,7 +3,8 @@ import { Bookmark, CircleCheck, Clock, MapPin, Sparkles, TriangleAlert } from "l
 import { useRef, type MouseEvent } from "react";
 import { Link } from "react-router-dom";
 import { Tag } from "../ui/Chip";
-import { formatDayTime, formatFee, formatKm } from "../../lib/format";
+import { formatFee, formatKm, formatWhen } from "../../lib/format";
+import { OrganizerLabel } from "../landing/PublicEventCard";
 import { easeOut, haptic, spring } from "../../lib/motion";
 import { usePrefetchEvent } from "../../lib/queries";
 import type { FeedItem } from "../../lib/types";
@@ -20,11 +21,19 @@ const GRADIENTS: Record<string, [string, string]> = {
   Music: ["#ff375f", "#bf5af2"],
   Sports: ["#ff9500", "#ffcc00"],
   Photography: ["#8e8e93", "#5ac8fa"],
+  Internship: ["#30b0c7", "#5856d6"],
+  Competition: ["#ff375f", "#ff9f0a"],
+};
+
+/** Gradient by event type first (item 12), then by the poster's own category text. */
+const TYPE_KEY: Record<string, string> = {
+  workshop: "Workshop", meetup: "Meetup", hackathon: "Hackathon", conference: "Conference", webinar: "Webinar",
+  internship: "Internship", competition: "Competition",
 };
 
 /** Poster when there is one, otherwise a category gradient. Shares a layoutId with the detail hero. */
-export function Thumb({ event, className = "", large = false }: { event: Pick<FeedItem, "id" | "category" | "title" | "poster_url">; className?: string; large?: boolean }) {
-  const [a, b] = GRADIENTS[event.category] ?? ["#636366", "#aeaeb2"];
+export function Thumb({ event, className = "", large = false }: { event: Pick<FeedItem, "id" | "category" | "title" | "poster_url"> & { event_type?: string }; className?: string; large?: boolean }) {
+  const [a, b] = GRADIENTS[TYPE_KEY[event.event_type ?? ""] ?? event.category] ?? GRADIENTS[event.category] ?? ["#636366", "#aeaeb2"];
   return (
     <m.div
       layoutId={`thumb-${event.id}`}
@@ -109,11 +118,11 @@ export function EventCard({ event, index, onToggleSave, onDismiss, onRemindSimil
             <h3 className="headline line-clamp-2">{event.title}</h3>
             <p className="footnote mt-0.5 text-text-2">{event.organizer_name}</p>
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <Tag tone={muted ? "neutral" : "accent"}><Clock className="size-3.5" aria-hidden />{formatDayTime(event.start_at, event.end_at)}</Tag>
+              <Tag tone={muted ? "neutral" : "accent"}><Clock className="size-3.5" aria-hidden />{formatWhen(event)}</Tag>
               <Tag><MapPin className="size-3.5" aria-hidden />{formatKm(event.distance_km)}</Tag>
-              <Tag>{formatFee(event.fee_inr)}</Tag>
+              {event.event_type === "internship" ? <OrganizerLabel event={event} /> : <Tag>{formatFee(event.fee_inr)}</Tag>}
               {event.waitlist && <Tag tone="warning">Waitlist</Tag>}
-              {event.verification_label === "unverified" && <Tag tone="warning">Unverified</Tag>}
+              {event.event_type !== "internship" && event.verification_label === "unverified" && <Tag tone="warning">Unverified</Tag>}
             </div>
             {explore && event.time_fit && (
               <p className={`footnote mt-2 flex items-start gap-1.5 ${event.time_fit.fits ? "text-success-text" : "text-text-2"}`}>
@@ -153,7 +162,7 @@ export function EventCard({ event, index, onToggleSave, onDismiss, onRemindSimil
           <Bookmark className={`size-5 ${event.saved ? "fill-accent text-accent" : ""}`} />
         </button>
 
-        {event.fits && !muted && (
+        {event.fits && !muted && event.event_type !== "internship" && (
           <div className="-mt-1 flex justify-end px-4 pb-3">
             <RegisterAction event={event} compact />
           </div>

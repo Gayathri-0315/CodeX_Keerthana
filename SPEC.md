@@ -11,9 +11,9 @@
 3. Every phase must end with a runnable app. Run it, test the flow, then `git commit`.
 4. Prefer simple, boring code. No premature abstraction, no unneeded libraries.
 5. The app must work **without any API keys** (mock mode, section 9.4). Real AI calls are an upgrade, not a dependency.
-6. Seed realistic demo data (section 12) so the app looks alive on first run.
+6. Provide local-development sample data (section 12) behind `python manage.py seed_dev`; production starts empty.
 7. One command to run everything: `make dev` (or `npm run dev` at the root). One command to seed: `make seed`.
-8. Write a `README.md` with setup, env vars, demo script and known limitations.
+8. Write a `README.md` with setup, env vars, test steps and known limitations.
 9. Performance and polish are requirements, not extras (sections 7 and 8).
 
 ---
@@ -202,7 +202,7 @@ clamp to [0.15, 0.95]
 
 ### 5.9 Waitlist promotion
 - When capacity is full, new registrations become `waitlisted` with a position.
-- On cancel ("Can't make it"): mark `cancelled`, then promote the first waitlisted user to `promoted_pending` with `promotion_expires_at = now + 15 min` (configurable; `DEMO_MODE` uses 2 min), send an urgent `seat_opened` notification with a **Confirm seat** action.
+- On cancel ("Can't make it"): mark `cancelled`, then promote the first waitlisted user to `promoted_pending` with `promotion_expires_at = now + 15 min` (configurable), send an urgent `seat_opened` notification with a **Confirm seat** action.
 - If confirmed, status `registered`. If expired, move on to the next in line. Re-number positions after each change. All inside one DB transaction to avoid double-promotion.
 
 ### 5.10 Check-in
@@ -245,11 +245,11 @@ Send the extracted text; ask for `{"risk": "low|medium|high", "reasons": [..]}`.
 
 ### 6.4 Resilience
 - Validate every model output with Pydantic; on failure retry once with the validation error appended; on second failure return a friendly error and open the manual form pre-filled with whatever was parsed.
-- Hash the uploaded file; cache extraction results by hash (table `extraction_cache`), so repeated demos are instant.
+- Hash the uploaded file; cache extraction results by hash (table `extraction_cache`), so repeated uploads are instant.
 - Timeout 25 s with a visible progress state.
 
 ### 6.5 Mock mode
-If no API key, or `AI_MODE=mock`, extraction returns results from `seed/posters/*.json` and `seed/timetables/*.json` matched by file hash or file name, with a plausible 1.5 s delay. The UI behaves identically. This is also the demo fallback.
+If no API key, or `AI_MODE=mock`, extraction returns results from `seed/posters/*.json` and `seed/timetables/*.json` matched by file hash or file name, with a plausible 1.5 s delay. The UI behaves identically. 
 
 ---
 
@@ -395,7 +395,7 @@ Visible focus rings, 44 px minimum tap targets, contrast AA, semantic landmarks,
 
 ## 9. API (JSON, prefix `/api`)
 
-Auth: JWT bearer (httpOnly cookie preferred). Passwords hashed with bcrypt. Demo login buttons ("Continue as demo student", "Continue as demo organizer") exist when `DEMO_MODE=true`.
+Auth: JWT bearer (httpOnly cookie preferred). Passwords hashed with bcrypt.
 
 ```
 POST   /auth/register            POST /auth/login          GET /auth/me
@@ -444,7 +444,6 @@ Pagination by cursor. Standard error shape `{ "error": { "code", "message" } }`.
 
 ```
 APP_ENV=dev
-DEMO_MODE=true
 AI_MODE=auto               # auto | mock | live
 ANTHROPIC_API_KEY=
 ANTHROPIC_MODEL=claude-sonnet-5-5
@@ -453,7 +452,7 @@ DATABASE_URL=sqlite:///./showup.db
 TELEGRAM_BOT_TOKEN=
 ORS_API_KEY=
 SMTP_HOST= SMTP_USER= SMTP_PASS= SMTP_FROM=
-WAITLIST_CONFIRM_MINUTES=15      # DEMO_MODE overrides to 2
+WAITLIST_CONFIRM_MINUTES=15
 FRONTEND_ORIGIN=http://localhost:5173
 ```
 Never commit secrets. Validate config at startup with clear messages.
@@ -473,18 +472,17 @@ Never commit secrets. Validate config at startup with clear messages.
 
 ## 12. Seed data (`make seed`)
 
-- **Users:** `student@demo.app` (interests AI, Python, Hackathons; free Sat 14:00 to 18:00 and Sun 09:00 to 13:00; budget ₹200; 20 km; tags college_student, it_dept), 30 generated students with varied interests/availability (so reach preview shows realistic numbers), `organizer@demo.app` (a "trusted" club), a second "new" organizer, `admin@demo.app`.
-- **Events (about 24, Coimbatore area, dates relative to today so the demo is always upcoming):**
+- **Users:** a sample student (interests AI, Python, Hackathons; free Sat 14:00 to 18:00 and Sun 09:00 to 13:00; budget ₹200; 20 km; tags college_student, it_dept), 30 generated students with varied interests/availability (so reach preview shows realistic numbers), a sample organizer (a "trusted" club), a second "new" organizer, a sample admin.
+- **Events (about 24, Coimbatore area, dates relative to today so samples are always upcoming):**
   - Perfect match: AI Workshop (Sat 15:00 to 17:00, 5 km, ₹100).
   - Suitable: Python Meetup (Sat 17:00 to 18:30, free).
   - Clash for the "Almost" list: ML Hackathon (Sun 09:00 to 17:00), AI Conference (Wednesday evening).
-  - Capacity-full event with a waitlist of 3, to demo promotion.
+  - Capacity-full event with a waitlist of 3, to test promotion.
   - A deadline-in-6-hours event for the urgent notification.
   - Variety: design, robotics, startup pitch, cybersecurity, open-source, volunteering, music, sports, one online event, one eligibility-restricted event.
-  - **Spam examples** (for the demo and tests): "Guaranteed internship, pay ₹500 to this UPI ID", a duplicate of the AI Workshop, an event with a past date, one with a shortened link.
+  - **Spam examples** (for tests): "Guaranteed internship, pay ₹500 to this UPI ID", a duplicate of the AI Workshop, an event with a past date, one with a shortened link.
 - **Posters:** 6 sample poster images + matching extraction JSONs; 3 sample timetable images + JSONs for mock mode.
-- Venue lookup table with lat/lng for common Coimbatore areas (Peelamedu, Saravanampatti, Gandhipuram, RS Puram, Singanallur) so geocoding is not required to demo.
-- A `DEMO_MODE` panel (hidden at `/demo`) with buttons: "Publish AI Workshop now (triggers match notification)", "Release a seat (promotes waitlist)", "Fast-forward to leave-by time", "Reset demo".
+- Venue lookup table with lat/lng for common Coimbatore areas (Peelamedu, Saravanampatti, Gandhipuram, RS Puram, Singanallur) so geocoding is not required locally.
 
 ---
 
@@ -508,8 +506,8 @@ Frontend smoke (Playwright or manual checklist in README): onboarding, calendar 
 ## 14. Build phases (do in order)
 
 **Phase 1: Foundation (get something running)**
-Repo, Makefile, backend + DB + models + seed, auth with demo login, design tokens, app shell (nav/tab bar, dark mode), onboarding, interests, profile settings.
-*Done when:* you can sign in as the demo student and see the shell with seeded data.
+Repo, Makefile, backend + DB + models + seed, email + password auth, design tokens, app shell (nav/tab bar, dark mode), onboarding, interests, profile settings.
+*Done when:* you can sign in as a sample student and see the shell with sample data.
 
 **Phase 2: Free-time calendar**
 Paint grid, presets, one-off override, batched debounced save, live "N events fit" pill, keyboard support.
@@ -525,7 +523,7 @@ Upload, extraction (mock + live), confirm screen with confidence highlights, tru
 
 **Phase 5: Registration, notifications, attendance**
 Register + animation + pass, SSE toasts, notification rules and caps, Telegram/email channels, reminders and leave-by, cancel and waitlist promotion, .ics, QR check-in, show-up likelihood, organizer analytics.
-*Done when:* the full demo script in section 15 runs without errors.
+*Done when:* the end-to-end flow in section 15 runs without errors.
 
 **Phase 6: Timetable import and polish**
 Timetable extraction to free slots with review state, Telegram poster flow, empty/error/offline states, accessibility pass, performance pass against section 7.3, README.
@@ -534,11 +532,11 @@ The first 60% target = Phases 1 to 4 plus the register animation and an in-app t
 
 ---
 
-## 15. Demo script (3 minutes; must work end to end)
+## 15. End-to-end flow (must work)
 
-1. Sign in as the demo student. Open Calendar, import the sample timetable; free slots fill in; the pill reads "14 events fit your free time".
+1. Sign in as a student. Open Calendar, import the sample timetable; free slots fill in; the pill reads "14 events fit your free time".
 2. Home shows AI Workshop (reasons visible) and the ML Hackathon under Almost with its clash explanation.
-3. Switch to the organizer (demo panel). Upload the AI Workshop poster; extraction fills the form; fix one amber field; reach preview shows "About 140 students fit"; publish.
+3. Sign in as an organizer. Upload the AI Workshop poster; extraction fills the form; fix one amber field; reach preview shows "About 140 students fit"; publish.
 4. Back as the student: a Dynamic-Island toast appears ("A seat that fits your Saturday"). Tap Register: ring, check draw, pass sheet with QR and "Leave by 2:25 PM", confetti.
 5. Upload the fake internship poster as the organizer: blocked with clear reasons.
 6. Another registrant taps "Can't make it": the waitlisted student gets "A seat just opened up" and confirms.
@@ -551,4 +549,4 @@ The first 60% target = Phases 1 to 4 plus the register animation and an in-app t
 - All Phase 1 to 6 acceptance lines met; `make dev` and `make seed` work from a clean clone.
 - App works fully in mock mode with no keys.
 - No console errors; no animation drops visibly on a mid-range phone; interactions feel instant.
-- README includes: setup, env vars, demo script, architecture sketch, limitations (rule-based show-up estimate, mock vs live AI, spam gate is a first line of defence), and roadmap (teammate matching, Google Calendar free/busy, WhatsApp, Tamil/English posters, smarter ranking from real pilot data).
+- README includes: setup, env vars, test steps, architecture sketch, limitations (rule-based show-up estimate, mock vs live AI, spam gate is a first line of defence), and roadmap (teammate matching, Google Calendar free/busy, WhatsApp, Tamil/English posters, smarter ranking from real pilot data).

@@ -17,7 +17,7 @@ from ..config import settings
 from ..db import Base, SessionLocal, engine
 from ..models import AvailabilitySlot, Event, Organizer, Registration, User, UserInterest
 from ..security import hash_password
-from ..services import feedcache, listing, spam
+from ..services import categories, event_types, feedcache, listing, spam
 from ..timeutil import ist_to_utc, ist_today, utcnow
 from .make_samples import make_posters, make_timetables
 from .venues import AREAS, find_area
@@ -55,7 +55,7 @@ def slot(user_id: str, dow: int, start: str, end: str) -> AvailabilitySlot:
 
 
 def make_user(email: str, name: str, pw: str, role: str = "student", **kw) -> User:
-    return User(email=email, name=name, password_hash=pw, role=role, onboarded=True, email_verified_at=utcnow(), **kw)
+    return User(email=email, name=name, password_hash=pw, role=role, onboarded=True, **kw)
 
 
 def dev_email(local: str) -> str:
@@ -66,6 +66,7 @@ def seed(db: Session, password: str) -> dict:
     if settings.is_production:
         raise SystemExit("Refusing to load sample data: APP_ENV=production.")
     rng = random.Random(42)
+    categories.ensure_rows(db)
     pw = hash_password(password)
     today = ist_today()
     now = utcnow()
@@ -138,10 +139,14 @@ def seed(db: Session, password: str) -> dict:
         start, end = ist_to_utc(d, hm(item["start"])), ist_to_utc(d, hm(item["end"]))
         org = orgs[item["org"]]
         deadline = now + timedelta(hours=item["deadline_in_hours"]) if "deadline_in_hours" in item else start - timedelta(hours=2)
+        if item.get("type") == "internship":
+            deadline = end = start  # apply-by date: no session time
         clean_label = "organizer_verified" if org.trust_level in ("verified", "trusted") else "details_reviewed"
         status = item.get("status", "published")
         e = Event(
             organizer_id=org.id, title=item["title"], description=item["description"], category=item["category"],
+            category_slug=categories.suggest(item["tags"], item["title"]),
+            event_type=item.get("type") or event_types.suggest(item["title"], item["category"], " ".join(item["tags"])),
             tags=item["tags"], mode=item.get("mode", "in_person"), venue_name=item["venue"], address=item["address"],
             lat=item["lat"], lng=item["lng"], start_at=start, end_at=end, registration_deadline=deadline,
             fee_inr=item["fee"], capacity=item["capacity"], eligibility=item.get("eligibility", {}),
@@ -154,7 +159,8 @@ def seed(db: Session, password: str) -> dict:
         # Run the real gate so seeded risk scores and reasons match what an upload would get.
         # Only earlier events exist yet, so a copy is flagged, never its original.
         a = spam.assess(
-            spam.Candidate(e.title, e.description, e.category, e.mode, e.venue_name, e.start_at, e.end_at, e.fee_inr, e.registration_url),
+            spam.Candidate(e.title, e.description, e.category, e.mode, e.venue_name, e.start_at, e.end_at, e.fee_inr, e.registration_url,
+                           event_type=e.event_type),
             org.trust_level, now, listing.find_duplicate(db, e, e.id),
         )
         e.risk_score, e.risk_reasons, e.duplicate_of = a.score, a.reasons, a.duplicate_of
