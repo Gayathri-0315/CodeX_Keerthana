@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Literal
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
@@ -114,11 +117,7 @@ def verify_organizer(organizer_id: str, user: User = Depends(admin_only), db: Se
     org = db.get(Organizer, organizer_id)
     if org is None:
         raise HTTPException(404, "That organizer doesn't exist.")
-    if org.trust_level == "new":
-        org.trust_level = "verified"
-    org.verified_by = user.id
-    db.commit()
-    feedcache.invalidate_all()
+    set_trust(db, org, "verified" if org.trust_level == "new" else org.trust_level, user)
     return {"id": org.id, "trust_level": org.trust_level}
 
 
@@ -213,3 +212,55 @@ def decide_chat_report(report_id: str, action: str, user: User = Depends(admin_o
         other.status = "hidden" if action == "hide" else "dismissed"
     db.commit()
     return {"status": r.status}
+
+
+# ---- every organizer, so an admin can verify (or un-verify) anyone ----
+
+class TrustIn(BaseModel):
+    level: Literal["new", "verified", "trusted"]
+
+
+def set_trust(db: Session, org: Organizer, level: str, admin: User) -> None:
+    """Change an organizer's trust level and bring their events' badge in line with it."""
+    from ..services import org_alerts
+
+    was_verified = org.trust_level in ("verified", "trusted")
+    org.trust_level = level
+    org.verified_by = admin.id if level != "new" else None
+    verified = level in ("verified", "trusted")
+    for e in db.scalars(select(Event).where(Event.organizer_id == org.id)):
+        if verified and e.verification_label == "details_reviewed":
+            e.verification_label = "organizer_verified"
+        elif not verified and e.verification_label == "organizer_verified":
+            e.verification_label = "details_reviewed"
+    db.commit()
+    feedcache.invalidate_all()
+    if verified and not was_verified:
+        org_alerts.verification_result(db, org, True)
+
+
+@router.get("/organizers")
+def organizers(q: str = Query("", max_length=100), user: User = Depends(admin_only), db: Session = Depends(get_db)):
+    from sqlalchemy import func
+
+    counts = dict(db.execute(select(Event.organizer_id, func.count()).where(Event.status == "published").group_by(Event.organizer_id)).all())
+    stmt = select(Organizer, User).join(User, User.id == Organizer.user_id)
+    if q.strip():
+        like = f"%{q.strip().lower()}%"
+        stmt = stmt.where(or_(func.lower(Organizer.org_name).like(like), func.lower(User.email).like(like),
+                              func.lower(func.coalesce(Organizer.college_or_company, "")).like(like)))
+    rows = db.execute(stmt.order_by(Organizer.org_name).limit(200)).all()
+    # Unverified first: they're the ones an admin is usually looking for.
+    rows.sort(key=lambda r: (r[0].trust_level != "new", r[0].org_name.lower()))
+    return {"items": [{"id": o.id, "name": o.org_name, "slug": o.slug, "email": u.email, "college_or_company": o.college_or_company,
+                       "city": o.city, "trust_level": o.trust_level, "events": counts.get(o.id, 0), "joined": iso_utc(u.created_at)}
+                      for o, u in rows]}
+
+
+@router.post("/organizers/{organizer_id}/trust")
+def change_trust(organizer_id: str, body: TrustIn, user: User = Depends(admin_only), db: Session = Depends(get_db)):
+    org = db.get(Organizer, organizer_id)
+    if org is None:
+        raise HTTPException(404, "That organizer doesn't exist.")
+    set_trust(db, org, body.level, user)
+    return {"id": org.id, "trust_level": org.trust_level}

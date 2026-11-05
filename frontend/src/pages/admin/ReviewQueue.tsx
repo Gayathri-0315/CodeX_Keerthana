@@ -9,12 +9,25 @@ import { useToast } from "../../components/ui/Toaster";
 import { formatFee } from "../../lib/format";
 import { STATUS_CHIP, useAdminAction, useReviewQueue } from "../../lib/organizer";
 import type { ReviewItem } from "../../lib/types";
+import { Segmented } from "../../components/ui/Segmented";
+import { OrganizersAdmin } from "./OrganizersAdmin";
 
 export default function ReviewQueue() {
+  const [tab, setTab] = useState<"review" | "organizers">("review");
+  return (
+    <>
+      <PageHeader title="Admin" subtitle={tab === "review" ? "Events waiting for review, reported events and appeals." : "Verify organizers so their events show the Verified badge."} action={<TestEmailButton />} />
+      <Segmented label="Admin section" className="mb-6 w-full sm:w-auto" value={tab} onChange={setTab}
+        options={[{ value: "review", label: "Review" }, { value: "organizers", label: "Organizers" }]} />
+      {tab === "review" ? <Review /> : <OrganizersAdmin />}
+    </>
+  );
+}
+
+function Review() {
   const { data: items, isPending, isError, refetch } = useReviewQueue();
   return (
     <>
-      <PageHeader title="Review queue" subtitle="Events waiting for review, reported events and appeals." action={<TestEmailButton />} />
       <VerificationRequests />
       {isError ? (
         <div className="card p-6 text-center">
