@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { CalendarDays, ChevronDown, ScanLine } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../../lib/api";
 import { addDays, formatMinutes, istToday, shortDate, weekdayIndex } from "../../lib/format";
@@ -46,6 +46,17 @@ export function YourWeek({ weekOffset = 0, className = "" }: { weekOffset?: numb
   const [expanded, setExpanded] = useState(readExpanded);
   const [selected, setSelected] = useState(() => (weekOffset === 0 ? weekdayIndex(today) : 0));
   const [sheetDay, setSheetDay] = useState<Day | null>(null);
+  const picked = useRef(false);
+
+  // Phones show one day: open on the first day from today that has free time or events, not an empty lane.
+  useEffect(() => {
+    if (!week || picked.current) return;
+    picked.current = true;
+    const from = weekOffset === 0 ? weekdayIndex(today) : 0;
+    const busyish = (d: Day) => d.free.length > 0 || d.going.length > 0 || d.fits.length > 0;
+    const next = week.days.findIndex((d, i) => i >= from && busyish(d));
+    if (next >= 0) setSelected(next);
+  }, [week, weekOffset, today]);
 
   const toggle = () => {
     const next = !expanded;
