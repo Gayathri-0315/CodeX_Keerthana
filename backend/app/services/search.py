@@ -11,7 +11,7 @@ import re
 from datetime import date, timedelta
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from . import llm
 from .categories import CATEGORIES, SLUGS
@@ -51,18 +51,37 @@ class SearchFilters(BaseModel):
     free_only: bool = False
     mode: Mode | None = None
     max_distance_km: int | None = Field(None, ge=1, le=500)
-    near: str | None = None  # an area name from AREAS, or "me" (the student's home)
+    near: str | None = None  # a place's display name, or "me" (the student's home)
+    near_lat: float | None = Field(None, ge=-90, le=90)
+    near_lng: float | None = Field(None, ge=-180, le=180)
     keywords: list[str] = Field(default_factory=list, max_length=5)
+    # The place phrase as typed ("PSG college"); resolved by parse() into near/near_lat/near_lng. Never sent out.
+    place: str | None = Field(None, max_length=80, exclude=True)
 
-    @field_validator("near")
+    @field_validator("near", "place")
     @classmethod
-    def _known_area(cls, v: str | None) -> str | None:
+    def _clean_place(cls, v: str | None) -> str | None:
         if not v:
             return None
-        if v.lower() in ("me", "near me", "home"):
+        if str(v).lower().strip() in ("me", "near me", "home", "nearby", "my home"):
             return "me"
-        low = v.strip().lower()
-        return next((a for a in AREA_NAMES if a.lower() == low), AREA_ALIASES.get(low))
+        v = re.sub(r"[^\w .,&'()-]", "", str(v)).strip(" .,")[:80]
+        return v or None
+
+    @model_validator(mode="after")
+    def _place_has_a_point(self):
+        """A place needs coordinates. Known areas get theirs from the table; anything else must bring its own."""
+        if self.near and self.near != "me" and (self.near_lat is None or self.near_lng is None):
+            low = self.near.lower()
+            name = next((a for a in AREA_NAMES if a.lower() == low), AREA_ALIASES.get(low))
+            area = next((a for a in AREAS if a["name"] == name), None)
+            if area:
+                self.near, self.near_lat, self.near_lng = area["name"], area["lat"], area["lng"]
+            else:
+                self.near = None
+        if self.near in (None, "me"):
+            self.near_lat = self.near_lng = None
+        return self
 
     @field_validator("categories")
     @classmethod
@@ -174,6 +193,14 @@ WHEN_WORDS: list[tuple[str, str]] = [
     (r"\b(today|now)\b", "today"),
     (r"\b(tomorrow|tmrw|tmr)\b", "tomorrow"),
 ]
+# "near PSG college", "at Codissia", "in Kovaipudur this weekend", "around tidel park under 200"
+PLACE_RE = re.compile(
+    r"\b(?:near|in|at|around|close to|inside|opposite)\s+(?!(?:the\s+)?(?:morning|afternoon|evening|night|weekend)\b|"
+    r"(?:this|next|my|your|person|online|free|hybrid|campus|me)\b)"
+    r"([a-z0-9][a-z0-9 .&'-]{1,40}?)"
+    r"(?=\s+(?:this|next|on|under|below|for|with|today|tomorrow|tonight|from|that|which|and|or|during|between|after|before|"
+    r"within|at|in|around|near|events?|workshops?|hackathons?)\b|[,?!]|\s*$)"
+)
 DAY_RE = re.compile(r"\b(next\s+|this\s+|on\s+)?(mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)(day|nesday|sday|rsday|urday)?\b")
 FEE_RE = re.compile(r"(?:under|below|less than|upto|up to|within|max|maximum|<|cheaper than)\s*(?:₹|rs\.?|inr|rupees)?\s*(\d{1,6})\b")
 FEE_RE2 = re.compile(r"(?:₹|rs\.?|inr)\s*(\d{1,6})\s*(?:or less|max|and below)?")
@@ -214,10 +241,17 @@ def rule_parse(text: str, today: date) -> SearchFilters:
         or next((name for alias, name in AREA_ALIASES.items() if _has(t, alias)), None)
     if near is None and any(_has(t, w) for w in ("near me", "nearby", "close to me", "around me", "near my home")):
         near = "me"
+    place = None
+    if near is None and (m := PLACE_RE.search(t)):
+        cand = m.group(1).strip(" .,'")
+        words = set(cand.split())
+        topic = {w for _, ws in CATEGORY_WORDS + TYPE_WORDS for w in ws} | {"person", "online", "campus", "free", "my", "your"}
+        if cand and not words <= topic:
+            place = cand
     f = SearchFilters(
         categories=cats[:4], event_type=etype, when=when, time_of_day=tod,
         max_fee_inr=int(fee.group(1)) if fee else None, free_only=bool(FREE_RE.search(t)),
-        mode=mode, max_distance_km=int(km.group(1)) if km and int(km.group(1)) >= 1 else None, near=near,
+        mode=mode, max_distance_km=int(km.group(1)) if km and int(km.group(1)) >= 1 else None, near=near, place=place,
     )
     return finish(f, today)
 
@@ -230,8 +264,8 @@ def finish(f: SearchFilters, today: date) -> SearchFilters:
         f.max_fee_inr = None
     if f.when == "tonight" and f.time_of_day is None:
         f.time_of_day = "evening"
-    if f.near and f.mode == "online":
-        f.near = None  # "online ... near X" can't both hold; online wins
+    if f.mode == "online" and (f.near or f.place):
+        f.near = f.near_lat = f.near_lng = f.place = None  # "online ... near X" can't both hold; online wins
     if f.near and f.max_distance_km is None:
         f.max_distance_km = NEAR_KM
     return f
@@ -246,11 +280,12 @@ SYSTEM = (
     '{"categories": [category slugs], "event_type": type or null, "when": date word or null, '
     '"time_of_day": "morning"|"afternoon"|"evening"|"night"|null, "max_fee_inr": integer or null, '
     '"free_only": true|false, "mode": "online"|"in_person"|null, "max_distance_km": integer or null, '
-    '"near": one of the area names below, or "me" for near me / nearby, or null, '
+    '"place": the place they mention, written as they wrote it (an area, college, venue, landmark or city), '
+    '"me" for near me / nearby, or null, '
     '"keywords": [up to 3 short topic words not covered by a category, else empty]}\n'
     "Category slugs: " + ", ".join(s for s, _, _ in CATEGORIES) + "\n"
     "Event types: " + ", ".join(t for t in TYPES if t != "other") + "\n"
-    "Area names (Coimbatore): " + ", ".join(AREA_NAMES) + "\n"
+    "Students are in Coimbatore, India.\n"
     "Date words (never write dates): " + ", ".join(WHEN) + "\n"
     'Examples: "AI workshop this Saturday under 200" -> {"categories":["ai-ml"],"event_type":"workshop","when":"saturday",'
     '"time_of_day":null,"max_fee_inr":200,"free_only":false,"mode":null,"max_distance_km":null,"keywords":[]}. '
@@ -266,7 +301,9 @@ def ai_parse(text: str, today: date) -> SearchFilters | None:
         return None
     try:
         allowed = {k: out[k] for k in ("categories", "event_type", "when", "time_of_day", "max_fee_inr", "free_only", "mode",
-                                       "max_distance_km", "near", "keywords") if k in out}
+                                       "max_distance_km", "keywords") if k in out}
+        if isinstance(out.get("place") or out.get("near"), str):
+            allowed["place"] = out.get("place") or out.get("near")
         if not isinstance(allowed.get("free_only", False), bool):
             allowed["free_only"] = False
         f = SearchFilters.model_validate(allowed)
@@ -275,11 +312,11 @@ def ai_parse(text: str, today: date) -> SearchFilters | None:
     return finish(f, today)
 
 
-def parse(text: str, today: date) -> tuple[SearchFilters, str]:
-    """-> (filters, "ai" | "rules")."""
+def parse(text: str, today: date, db=None) -> tuple[SearchFilters, str, str | None]:
+    """-> (filters, "ai" | "rules", a note for the user or None)."""
     text = text.strip()[:MAX_TEXT]
     if not text:
-        return SearchFilters(), "rules"
+        return SearchFilters(), "rules", None
     rules = rule_parse(text, today)
     ai = ai_parse(text, today) if llm.enabled() else None
     if ai is None:
@@ -287,15 +324,50 @@ def parse(text: str, today: date) -> tuple[SearchFilters, str]:
     else:
         # The rules are exact about money, dates and "free"; let them fill anything the model left out.
         f, source = ai, "ai"
-        for k in ("when", "max_fee_inr", "mode", "event_type", "time_of_day", "max_distance_km", "near"):
+        for k in ("when", "max_fee_inr", "mode", "event_type", "time_of_day", "max_distance_km", "near", "place"):
             if getattr(f, k) is None and getattr(rules, k) is not None:
                 setattr(f, k, getattr(rules, k))
         f.free_only = f.free_only or rules.free_only
         if not f.categories:
             f.categories = rules.categories
         f = finish(f, today)
+    note = _place(f, db, trusted=source == "ai")
+    f = finish(f, today)
     log.info("search parsed by %s: %s", source, f.model_dump(exclude_defaults=True, mode="json"))  # filters only, never the text
-    return f, source
+    return f, source, note
+
+
+def _is_topic(text: str) -> bool:
+    from .writing import TAG_WORDS, TAGS
+
+    words = set(re.findall(r"[a-z0-9+#]+", text.lower()))
+    topic = {w for _, ws in CATEGORY_WORDS + TYPE_WORDS for w in ws} | set(TAGS) | {w for ws in TAG_WORDS.values() for w in ws}
+    topic |= {"java", "c", "c++", "javascript", "golang", "rust", "kotlin", "swift", "dsa", "coding", "programming", "english", "tamil"}
+    return bool(words) and words <= topic
+
+
+def _place(f: SearchFilters, db, trusted: bool) -> str | None:
+    """Turn the typed place into a point (areas, ShowUp venues, then the map). Returns a note if we couldn't."""
+    from . import places
+
+    text, f.place = f.place, None
+    if f.near and f.near != "me" and f.near_lat is None:
+        text, f.near = f.near, None  # named but not placed yet (e.g. merged from the rules): resolve it below
+    if f.near or not text:
+        return None
+    if _is_topic(text):
+        return None  # "workshops in python": a subject, not a place
+    if text == "me":
+        f.near = "me"
+        return None
+    hit = places.resolve(db, text)
+    if hit:
+        f.near, f.near_lat, f.near_lng = hit["name"] or text, hit["lat"], hit["lng"]
+        if f.max_distance_km is None:
+            f.max_distance_km = places.radius_for(hit["kind"])
+        return None
+    # The rules guess at places; only the model's reading is sure enough to tell the user we missed it.
+    return f"Couldn't find \"{text}\" on the map, so these are events anywhere." if trusted else None
 
 
 # ---- from search filters to Explore filters, and relaxing when nothing matches ----
@@ -306,8 +378,7 @@ def near_point(f: SearchFilters, user=None) -> tuple[float, float] | None:
         if user is not None and getattr(user, "home_lat", None) is not None:
             return user.home_lat, user.home_lng
         return None
-    area = next((a for a in AREAS if a["name"] == f.near), None)
-    return (area["lat"], area["lng"]) if area else None
+    return (f.near_lat, f.near_lng) if f.near_lat is not None else None
 
 
 def to_filters(f: SearchFilters, user=None):
@@ -350,7 +421,7 @@ def relaxations(f: SearchFilters) -> list[tuple[SearchFilters, str]]:
         for km in (10, 20):
             if (cur.max_distance_km or NEAR_KM) < km:
                 step(f"up to {km} km away", max_distance_km=km)
-        step("anywhere in the city", near=None, max_distance_km=None)
+        step("anywhere", near=None, near_lat=None, near_lng=None, max_distance_km=None)
     elif cur.max_distance_km is not None:
         step("any distance", max_distance_km=None)
     if cur.mode:

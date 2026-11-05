@@ -76,10 +76,10 @@ def _run(data, f: search.SearchFilters, user):
 
 
 @router.post("/parse")
-def parse(body: ParseIn, request: Request, user: User | None = Depends(optional_user)):
+def parse(body: ParseIn, request: Request, user: User | None = Depends(optional_user), db: Session = Depends(get_db)):
     _limit(request, user)
-    f, source = search.parse(body.text, ist_today())
-    return {"filters": f.model_dump(mode="json"), "chips": chips(f), "source": source}
+    f, source, note = search.parse(body.text, ist_today(), db)
+    return {"filters": f.model_dump(mode="json"), "chips": chips(f), "source": source, "note": note}
 
 
 @router.post("/results")
@@ -99,7 +99,7 @@ def results(body: ResultsIn, request: Request, user: User | None = Depends(optio
     if f.when:  # dates are always the server's, from the date word
         f = search.finish(f, ist_today())
     if f.near == "me" and search.near_point(f, user) is None:
-        f = f.model_copy(update={"near": None, "max_distance_km": None})  # guests: we don't know where "me" is
+        f = f.model_copy(update={"near": None, "near_lat": None, "near_lng": None, "max_distance_km": None})  # guests: no home
     items = _run(data, f, user)
     relaxed = None
     if not items and not f.is_empty():
@@ -108,7 +108,8 @@ def results(body: ResultsIn, request: Request, user: User | None = Depends(optio
             changes.append(change)
             items = _run(data, loose, user)
             if items:
-                relaxed = {"message": f"Nothing for {search.describe(f)}. Showing {' and '.join(changes)}.",
+                desc = search.describe(f)
+                relaxed = {"message": f"Nothing {desc if desc.startswith('near ') else 'for ' + desc}. Showing {' and '.join(changes)}.",
                            "filters": loose.model_dump(mode="json"), "chips": chips(loose)}
                 break
     if student:

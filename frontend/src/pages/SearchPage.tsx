@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Sparkles, X } from "lucide-react";
+import { MapPinOff, Sparkles, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { SmartSearch } from "../components/events/SmartSearch";
@@ -21,10 +21,12 @@ export type SearchFilters = {
   mode: string | null;
   max_distance_km: number | null;
   near: string | null;
+  near_lat: number | null;
+  near_lng: number | null;
   keywords: string[];
 };
 type Chip = { field: keyof SearchFilters; value: string | number | boolean | null; label: string };
-type Parsed = { filters: SearchFilters; chips: Chip[]; source: "ai" | "rules" };
+type Parsed = { filters: SearchFilters; chips: Chip[]; source: "ai" | "rules"; note: string | null };
 type Results = { items: FeedItem[]; total: number; relaxed: { message: string; filters: SearchFilters; chips: Chip[] } | null };
 
 /** Remove one chip: lists drop that value, everything else goes back to "any". */
@@ -32,7 +34,7 @@ function without(f: SearchFilters, chip: Chip): SearchFilters {
   const v = f[chip.field];
   if (Array.isArray(v)) return { ...f, [chip.field]: v.filter((x) => x !== chip.value) };
   if (chip.field === "when") return { ...f, when: null, date_from: null, date_to: null };
-  if (chip.field === "near") return { ...f, near: null, max_distance_km: null };
+  if (chip.field === "near") return { ...f, near: null, near_lat: null, near_lng: null, max_distance_km: null };
   return { ...f, [chip.field]: chip.field === "free_only" ? false : null };
 }
 
@@ -50,12 +52,14 @@ export default function SearchPage() {
   const q = params.get("q") ?? "";
   const [filters, setFilters] = useState<SearchFilters | null>(null);
   const [allChips, setAllChips] = useState<Chip[]>([]);
+  const [note, setNote] = useState<string | null>(null);
 
   const parse = useMutation({
     mutationFn: (text: string) => api<Parsed>("/search/parse", { method: "POST", body: { text } }),
     onSuccess: (p) => {
       setFilters(p.filters);
       setAllChips(p.chips);
+      setNote(p.note);
     },
   });
   useEffect(() => {
@@ -74,6 +78,7 @@ export default function SearchPage() {
   const clear = () => {
     setFilters(null);
     setAllChips([]);
+    setNote(null);
     setParams({});
   };
 
@@ -110,6 +115,8 @@ export default function SearchPage() {
             )}
             {(chips.length > 0 || q) && <Button size="sm" variant="quiet" onClick={clear}>Clear</Button>}
           </div>
+
+          {note && <p className="callout -mt-2 mb-5 flex items-start gap-2 text-text-2" role="status"><MapPinOff className="mt-0.5 size-4 shrink-0" aria-hidden />{note}</p>}
 
           {results.isError ? (
             <div className="card p-6 text-center">
