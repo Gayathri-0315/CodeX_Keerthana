@@ -14,18 +14,22 @@ type Props = {
 /** Bottom sheet on phones, centered card on wider screens. */
 export function Sheet({ open, onClose, title, children }: Props) {
   const panel = useRef<HTMLDivElement>(null);
+  // Latest onClose without re-running the effect: callers pass a new function on every render, and
+  // re-running would move focus back to the panel after each keystroke in a field inside the sheet.
+  const close = useRef(onClose);
+  close.current = onClose;
 
   useEffect(() => {
     if (!open) return;
     const prev = document.activeElement as HTMLElement | null;
     panel.current?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && close.current();
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("keydown", onKey);
       prev?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   return createPortal(
     <AnimatePresence>
