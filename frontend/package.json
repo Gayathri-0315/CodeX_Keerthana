@@ -12,6 +12,7 @@
   "dependencies": {
     "@fontsource-variable/inter": "^5.1.0",
     "@tanstack/react-query": "^5.62.0",
+    "html-to-image": "1.11.11",
     "html5-qrcode": "^2.3.8",
     "lucide-react": "^0.468.0",
     "motion": "^11.15.0",

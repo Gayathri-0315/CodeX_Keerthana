@@ -28,3 +28,18 @@ def my_record(user: User = Depends(student_only), db: Session = Depends(get_db))
     from ..services.record import record_out
 
     return record_out(db, user)
+
+
+@router.get("/recap")
+def my_recap(period: str | None = Query(None, max_length=8, description="e.g. 2026-H2"),
+             user: User = Depends(student_only), db: Session = Depends(get_db)):
+    """Semester recap: first name only, from organizer check-ins in that half year. Cached 60 s."""
+    from fastapi import HTTPException
+
+    from ..services.recap import build_recap
+
+    today = ist_today()
+    try:
+        return build_recap(db, user, period or f"{today.year}-H{1 if today.month <= 6 else 2}")
+    except ValueError as e:
+        raise HTTPException(422, str(e))

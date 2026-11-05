@@ -6,6 +6,7 @@ import { api } from "../../lib/api";
 import { formatDayTime, formatLongDate } from "../../lib/format";
 import { useCategories } from "../../lib/queries";
 import { CountUp } from "../ui/CountUp";
+import { RecapCard } from "./RecapCard";
 
 export type RecordData = {
   events_attended: number;
@@ -20,7 +21,7 @@ export function useRecord() {
 }
 
 /** Private participation record: only organizer-confirmed check-ins. `top` is where the recap card goes. */
-export function RecordView({ top }: { top?: ReactNode }) {
+export function RecordView() {
   const { data, isPending, isError, refetch } = useRecord();
   const { data: categories } = useCategories();
   if (isError) {
@@ -53,7 +54,7 @@ export function RecordView({ top }: { top?: ReactNode }) {
 
   return (
     <div>
-      {top}
+      <RecapCard />
       <dl className="mb-2 grid grid-cols-3 gap-3">
         <Stat label="Events attended" value={<CountUp value={data.events_attended} />} />
         <Stat label="Hours learning" value={<CountUp value={Math.round(data.hours)} />} />
