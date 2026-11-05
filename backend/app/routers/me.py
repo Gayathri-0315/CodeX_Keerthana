@@ -20,3 +20,11 @@ def my_week(start: date | None = Query(None, description="Any date; the week sta
     day = start or ist_today()
     monday = day - timedelta(days=day.weekday())
     return build_week(db, user, monday)
+
+
+@router.get("/record")
+def my_record(user: User = Depends(student_only), db: Session = Depends(get_db)):
+    """Private: only the signed-in student's own organizer-confirmed check-ins."""
+    from ..services.record import record_out
+
+    return record_out(db, user)

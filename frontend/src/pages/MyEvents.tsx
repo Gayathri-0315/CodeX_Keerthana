@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { PageHeader } from "../components/AppShell";
 import { PassSheet } from "../components/attendance/PassSheet";
+import { RecordView } from "../components/record/RecordView";
 import { Thumb } from "../components/events/EventCard";
 import { Button } from "../components/ui/Button";
 import { Tag } from "../components/ui/Chip";
@@ -13,14 +14,14 @@ import { formatDayTime, formatTime } from "../lib/format";
 import type { Registration } from "../lib/types";
 import { useNow } from "../lib/useNow";
 
-type Tab = "upcoming" | "waitlist" | "past";
+type Tab = "upcoming" | "waitlist" | "past" | "record";
 
 export default function MyEvents() {
   const { data, isPending, isError, refetch } = useMyRegistrations();
   const [tab, setTab] = useState<Tab>("upcoming");
   const [pass, setPass] = useState<Registration | null>(null);
   const now = useNow(1000);
-  const list = data?.[tab] ?? [];
+  const list = tab === "record" ? [] : data?.[tab] ?? [];
 
   return (
     <>
@@ -34,9 +35,12 @@ export default function MyEvents() {
           { value: "upcoming", label: `Upcoming${data ? ` · ${data.upcoming.length}` : ""}` },
           { value: "waitlist", label: `Waitlist${data?.waitlist.length ? ` · ${data.waitlist.length}` : ""}` },
           { value: "past", label: "Past" },
+          { value: "record", label: "Record" },
         ]}
       />
-      {isError ? (
+      {tab === "record" ? (
+        <RecordView />
+      ) : isError ? (
         <div className="card p-6 text-center">
           <p className="headline">Couldn't load your events.</p>
           <Button variant="secondary" className="mt-4" onClick={() => refetch()}>Try again</Button>
@@ -44,7 +48,7 @@ export default function MyEvents() {
       ) : isPending ? (
         <div className="skeleton h-32 rounded-[22px]" />
       ) : list.length === 0 ? (
-        <Empty tab={tab} />
+        <Empty tab={tab as Exclude<Tab, "record">} />
       ) : (
         <ul className="grid gap-3 md:grid-cols-2">
           {list.map((r) => (
@@ -59,7 +63,7 @@ export default function MyEvents() {
   );
 }
 
-function Empty({ tab }: { tab: Tab }) {
+function Empty({ tab }: { tab: Exclude<Tab, "record"> }) {
   const copy = {
     upcoming: ["No events yet.", "Events you register for show up here with your pass."],
     waitlist: ["You're not on any waitlists.", "When an event is full, join its waitlist and we'll tell you if a seat opens."],
