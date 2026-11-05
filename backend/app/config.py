@@ -34,7 +34,7 @@ class Settings(BaseSettings):
 
     # Groq (AI helpers: chat safety, search, event Q&A, writing help). Optional; rules are used without it.
     groq_api_key: str = ""
-    groq_model: str = "llama-3.1-8b-instant"
+    groq_model: str = "openai/gpt-oss-20b"
     search_model: str = ""  # optional cheaper model just for search parsing (defaults to GROQ_MODEL)
     seed_dev_password: str = ""  # local sample accounts only (python manage.py seed_dev)
 

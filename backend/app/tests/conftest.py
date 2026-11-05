@@ -10,6 +10,7 @@ os.environ["APP_ENV"] = "test"
 os.environ["AI_MODE"] = "mock"
 os.environ["SEED_DEV_PASSWORD"] = "sample-pass-123"
 os.environ["EMAIL_API_KEY"] = ""
+os.environ["GROQ_API_KEY"] = ""  # tests never call the real AI; they mock it
 os.environ["JWT_SECRET"] = "test-secret-that-is-long-enough-for-hs256-0123456789"
 
 import pytest  # noqa: E402

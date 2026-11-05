@@ -30,12 +30,38 @@ def enabled() -> bool:
     return bool(settings.groq_api_key)
 
 
+_ODD = str.maketrans({"‐": "-", "‑": "-", "‒": "-", "–": "-", " ": " ", " ": " ",
+                      " ": " ", "​": "", "‘": "'", "’": "'", "“": '"', "”": '"'})
+
+
+def _clean(v):
+    """Plain characters only: models like non-breaking hyphens and curly quotes, which look odd in inputs."""
+    if isinstance(v, str):
+        return v.translate(_ODD)
+    if isinstance(v, list):
+        return [_clean(x) for x in v]
+    if isinstance(v, dict):
+        return {k: _clean(x) for k, x in v.items()}
+    return v
+
+
+def _payload(model: str, system: str, user: str, max_tokens: int, temperature: float) -> dict:
+    body = {"model": model, "temperature": temperature, "max_tokens": max_tokens, "response_format": {"type": "json_object"},
+            "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}
+    if model.startswith(("openai/gpt-oss", "qwen/")):
+        # Reasoning models: think briefly, and leave room for the thinking on top of the JSON.
+        body["reasoning_effort"] = "low"
+        body["max_tokens"] = max(max_tokens, 200) + 400
+    return body
+
+
 def chat_json(system: str, user: str, *, timeout: float = 4.0, max_tokens: int = 400, cache_seconds: int = 0,
               temperature: float = 0.0, model: str | None = None) -> dict | None:
     """One JSON-mode completion. Returns the parsed object, or None (no key, slow, error, not JSON)."""
     if not enabled():
         return None
-    key = hashlib.sha256(f"{settings.groq_model}\n{system}\n{user}".encode()).hexdigest() if cache_seconds else ""
+    model = model or settings.groq_model
+    key = hashlib.sha256(f"{model}\n{system}\n{user}".encode()).hexdigest() if cache_seconds else ""
     if key:
         with _lock:
             hit = _cache.get(key)
@@ -45,9 +71,7 @@ def chat_json(system: str, user: str, *, timeout: float = 4.0, max_tokens: int =
         r = httpx.post(
             URL,
             headers={"Authorization": f"Bearer {settings.groq_api_key}"},
-            json={"model": model, "temperature": temperature, "max_tokens": max_tokens,
-                  "response_format": {"type": "json_object"},
-                  "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]},
+            json=_payload(model, system, user, max_tokens, temperature),
             timeout=timeout,
         )
         if r.status_code >= 300:
@@ -56,6 +80,7 @@ def chat_json(system: str, user: str, *, timeout: float = 4.0, max_tokens: int =
         data = json.loads(r.json()["choices"][0]["message"]["content"])
         if not isinstance(data, dict):
             return None
+        data = _clean(data)
     except (httpx.HTTPError, KeyError, ValueError, IndexError) as e:
         log.warning("Groq call failed: %s", type(e).__name__)
         return None
