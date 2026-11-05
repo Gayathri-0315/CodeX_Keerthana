@@ -156,6 +156,12 @@ function TurnoutCard({ a }: { a: Analytics }) {
           <m.div className="absolute inset-y-0 left-0 w-full origin-left rounded-full bg-success" initial={{ scaleX: 0 }} animate={{ scaleX: a.actual / scale }} transition={{ duration: 0.7, ease: easeOut }} />
         </Bar>
       </div>
+      {a.described_pct != null && (
+        <p className="callout mt-4">
+          <span className="font-semibold tnum">{a.described_pct}%</span> said it matched the description
+          <span className="text-text-2 tnum"> ({a.described_answers} answers)</span>
+        </p>
+      )}
       <p className="footnote mt-4 text-text-2">Expected turnout is a planning estimate from simple rules (distance, timing, friends coming along), with a rough 80% range. Not a promise.</p>
     </div>
   );

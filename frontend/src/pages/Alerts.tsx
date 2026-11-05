@@ -1,10 +1,12 @@
 import { AnimatePresence, animate, m, useMotionValue, type PanInfo } from "motion/react";
 import { Bell } from "lucide-react";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/AppShell";
 import { Button } from "../components/ui/Button";
-import { useNotificationAction, useNotifications } from "../lib/attendance";
+import { useEventFeedback, useNotificationAction, useNotifications } from "../lib/attendance";
+import { ThumbsDown, ThumbsUp } from "lucide-react";
+import { useToast } from "../components/ui/Toaster";
 import { formatTime, istParts } from "../lib/format";
 import { easeOut, spring } from "../lib/motion";
 import type { AppNotification } from "../lib/types";
@@ -95,6 +97,7 @@ function AlertRow({ n }: { n: AppNotification }) {
   };
 
   return (
+    <div>
     <m.button
       style={{ x }}
       drag="x"
@@ -115,5 +118,43 @@ function AlertRow({ n }: { n: AppNotification }) {
         <span className="callout mt-0.5 block text-text-2">{n.body}</span>
       </span>
     </m.button>
+    {n.type === "how_was" && <Thumbs n={n} />}
+    </div>
+  );
+}
+
+function Thumbs({ n }: { n: AppNotification }) {
+  const feedback = useEventFeedback();
+  const toast = useToast();
+  const navigate = useNavigate();
+  const rid = n.actions.find((a) => a.kind === "feedback_up" && "registration_id" in a);
+  const [done, setDone] = useState(false);
+  if (!rid || !("registration_id" in rid)) return null;
+  const send = (up: boolean) => () => {
+    feedback.mutate({ registrationId: rid.registration_id, up }, {
+      onSuccess: () => {
+        setDone(true);
+        toast({
+          tone: "success",
+          title: "Thanks",
+          body: n.suggested ? `You might like ${n.suggested.title}.` : "That helps the next students choose.",
+          action: n.suggested ? { label: "View", onClick: () => navigate(`/event/${n.suggested!.event_id}`) } : undefined,
+        });
+      },
+      onError: (err) => toast({ tone: "error", title: "That didn't work", body: (err as Error).message }),
+    });
+  };
+  if (done) return <p className="footnote -mt-2 pb-4 pl-10 pr-5 text-success-text">Thanks</p>;
+  return (
+    <div className="-mt-2 flex gap-2 pb-4 pl-10 pr-5">
+      <button onClick={send(true)} disabled={feedback.isPending} aria-label="Thumbs up: it matched the description"
+        className="pressable inline-flex min-h-11 items-center gap-1.5 rounded-full bg-success/15 px-3 callout font-medium text-success-text">
+        <ThumbsUp className="size-4" aria-hidden /> Yes
+      </button>
+      <button onClick={send(false)} disabled={feedback.isPending} aria-label="Thumbs down: it didn't match"
+        className="pressable inline-flex min-h-11 items-center gap-1.5 rounded-full bg-text/6 px-3 callout font-medium text-text-2">
+        <ThumbsDown className="size-4" aria-hidden /> Not really
+      </button>
+    </div>
   );
 }

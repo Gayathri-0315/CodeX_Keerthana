@@ -204,7 +204,18 @@ def analytics(event_id: str, user: User = Depends(organizer_only), db: Session =
         "expected_high": high,
         "actual": sum(1 for reg, _ in rows if reg.status == "attended"),
         "ended": bool(event.end_at and event.end_at < utcnow()),
+        **_described(db, event.id),
     }
+
+
+def _described(db: Session, event_id: str) -> dict:
+    """Aggregate only ("86% said it matched the description"), and only from 3 answers, so nobody is identifiable."""
+    from ..services.followup import MIN_ANSWERS, described_stats
+
+    yes, total = described_stats(db, [event_id])
+    if total < MIN_ANSWERS:
+        return {"described_pct": None, "described_answers": total}
+    return {"described_pct": round(100 * yes / total), "described_answers": total}
 
 
 @router.post("/events/{event_id}/message")
@@ -256,6 +267,10 @@ def checkin(event_id: str, body: CheckinIn, user: User = Depends(organizer_only)
         raise HTTPException(409, f"{person.name} isn't registered ({reg.status.replace('_', ' ')}).")
     reg.status, reg.checked_in_at = "attended", utcnow()
     db.commit()
+    from ..services import stream
+
+    # If the student has ShowUp open, show the short "You're in" moment.
+    stream.publish(person.id, "checked_in", {"event_id": event.id, "title": event.title})
     return {"name": person.name, "status": "checked_in", "checked_in_at": iso_utc(reg.checked_in_at), "count": _attended(db, event.id)}
 
 

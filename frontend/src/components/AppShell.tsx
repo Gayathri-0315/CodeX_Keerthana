@@ -6,6 +6,7 @@ import { pageVariants, spring } from "../lib/motion";
 import { useMe } from "../lib/queries";
 import { returnTo, useNotifications } from "../lib/attendance";
 import { LiveAlerts } from "./attendance/LiveAlerts";
+import { CheckinMoment } from "./attendance/CheckinMoment";
 
 const TABS = [
   { to: "/", label: "Home", icon: Home },
@@ -78,6 +79,7 @@ export function AppShell() {
   return (
     <div className="min-h-dvh">
       <LiveAlerts />
+      <CheckinMoment />
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[70] focus:rounded-full focus:bg-surface focus:px-4 focus:py-2">
         Skip to content
       </a>

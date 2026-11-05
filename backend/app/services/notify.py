@@ -28,7 +28,7 @@ MIN_MATCH = 75
 # Which alerts also go out by email (when the user has email on). Each gets one line and one button.
 EMAIL_TYPES = {"match", "similar", "deadline", "registered", "waitlisted", "seat_opened", "reminder_24h",
                "reminder_leave_by", "cancelled_event", "message", "new_message",
-               "org_registration", "org_cancellation", "org_waitlist", "org_review", "org_reminder", "org_digest"}
+               "org_registration", "org_cancellation", "org_waitlist", "org_review", "org_reminder", "org_digest", "how_was"}
 # While alerts are paused, only these still email: things the user is actively waiting on.
 PAUSE_EXEMPT = {"seat_opened", "cancelled_event", "registered", "waitlisted", "new_message", "org_review"}
 # Shown as a live toast? Registration confirmations already show their own animation and toast in the app.
@@ -149,11 +149,15 @@ def actions_for(n: Notification) -> list[dict]:
         return [{"label": "Directions", "kind": "url", "url": p["maps_url"]}, view]
     if n.type.startswith("org_"):
         return [{"label": "Open event", "kind": "url", "url": f"/organizer/event/{eid}"}] if eid else []
+    if n.type == "how_was" and rid:
+        return [{"label": "Thumbs up", "kind": "feedback_up", "registration_id": rid},
+                {"label": "Thumbs down", "kind": "feedback_down", "registration_id": rid}]
     return [view] if eid else []
 
 
 def notification_out(n: Notification, event_title: str | None = None) -> dict:
     return {
+        "suggested": (n.payload or {}).get("suggested"),
         "id": n.id,
         "type": n.type,
         "title": n.title,
@@ -185,6 +189,8 @@ def email_button(n: Notification) -> tuple[str, str]:
         return "Read and reply", f"{base}{p.get('path', '/my')}"
     if n.type.startswith("org_"):
         return ("Open event", f"{base}/organizer/event/{n.event_id}") if n.event_id else ("Open dashboard", f"{base}/")
+    if n.type == "how_was":
+        return "Rate it in one tap", f"{base}/my"
     return "Open ShowUp", event
 
 

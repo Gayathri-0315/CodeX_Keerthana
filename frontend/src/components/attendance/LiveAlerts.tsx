@@ -7,6 +7,7 @@ import { attKeys, refreshAfterSeatChange } from "../../lib/attendance";
 import { useMe } from "../../lib/queries";
 import type { AppNotification, NotificationAction, Registration } from "../../lib/types";
 import { useToast } from "../ui/Toaster";
+import { showCheckinMoment } from "./CheckinMoment";
 
 const ICON = {
   match: Sparkles,
@@ -31,6 +32,11 @@ export function LiveAlerts() {
   useEffect(() => {
     if (!me) return;
     const es = new EventSource("/api/stream");
+    es.addEventListener("checked_in", (e) => {
+      const d: { event_id: string; title: string } = JSON.parse((e as MessageEvent).data);
+      refreshAfterSeatChange(qc, d.event_id);
+      showCheckinMoment(d.title);
+    });
     es.addEventListener("notification", (e) => {
       const n: AppNotification = JSON.parse((e as MessageEvent).data);
       qc.invalidateQueries({ queryKey: attKeys.notifications });
@@ -48,6 +54,18 @@ export function LiveAlerts() {
         void api(`/notifications/${note.id}/read?clicked=true`, { method: "POST" }).catch(() => {});
         if (a.kind === "view" || a.kind === "register") return navigate(`/event/${a.event_id}`);
         if (a.kind === "url") return void window.open(a.url, "_blank", "noopener");
+        if (a.kind === "feedback_up" || a.kind === "feedback_down") {
+          return void api(`/registrations/${a.registration_id}/feedback`, { method: "POST", body: { kind: a.kind === "feedback_up" ? "as_described" : "not_as_described" } })
+            .then(() =>
+              toast({
+                tone: "success",
+                title: "Thanks",
+                body: note.suggested ? `You might like ${note.suggested.title}.` : "That helps the next students choose.",
+                action: note.suggested ? { label: "View", onClick: () => navigate(`/event/${note.suggested!.event_id}`) } : undefined,
+              }),
+            )
+            .catch((err) => toast({ tone: "error", title: "That didn't work", body: (err as Error).message }));
+        }
         if (a.kind === "cancel" || !("registration_id" in a)) return navigate(`/my`);
         const path = a.kind === "confirm_seat" ? "confirm-seat" : "confirm-reminder";
         api<Registration>(`/registrations/${a.registration_id}/${path}`, { method: "POST" })

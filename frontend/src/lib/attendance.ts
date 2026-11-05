@@ -199,3 +199,13 @@ export function mmss(iso: string, now = Date.now()): string {
   const s = Math.max(0, Math.round((new Date(iso).getTime() - now) / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
+
+/** "How was it?": one tap records whether the event matched its description. */
+export function useEventFeedback() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ registrationId, up }: { registrationId: string; up: boolean }) =>
+      api<void>(`/registrations/${registrationId}/feedback`, { method: "POST", body: { kind: up ? "as_described" : "not_as_described" } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: attKeys.mine }),
+  });
+}

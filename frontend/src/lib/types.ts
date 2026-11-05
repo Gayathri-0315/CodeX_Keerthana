@@ -82,7 +82,7 @@ export type Registration = RegistrationBrief & {
 
 export type NotificationAction =
   | { label: string; kind: "view" | "register"; event_id: string }
-  | { label: string; kind: "confirm_seat" | "confirm_reminder" | "cancel"; registration_id: string }
+  | { label: string; kind: "confirm_seat" | "confirm_reminder" | "cancel" | "feedback_up" | "feedback_down"; registration_id: string }
   | { label: string; kind: "url"; url: string };
 
 export type AppNotification = {
@@ -95,6 +95,7 @@ export type AppNotification = {
   actions: NotificationAction[];
   created_at: string;
   read_at: string | null;
+  suggested?: { event_id: string; title: string } | null;
 };
 
 export type Registrant = {
@@ -135,6 +136,8 @@ export type Analytics = {
   expected_high: number;
   actual: number;
   ended: boolean;
+  described_pct: number | null;
+  described_answers: number;
 };
 
 export type FeedItem = {

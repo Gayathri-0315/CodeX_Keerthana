@@ -12,7 +12,7 @@ from ..config import settings
 from ..db import SessionLocal
 from ..models import Event, Organizer, Registration, Report, User
 from ..timeutil import utcnow
-from . import alerts, feedcache, notify, org_alerts, registration, together
+from . import alerts, feedcache, followup, notify, org_alerts, registration, together
 from .showup_score import reminder_times
 
 log = logging.getLogger("showup.jobs")
@@ -82,7 +82,7 @@ def close_finished(db: Session, now: datetime) -> int:
             n = org.past_events_count + 1
             org.avg_attendance_rate = rate if org.avg_attendance_rate is None else (org.avg_attendance_rate * (n - 1) + rate) / n
             org.past_events_count = n
-            clean = valid_reports(db, org) == 0
+            clean = valid_reports(db, org) == 0 and followup.organizer_described_ok(db, org)
             if org.trust_level == "new" and attended > 0 and clean:
                 org.trust_level = "verified"
             elif org.trust_level == "verified" and n >= 3 and org.avg_attendance_rate >= 0.5 and clean:
@@ -112,6 +112,7 @@ def tick(now: datetime | None = None) -> None:
             ("flush", lambda: notify.flush_pending(db, now)),
             ("organizer reminders", lambda: org_alerts.send_event_reminders(db, now)),
             ("organizer digests", lambda: org_alerts.send_digests(db, now)),
+            ("how was it", lambda: followup.send_how_was(db, now)),
             ("close", lambda: close_finished(db, now)),
         ):
             try:

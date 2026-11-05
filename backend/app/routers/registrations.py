@@ -80,6 +80,8 @@ def confirm_reminder(reg_id: str, user: User = Depends(student_only), db: Sessio
 @router.post("/{reg_id}/feedback", status_code=204)
 def feedback(reg_id: str, body: FeedbackIn, user: User = Depends(student_only), db: Session = Depends(get_db)):
     reg = my_registration(db, user, reg_id)
+    if body.kind != "useful" and reg.status != "attended":
+        raise HTTPException(409, "Only people checked in at the event can rate it.")
     kinds = ("as_described", "not_as_described") if body.kind != "useful" else ("useful",)
     existing = db.scalar(select(Feedback).where(Feedback.user_id == user.id, Feedback.event_id == reg.event_id, Feedback.kind.in_(kinds)))
     if existing:
