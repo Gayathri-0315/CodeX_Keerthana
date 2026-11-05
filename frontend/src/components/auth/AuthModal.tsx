@@ -9,7 +9,6 @@ import { closeAuth, useAuthModal, type Intent, type Mode, type Side } from "../.
 import { spring } from "../../lib/motion";
 import { useForgotPassword, useRegister, useRegisterOrganizer, useSignIn } from "../../lib/queries";
 import type { Registration, User } from "../../lib/types";
-import { useMediaQuery } from "../../lib/useMediaQuery";
 import { Button } from "../ui/Button";
 import { Field } from "../ui/Field";
 import { Segmented } from "../ui/Segmented";
@@ -30,7 +29,6 @@ const message = (err: unknown, fallback: string) => (err instanceof ApiError ? e
  */
 export function AuthModal() {
   const { open, audience, mode, intent, seq } = useAuthModal();
-  const wide = useMediaQuery("(min-width: 768px)");
   const panel = useRef<HTMLDivElement>(null);
   const finish = useFinish();
 
@@ -73,7 +71,7 @@ export function AuthModal() {
   return createPortal(
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-[60] flex items-stretch justify-center md:items-center md:p-6" onKeyDown={trap}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 md:p-6" onKeyDown={trap}>
           <m.div
             className="absolute inset-0 bg-black/40"
             initial={{ opacity: 0 }}
@@ -88,10 +86,10 @@ export function AuthModal() {
             role="dialog"
             aria-modal="true"
             aria-label="Sign in to ShowUp"
-            className="relative flex w-full flex-col overflow-y-auto bg-surface shadow-card md:max-h-[calc(100dvh-48px)] md:max-w-[440px] md:rounded-[22px]"
-            initial={wide ? { opacity: 0, scale: 0.96, y: 12 } : { y: "100%" }}
-            animate={wide ? { opacity: 1, scale: 1, y: 0 } : { y: 0 }}
-            exit={wide ? { opacity: 0, scale: 0.97, y: 8 } : { y: "100%" }}
+            className="relative flex max-h-[calc(100dvh-32px)] w-full max-w-[440px] flex-col overflow-y-auto rounded-[22px] bg-surface shadow-card md:max-h-[calc(100dvh-48px)]"
+            initial={{ opacity: 0, scale: 0.96, y: 12 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.97, y: 8 }}
             transition={spring}
           >
             <button onClick={closeAuth} aria-label="Close" className="pressable absolute right-3 top-3 z-10 grid size-11 place-items-center rounded-full text-text-2 hover:bg-text/6">
@@ -112,7 +110,7 @@ function SinglePanel({ audience, mode, onAuthed }: { audience: Side; mode: Mode;
   const [side, setSide] = useState<Side>(audience);
   const [panelMode, setPanelMode] = useState<PanelMode>(mode);
   return (
-    <div className="safe-top flex flex-1 flex-col pt-4 md:pt-0">
+    <div className="flex flex-1 flex-col">
       <div key={side} className="auth-fade">
         <SidePanel side={side} mode={panelMode} setMode={setPanelMode} onAuthed={onAuthed} />
         <p className="callout -mt-2 px-6 pb-8 text-text-2 md:px-8">
