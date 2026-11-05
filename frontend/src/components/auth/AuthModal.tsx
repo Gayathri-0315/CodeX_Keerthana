@@ -86,7 +86,7 @@ export function AuthModal() {
             role="dialog"
             aria-modal="true"
             aria-label="Sign in to ShowUp"
-            className="relative flex max-h-[calc(100dvh-32px)] w-full max-w-[440px] flex-col overflow-y-auto rounded-[22px] bg-surface shadow-card md:max-h-[calc(100dvh-48px)]"
+            className="no-scrollbar relative flex max-h-[calc(100dvh-32px)] w-full max-w-[440px] flex-col overflow-y-auto overscroll-contain rounded-[22px] bg-surface shadow-card md:max-h-[calc(100dvh-48px)]"
             initial={{ opacity: 0, scale: 0.96, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.97, y: 8 }}
