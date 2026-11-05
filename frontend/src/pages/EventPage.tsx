@@ -5,6 +5,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { Thumb } from "../components/events/EventCard";
 import { Button } from "../components/ui/Button";
 import { OrganizerCard } from "../components/events/OrganizerCard";
+import { AskEvent } from "../components/events/AskEvent";
 import { Tag } from "../components/ui/Chip";
 import { Sheet } from "../components/ui/Sheet";
 import { useToast } from "../components/ui/Toaster";
@@ -151,6 +152,7 @@ export default function EventPage() {
             <p className="body mt-2 max-w-[65ch] whitespace-pre-line text-text-2">{e.description}</p>
           </section>
         )}
+        {e.status === "published" && <AskEvent eventId={e.id} />}
         {e.organizer && <OrganizerCard org={e.organizer} />}
       </m.div>
 

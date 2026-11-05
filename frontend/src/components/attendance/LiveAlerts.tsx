@@ -20,6 +20,7 @@ const ICON = {
   buddy_joined: Users,
   buddy_cancelled: Users,
   chat_announcement: Megaphone,
+  chat_summary: Megaphone,
 };
 
 /** Listens on /api/stream and turns each alert into a Dynamic-Island toast with its actions. */

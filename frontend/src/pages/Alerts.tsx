@@ -84,7 +84,7 @@ function AlertRow({ n }: { n: AppNotification }) {
   const open = () => {
     if (dragged.current) return;
     if (!n.read_at) action.mutate({ id: n.id, kind: "click" });
-    if (n.event_id) navigate(n.type === "seat_opened" ? "/my" : n.type === "chat_announcement" ? `/event/${n.event_id}/chat` : `/event/${n.event_id}`);
+    if (n.event_id) navigate(n.type === "seat_opened" ? "/my" : n.type === "chat_announcement" || n.type === "chat_summary" ? `/event/${n.event_id}/chat` : `/event/${n.event_id}`);
   };
 
   const onDragEnd = (_: unknown, info: PanInfo) => {

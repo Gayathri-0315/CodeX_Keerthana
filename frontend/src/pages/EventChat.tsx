@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Flag, Lock, Megaphone, MoreHorizontal, Pin, Send, Trash2, Unlock, UserMinus, Users } from "lucide-react";
+import { ArrowLeft, Flag, Lock, Megaphone, MoreHorizontal, Pin, Send, Sparkles, Trash2, Unlock, UserMinus, Users } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/ui/Button";
@@ -22,6 +22,7 @@ export default function EventChat() {
   const [menu, setMenu] = useState<ChatMessage | null>(null);
   const [reporting, setReporting] = useState<ChatMessage | null>(null);
   const [people, setPeople] = useState(false);
+  const [summary, setSummary] = useState(false);
   const bottom = useRef<HTMLDivElement>(null);
   const { data: room, isPending, error } = useQuery({
     queryKey: chatKeys.room(id),
@@ -94,6 +95,7 @@ export default function EventChat() {
         </div>
         {host && (
           <div className="flex shrink-0 gap-1">
+            <Button size="sm" variant="quiet" aria-label="Summary of the last day" onClick={() => setSummary(true)}><Sparkles className="size-5" aria-hidden /></Button>
             <Button size="sm" variant="quiet" aria-label="People in this chat" onClick={() => setPeople(true)}><Users className="size-5" aria-hidden /></Button>
             <Button size="sm" variant="quiet" aria-label={room.locked ? "Let everyone post" : "Only I can post"} disabled={room.read_only}
               onClick={() => act.mutate(() => api(`/events/${id}/chat/lock`, { method: "POST", body: { locked: !room.locked } }))}>
@@ -191,6 +193,7 @@ export default function EventChat() {
         </div>
       </Sheet>
 
+      {host && <SummarySheet open={summary} onClose={() => setSummary(false)} eventId={id} />}
       {host && <PeopleSheet open={people} onClose={() => setPeople(false)} eventId={id} onRemoved={refresh} />}
     </div>
   );
@@ -262,6 +265,45 @@ function PeopleSheet({ open, onClose, eventId, onRemoved }: { open: boolean; onC
           ))}
         </ul>
       )}
+    </Sheet>
+  );
+}
+
+type Summary = { summary: string[]; questions: string[]; messages: number; source: "ai" | "rules" };
+
+/** Host: what the chat talked about in the last day, and questions still waiting for a reply. */
+function SummarySheet({ open, onClose, eventId }: { open: boolean; onClose: () => void; eventId: string }) {
+  const { data, isPending, isError, error } = useQuery({
+    queryKey: ["chat-summary", eventId],
+    queryFn: () => api<Summary>(`/events/${eventId}/chat/summary`),
+    enabled: open,
+    staleTime: 60_000,
+  });
+  return (
+    <Sheet open={open} onClose={onClose} title="Last 24 hours">
+      <div className="pb-2">
+        {isPending ? (
+          <div className="flex flex-col gap-2" aria-busy="true"><div className="skeleton h-5 w-3/4 rounded" /><div className="skeleton h-5 w-1/2 rounded" /></div>
+        ) : isError ? (
+          <p className="callout text-danger-text">{(error as Error).message}</p>
+        ) : data.messages === 0 ? (
+          <p className="callout text-text-2">No messages from students in the last day.</p>
+        ) : (
+          <>
+            <ul className="flex flex-col gap-1.5">
+              {data.summary.map((s) => <li key={s} className="body">{s}</li>)}
+            </ul>
+            {data.questions.length > 0 && (
+              <>
+                <h3 className="headline mt-5">Waiting for your reply</h3>
+                <ul className="mt-2 flex flex-col gap-2">
+                  {data.questions.map((q) => <li key={q} className="callout rounded-[14px] bg-text/6 px-3.5 py-2.5">{q}</li>)}
+                </ul>
+              </>
+            )}
+          </>
+        )}
+      </div>
     </Sheet>
   );
 }

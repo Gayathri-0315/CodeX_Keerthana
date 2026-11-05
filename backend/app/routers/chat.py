@@ -7,12 +7,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..deps import current_user
+from ..deps import RateLimit, current_user
 from ..models import ChatMessage, ChatRemoval, ChatReport, Event, Registration, User
 from ..services import chat
 from ..timeutil import iso_utc
 
 router = APIRouter(tags=["chat"])
+summary_limit = RateLimit(10, 60, "Wait a moment before asking for another summary.")
 
 
 class PostIn(BaseModel):
@@ -138,6 +139,18 @@ def remove_member(event_id: str, member_id: str, user: User = Depends(current_us
         db.add(ChatRemoval(event_id=event.id, user_id=member_id))
         db.commit()
     chat.broadcast(db, event, {"type": "update", "event_id": event.id})
+
+
+@router.get("/events/{event_id}/chat/summary")
+def summary(event_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Host only: what the chat talked about in the last day, and questions still waiting for a reply."""
+    from ..services import assist
+
+    event = chat.get_event_for(db, user, event_id)
+    if not chat.is_host(user, event):
+        raise HTTPException(403, "Only the host can see the chat summary.")
+    summary_limit.hit(user.id)
+    return assist.summarize(db, event)
 
 
 @router.get("/me/chats")

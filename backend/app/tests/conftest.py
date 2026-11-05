@@ -54,5 +54,10 @@ def client():
 
     ip_limit.reset()
     user_limit.reset()
+    from app.routers.assist import ask_limit
+    from app.routers.chat import summary_limit
+
+    ask_limit.reset()
+    summary_limit.reset()
     with TestClient(app) as c:
         yield with_csrf(c)
