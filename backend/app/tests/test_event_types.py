@@ -70,11 +70,12 @@ def test_internship_scam_signals_are_blocked_even_for_trusted_organizers(client,
     assert r["status"] == "blocked" and any(reason in x for x in r["risk"]["reasons"])
 
 
-def test_internship_needs_an_apply_link_and_date(client):
+def test_internship_needs_a_date_but_the_apply_link_is_optional(client):
     make_org(client, "trusted")
     saved = client.post("/api/organizer/events", json={**INTERNSHIP, "registration_url": None, "registration_deadline": None}).json()
     r = client.post(f"/api/organizer/events/{saved['id']}/publish")
-    assert r.status_code == 422 and "an apply-by date" in r.json()["error"]["message"] and "an apply link" in r.json()["error"]["message"]
+    msg = r.json()["error"]["message"]
+    assert r.status_code == 422 and "an apply-by date" in msg and "apply link" not in msg  # no link = apply on ShowUp
 
 
 def test_seeded_fake_internship_is_blocked():

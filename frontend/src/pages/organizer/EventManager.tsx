@@ -9,10 +9,11 @@ import { Segmented } from "../../components/ui/Segmented";
 import { Sheet } from "../../components/ui/Sheet";
 import { useToast } from "../../components/ui/Toaster";
 import { useAnalytics, useCancelEvent, useMessageRegistrants, useRegistrants } from "../../lib/attendance";
-import { formatDayTime, formatTime } from "../../lib/format";
+import { formatApplyBy, formatDayTime, formatTime } from "../../lib/format";
 import { easeOut } from "../../lib/motion";
 import { STATUS_CHIP, useOrgEvent } from "../../lib/organizer";
 import { useChatEntry } from "../../lib/chat";
+import { Applications } from "../../components/organizer/Applications";
 import type { Analytics, Registrant } from "../../lib/types";
 
 type Filter = "all" | "registered" | "waitlisted" | "attended" | "no_show";
@@ -49,6 +50,7 @@ export default function EventManager() {
   const e = event.data;
   const chip = STATUS_CHIP[e.status];
   const live = e.status === "published";
+  const internship = e.form.event_type === "internship";
 
   const exportCsv = () => {
     const header = "Name,Status,Waitlist position,Registered at,Checked in at,Coming with friends\n";
@@ -70,23 +72,31 @@ export default function EventManager() {
         <div className="min-w-0">
           <Tag tone={chip.tone}>{chip.text}</Tag>
           <h1 className="title-1 mt-2">{e.form.title}</h1>
-          {e.start_at && e.end_at && <p className="callout mt-1 text-text-2 tnum">{formatDayTime(e.start_at, e.end_at)}</p>}
+          {e.start_at && e.end_at && (
+            <p className="callout mt-1 text-text-2 tnum">{internship ? formatApplyBy(e.start_at) : formatDayTime(e.start_at, e.end_at)}</p>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
-          {live && (
+          {live && !internship && (
             <Link to={`/organizer/event/${id}/checkin`} className="pressable inline-flex min-h-11 items-center gap-2 rounded-[14px] bg-accent-fill px-4 font-semibold text-white">
               <QrCode className="size-5" aria-hidden /> Check-in
             </Link>
           )}
-          {live && <ChatButton eventId={id} />}
+          {live && !internship && <ChatButton eventId={id} />}
           <Link to={`/organizer/event/${id}/edit`} className="pressable inline-flex min-h-11 items-center gap-2 rounded-[14px] bg-accent-soft px-4 font-semibold text-accent">
             <Pencil className="size-4" aria-hidden /> Edit
           </Link>
         </div>
       </div>
 
-      {analytics.data && <TurnoutCard a={analytics.data} />}
+      {analytics.data && !internship && <TurnoutCard a={analytics.data} />}
 
+      {internship && !e.form.registration_url && e.status !== "draft" && <Applications eventId={id} title={e.form.title} />}
+      {internship && e.form.registration_url && (
+        <p className="card callout mt-8 p-5 text-text-2">Students apply on your site ({e.form.registration_url}). Clear the apply link in Edit to receive applications here instead.</p>
+      )}
+
+      {!internship && (
       <section className="mt-8">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h2 className="title-3">Registrations</h2>
@@ -131,6 +141,7 @@ export default function EventManager() {
         )}
         <p className="footnote mt-3 text-text-2">Attendee lists are only visible to you.</p>
       </section>
+      )}
 
       <MessageSheet eventId={id} open={messaging} onClose={() => setMessaging(false)} />
       <CancelSheet eventId={id} open={cancelling} onClose={() => setCancelling(false)} onDone={() => event.refetch()} />

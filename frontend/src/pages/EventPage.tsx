@@ -12,6 +12,7 @@ import { useToast } from "../components/ui/Toaster";
 import { ApiError } from "../lib/api";
 import { useReportEvent } from "../lib/organizer";
 import { RegisterAction } from "../components/attendance/RegisterAction";
+import { ApplyOnShowUp } from "../components/attendance/ApplyOnShowUp";
 import { ClassmatesLine, GoTogetherCard } from "../components/attendance/GoTogether";
 import { formatFee, formatLongDate, formatTimeRange } from "../lib/format";
 import { easeOut } from "../lib/motion";
@@ -71,7 +72,9 @@ export default function EventPage() {
           {e.event_type === "internship" ? (
             <Row icon={Clock} label="Apply by">
               <span className="body">Apply by {formatLongDate(e.start_at)}</span>
-              <span className="callout block text-text-2">Applications go to the organizer's own site.</span>
+              <span className="callout block text-text-2">
+                {e.registration_url ? `Applications go to ${siteOf(e.registration_url)}.` : "Apply here on ShowUp; the organizer replies by email."}
+              </span>
             </Row>
           ) : (
             <Row icon={Clock} label="When">
@@ -209,7 +212,9 @@ function ActionBar({ event: e }: { event: EventDetail }) {
             <MoreHorizontal className="size-5" />
           </button>
           {e.event_type === "internship" ? (
-            e.status === "published" && e.registration_url && (
+            e.status === "published" && !e.registration_url ? (
+              <ApplyOnShowUp event={e} />
+            ) : e.status === "published" && e.registration_url && (
               <a href={e.registration_url} target="_blank" rel="noopener noreferrer"
                 aria-label={`Apply on ${siteOf(e.registration_url)} (opens in a new tab)`}
                 className="pressable inline-flex h-[52px] min-w-0 flex-col items-center justify-center rounded-[14px] bg-accent-fill px-6 text-white">

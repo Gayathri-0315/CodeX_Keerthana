@@ -405,3 +405,18 @@ class ChatReport(Base):
     reason: Mapped[str] = mapped_column(String(300))
     status: Mapped[str] = mapped_column(String(16), default="open")  # open | hidden | dismissed
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class Application(Base):
+    """A student's application to an internship that takes applications on ShowUp (no outside apply link)."""
+
+    __tablename__ = "applications"
+    __table_args__ = (UniqueConstraint("event_id", "user_id"), Index("ix_applications_event", "event_id"))
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    event_id: Mapped[str] = mapped_column(ForeignKey("events.id", ondelete="CASCADE"))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    note: Mapped[str] = mapped_column(Text)
+    link: Mapped[str | None] = mapped_column(String(500))
+    status: Mapped[str] = mapped_column(String(16), default="submitted")  # submitted | shortlisted | declined
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

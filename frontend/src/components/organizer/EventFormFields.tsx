@@ -156,8 +156,8 @@ function Fields({ form, onChange, check }: Props) {
           <Field label="Apply by" name="registration_deadline" check={check}>
             <input type="date" {...text("registration_deadline")} required className={`${inputCls} tnum`} />
           </Field>
-          <Field label="Apply link" name="registration_url" check={check} hint="Your organization's own page, not a short link.">
-            <input {...text("registration_url")} type="url" inputMode="url" required maxLength={500} className={inputCls} placeholder="https://" />
+          <Field label="Apply link (optional)" name="registration_url" check={check} hint="Leave empty to receive applications here on ShowUp. If you add one, use your organization's own page, not a short link.">
+            <input {...text("registration_url")} type="url" inputMode="url" maxLength={500} className={inputCls} placeholder="https://" />
             <LinkCheck url={form.registration_url} />
           </Field>
         </Section>

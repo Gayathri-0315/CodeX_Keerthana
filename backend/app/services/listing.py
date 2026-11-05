@@ -209,8 +209,6 @@ def publish(db: Session, organizer: Organizer, event: Event) -> str:
                                      ("an apply-by date" if internship else "a date and start time", event.start_at)) if not ok]
     if event.mode == "in_person" and not internship and not event.venue_name:
         missing.append("a venue")
-    if internship and not event.registration_url:
-        missing.append("an apply link")
     if not event.category_slug:
         missing.append("a category")
     if missing:

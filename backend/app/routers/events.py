@@ -52,6 +52,12 @@ def get_event(event_id: str, user: User | None = Depends(optional_user), db: Ses
         together.classmates_going(db, user, [event.id]).get(event.id),
         together.companions_out(db, reg) if reg else [],
     )
+    if event.event_type == "internship":
+        from ..models import Application
+        from .applications import application_out
+
+        out["application"] = application_out(db.scalar(select(Application).where(
+            Application.event_id == event.id, Application.user_id == user.id)))
     if reg is None and event.capacity is not None and out["seats_taken"] >= event.capacity:
         waiting = db.scalar(select(func.count()).select_from(Registration).where(
             Registration.event_id == event.id, Registration.status == "waitlisted"))
@@ -102,7 +108,7 @@ def register(event_id: str, body: RegisterIn | None = None, user: User = Depends
         raise HTTPException(403, "Only students can register for events.")
     event = visible_event(db, event_id, user)
     if event.event_type == "internship":
-        raise HTTPException(409, "Apply for internships on the organizer's site, using the Apply button.")
+        raise HTTPException(409, "Use the Apply button for internships.")
     reg = registration.register(db, user, event, external=bool(body and body.external))
     out = registration.registration_out(db, reg, user)
     start = to_ist(event.start_at)

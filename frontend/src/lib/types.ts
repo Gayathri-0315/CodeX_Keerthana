@@ -181,6 +181,8 @@ export type FeedPage = { items: FeedItem[]; next_cursor: string | null; total: n
 
 export type EventDetail = FeedItem & {
   description: string;
+  /** Internships that take applications on ShowUp: mine, if I applied. */
+  application?: { id: string; status: "submitted" | "shortlisted" | "declined"; at: string } | null;
   address: string | null;
   lat: number | null;
   lng: number | null;
