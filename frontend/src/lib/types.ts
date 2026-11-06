@@ -129,6 +129,11 @@ export type Invite = {
 };
 
 export type Analytics = {
+  /** One plain, actionable sentence (totals only), or null. */
+  advice: string | null;
+  /** "learned" once enough past events beat the rules; "rules" until then. */
+  estimate: "learned" | "rules";
+  learned_from: number | null;
   registered: number;
   capacity: number | null;
   waitlisted: number;

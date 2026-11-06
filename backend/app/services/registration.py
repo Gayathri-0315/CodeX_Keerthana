@@ -55,34 +55,54 @@ def leave_by_for(user: User, event: Event) -> datetime | None:
     return None if distance is None else leave_by(event.start_at, travel)
 
 
-def past_attendance(db: Session, user_id: str) -> float | None:
-    rows = dict(db.execute(
-        select(Registration.status, func.count()).where(Registration.user_id == user_id, Registration.status.in_(("attended", "no_show")))
-        .group_by(Registration.status)
-    ).all())
+def past_attendance(db: Session, user_id: str, before: datetime | None = None) -> float | None:
+    """attended / (attended + no-show). With `before`, only events that started earlier (for training, no peeking)."""
+    q = select(Registration.status, func.count()).where(Registration.user_id == user_id, Registration.status.in_(("attended", "no_show")))
+    if before is not None:
+        q = q.join(Event, Event.id == Registration.event_id).where(Event.start_at < before)
+    rows = dict(db.execute(q.group_by(Registration.status)).all())
     total = rows.get("attended", 0) + rows.get("no_show", 0)
     return rows.get("attended", 0) / total if total >= 2 else None
 
 
-def compute_likelihood(db: Session, user: User, event: Event, reg: Registration) -> Likelihood:
+def features_for(db: Session, user: User, event: Event, reg: Registration, exclude_event: bool = False):
+    """What we know about one registration, for the show-up prediction."""
     from .feed import evaluate_one
+    from .showup_model import Features
 
     ev = evaluate_one(db, user, event)
     distance, _ = travel_for(user, event)
-    days_before = (event.start_at - reg.registered_at).total_seconds() / 86400
     with_friend = bool(reg.group_id) and db.scalar(
         select(func.count()).select_from(Registration).where(
-            Registration.group_id == reg.group_id, Registration.id != reg.id, Registration.status.in_(ACTIVE))
+            Registration.group_id == reg.group_id, Registration.id != reg.id,
+            Registration.status.in_(ACTIVE + (("attended", "no_show") if exclude_event else ())))
     ) > 0
-    return likelihood(
+    return Features(
+        with_friend=with_friend,
         interest=ev.scored.interest if ev.scored else None,
         distance_km=distance,
-        days_before=days_before,
-        reminder_confirmed=reg.reminder_confirmed,
-        past_rate=past_attendance(db, user.id),
+        days_before=(event.start_at - reg.registered_at).total_seconds() / 86400,
+        confirmed=reg.reminder_confirmed,
+        past_rate=past_attendance(db, user.id, before=event.start_at if exclude_event else None),
         slack_min=ev.scored.slack_min if ev.scored else None,
-        with_friend=with_friend,
+        start=event.start_at,
+        fee_inr=event.fee_inr or 0,
     )
+
+
+def compute_likelihood(db: Session, user: User, event: Event, reg: Registration) -> Likelihood:
+    """Learned from past events when there's enough data and it beats the rules (see showup_model.py); else the rules."""
+    from . import showup_model
+
+    f = features_for(db, user, event, reg)
+    rules = likelihood(interest=f.interest, distance_km=f.distance_km, days_before=f.days_before, reminder_confirmed=f.confirmed,
+                       past_rate=f.past_rate, slack_min=f.slack_min, with_friend=f.with_friend)
+    model = showup_model.current(db)
+    if model is None:
+        return rules
+    from .showup_score import CEIL, FLOOR
+
+    return Likelihood(round(min(CEIL, max(FLOOR, showup_model.predict(model, f))), 2), rules.reasons)
 
 
 def _renumber(db: Session, event_id: str) -> None:

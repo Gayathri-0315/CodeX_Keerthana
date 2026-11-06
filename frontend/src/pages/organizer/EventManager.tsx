@@ -1,5 +1,5 @@
 import { m } from "motion/react";
-import { ArrowLeft, Download, MessageSquare, MessagesSquare, Pencil, QrCode, Search, Users, XCircle } from "lucide-react";
+import { ArrowLeft, Download, Lightbulb, MessageSquare, MessagesSquare, Pencil, QrCode, Search, Users, XCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Button } from "../../components/ui/Button";
@@ -175,7 +175,16 @@ function TurnoutCard({ a }: { a: Analytics }) {
           <span className="text-text-2 tnum"> ({a.described_answers} answers)</span>
         </p>
       )}
-      <p className="footnote mt-4 text-text-2">Expected turnout is a planning estimate from simple rules (distance, timing, friends coming along), with a rough 80% range. Not a promise.</p>
+      {a.advice && (
+        <p className="callout mt-4 flex items-start gap-2 rounded-[14px] bg-accent-soft p-3 text-text">
+          <Lightbulb className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden />{a.advice}
+        </p>
+      )}
+      <p className="footnote mt-4 text-text-2">
+        {a.estimate === "learned"
+          ? `Expected turnout is learned from ${a.learned_from} past registrations on ShowUp (who came and who didn't), with a rough 80% range. Not a promise.`
+          : "Expected turnout is a planning estimate from simple rules (distance, timing, friends coming along), with a rough 80% range. It learns from real attendance once enough events have finished. Not a promise."}
+      </p>
     </div>
   );
 }

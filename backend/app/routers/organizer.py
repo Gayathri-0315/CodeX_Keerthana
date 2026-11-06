@@ -198,7 +198,11 @@ def analytics(event_id: str, user: User = Depends(organizer_only), db: Session =
     ps = [registration.compute_likelihood(db, person, event, reg).p for reg, person in rows]
     expected, low, high = showup_score.expected_turnout(ps)
     waitlisted = db.scalar(select(func.count()).select_from(Registration).where(Registration.event_id == event.id, Registration.status == "waitlisted"))
+    model = showup_score_model_status(db)
     return {
+        "advice": turnout_advice(len(ps), expected, event.capacity, waitlisted or 0, bool(event.end_at and event.end_at < utcnow())),
+        "estimate": "learned" if model.get("used") else "rules",
+        "learned_from": model.get("rows") if model.get("used") else None,
         "registered": len(ps),
         "capacity": event.capacity,
         "waitlisted": waitlisted or 0,
@@ -209,6 +213,26 @@ def analytics(event_id: str, user: User = Depends(organizer_only), db: Session =
         "ended": bool(event.end_at and event.end_at < utcnow()),
         **_described(db, event.id),
     }
+
+
+def showup_score_model_status(db: Session) -> dict:
+    from ..services import showup_model
+
+    return showup_model.status(db) or {}
+
+
+def turnout_advice(registered: int, expected: float, capacity: int | None, waitlisted: int, ended: bool) -> str | None:
+    """One plain sentence an organizer can act on. Totals only; never about a named student."""
+    if ended or registered == 0:
+        return None
+    unused = round(registered - expected)
+    if capacity and registered >= capacity and waitlisted and unused >= 2:
+        extra = min(unused, waitlisted)
+        return (f"About {unused} seats will likely go unused. You could let {extra} more in from the waitlist; "
+                "we also privately ask likely no-shows to confirm a few hours before.")
+    if unused >= 3:
+        return f"Expect about {round(expected)} of {registered} to come. Plan food and seating for that, not the full list."
+    return None
 
 
 def _described(db: Session, event_id: str) -> dict:

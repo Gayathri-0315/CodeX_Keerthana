@@ -26,7 +26,7 @@ ALWAYS_NOW = {"seat_opened", "registered", "waitlisted"}
 MIN_MATCH = 75
 
 # Which alerts also go out by email (when the user has email on). Each gets one line and one button.
-EMAIL_TYPES = {"match", "similar", "club_post", "deadline", "registered", "waitlisted", "seat_opened", "reminder_24h",
+EMAIL_TYPES = {"match", "similar", "club_post", "deadline", "registered", "waitlisted", "seat_opened", "reminder_24h", "seat_check",
                "reminder_leave_by", "cancelled_event", "message", "new_message",
                "org_registration", "org_cancellation", "org_waitlist", "org_review", "org_reminder", "org_digest", "how_was", "chat_announcement", "chat_summary"}
 # While alerts are paused, only these still email: things the user is actively waiting on.
@@ -145,7 +145,7 @@ def actions_for(n: Notification) -> list[dict]:
         return [view]
     if n.type == "seat_opened":
         return [{"label": "Confirm seat", "kind": "confirm_seat", "registration_id": rid}, view]
-    if n.type == "reminder_24h":
+    if n.type in ("reminder_24h", "seat_check"):
         return [{"label": "Yes", "kind": "confirm_reminder", "registration_id": rid}, {"label": "Can't make it", "kind": "cancel", "registration_id": rid}]
     if n.type == "reminder_leave_by" and p.get("maps_url"):
         return [{"label": "Directions", "kind": "url", "url": p["maps_url"]}, view]
@@ -185,7 +185,7 @@ def email_button(n: Notification) -> tuple[str, str]:
         return "View event", event
     if n.type == "reminder_leave_by" and p.get("maps_url"):
         return "Get directions", p["maps_url"]
-    if n.type == "reminder_24h":
+    if n.type in ("reminder_24h", "seat_check"):
         return "I'm still going", f"{base}/my"
     if n.type in ("registered", "waitlisted"):
         return "View my pass" if n.type == "registered" else "View event", f"{base}/my" if n.type == "registered" else event

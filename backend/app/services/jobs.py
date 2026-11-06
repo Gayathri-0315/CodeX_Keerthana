@@ -59,6 +59,48 @@ def send_reminders(db: Session, now: datetime) -> int:
     return sent
 
 
+SEAT_CHECK_WINDOW = (timedelta(hours=3), timedelta(hours=8))  # before the start
+SEAT_CHECK_BELOW = 0.5  # predicted chance of coming
+
+
+def send_seat_checks(db: Session, now: datetime) -> int:
+    """A few hours before a full event with a waitlist: privately ask registrants who probably won't come, and haven't
+    confirmed, whether they're still going, so a waitlisted student can get the seat. Never shown to organizers."""
+    events = db.scalars(select(Event).where(Event.status == "published", Event.capacity.is_not(None),
+                                            Event.start_at > now + SEAT_CHECK_WINDOW[0], Event.start_at <= now + SEAT_CHECK_WINDOW[1])).all()
+    sent = 0
+    for event in events:
+        waiting = db.scalar(select(func.count()).select_from(Registration).where(Registration.event_id == event.id, Registration.status == "waitlisted"))
+        if not waiting:
+            continue
+        regs = db.scalars(select(Registration).where(Registration.event_id == event.id, Registration.status == "registered",
+                                                     Registration.reminder_confirmed.is_(False))).all()
+        for reg in regs:
+            user = db.get(User, reg.user_id)
+            if user is None or notify.already_sent(db, user, event.id, "seat_check"):
+                continue
+            if registration.compute_likelihood(db, user, event, reg).p >= SEAT_CHECK_BELOW:
+                continue
+            title = f"Still coming to {notify._short(event.title, 34)}?"
+            body = "Others are waiting for a seat. If you can't make it, let it go to them."
+            if notify.create(db, user, "seat_check", event, title, body, {"registration_id": reg.id}, now=now):
+                sent += 1
+    return sent
+
+
+def retrain_showup_model(db: Session, now: datetime) -> int:
+    """Once a night (after 3 AM IST): relearn who shows up from finished events."""
+    from ..timeutil import to_ist
+    from . import showup_model
+
+    local = to_ist(now)
+    last = (showup_model.status(db) or {}).get("trained_at")
+    if local.hour < 3 or (last and to_ist(datetime.fromisoformat(last.replace("Z", "+00:00")).replace(tzinfo=None)).date() == local.date()):
+        return 0
+    showup_model.train(db)
+    return 1
+
+
 def send_deadline_alerts(db: Session, now: datetime) -> int:
     events = db.scalars(select(Event).where(
         Event.status == "published", Event.registration_deadline > now, Event.registration_deadline <= now + DEADLINE_WINDOW,
@@ -114,6 +156,8 @@ def tick(now: datetime | None = None) -> None:
             ("organizer digests", lambda: org_alerts.send_digests(db, now)),
             ("how was it", lambda: followup.send_how_was(db, now)),
             ("chat summaries", lambda: assist.send_daily_summaries(db, now)),
+            ("seat checks", lambda: send_seat_checks(db, now)),
+            ("show-up model", lambda: retrain_showup_model(db, now)),
             ("close", lambda: close_finished(db, now)),
         ):
             try:
