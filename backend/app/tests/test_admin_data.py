@@ -45,3 +45,22 @@ def test_only_admins(client):
             assert client.get(path).status_code == 403, (role, path)
     client.cookies.clear()
     assert client.get(f"/api/admin/events/{eid}/people").status_code in (401, 403)
+
+
+def test_lists_understand_sentences(client):
+    login(client, "admin")
+    studs = client.get("/api/admin/students", params={"q": "3rd year IT students from sample college"}).json()
+    assert studs["terms"] and any(s["email"] == "asha@example.com" for s in studs["items"])
+    assert all(s["year"] == "Year 3" and s["department"] == "IT" for s in studs["items"])
+    orgs = client.get("/api/admin/organizers", params={"q": "show me unverified organizers"}).json()["items"]
+    assert orgs and all(o["trust_level"] == "new" for o in orgs)
+    evs = client.get("/api/admin/events", params={"q": "free hackathons by coimbatore ai club", "when": "all"}).json()["items"]
+    assert any(e["title"] == "ML Hackathon: Build for Kovai" for e in evs) and all(e["fee_inr"] == 0 for e in evs)
+
+
+def test_terms_never_include_filler_and_short_words_are_whole_words():
+    from app.services import smart_find as sf
+
+    assert sf.rule_terms("show me final year CSE students who checked in") == ["year 4", "cse", "attended"]
+    assert not sf.matches(sf.text_of("Aishwarya"), ["ai"]) and sf.matches(sf.text_of("ai-ml"), ["ai"])
+    assert not sf.matches(sf.text_of("new"), ["verified"])

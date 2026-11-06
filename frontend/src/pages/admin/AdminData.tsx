@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { ChevronRight, ExternalLink, Mail, Phone, Search } from "lucide-react";
+import { ChevronRight, ExternalLink, Mail, Phone, Sparkles } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Tag } from "../../components/ui/Chip";
@@ -50,17 +50,31 @@ const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? on
 export function useDebounced(text: string) {
   const [q, setQ] = useState("");
   useEffect(() => {
-    const t = window.setTimeout(() => setQ(text.trim()), 250);
+    const t = window.setTimeout(() => setQ(text.trim()), 450);
     return () => window.clearTimeout(t);
   }, [text]);
   return q;
+}
+
+export type Understood = { terms: string[]; source: "ai" | "rules" } | null;
+
+/** One line under a list's search box: the key terms the sentence was turned into. */
+export function UnderstoodLine({ u, q }: { u: Understood; q: string }) {
+  if (!q || !u || u.terms.length === 0) return null;
+  return (
+    <p className="footnote -mt-2 mb-3 flex flex-wrap items-center gap-1.5 px-1 text-text-2" role="status">
+      <Sparkles className="size-3.5 text-accent" aria-hidden />
+      {u.source === "ai" ? "ShowUp AI is looking for" : "Looking for"}
+      {u.terms.map((t) => <span key={t} className="rounded-full bg-accent-soft px-2 py-0.5 font-medium text-accent">{t}</span>)}
+    </p>
+  );
 }
 
 export function SearchBox({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
   return (
     <label className="relative mb-4 block">
       <span className="sr-only">{placeholder}</span>
-      <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-text-2" aria-hidden />
+      <Sparkles className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-accent" aria-hidden />
       <input type="search" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} maxLength={100}
         className="h-12 w-full rounded-[14px] bg-surface pl-11 pr-4 body text-text shadow-[inset_0_0_0_1px_var(--line)] outline-none focus:shadow-[inset_0_0_0_2px_var(--accent)]" />
     </label>
@@ -108,16 +122,19 @@ function EventRow({ e, onOpen, showOrg = true }: { e: AdminEvent; onOpen: (id: s
 export function EventsAdmin({ initialWhen = "upcoming" }: { initialWhen?: "upcoming" | "past" | "all" }) {
   const [text, setText] = useState("");
   const q = useDebounced(text);
+  const [understood, setUnderstood] = useState<Understood>(null);
   const [when, setWhen] = useState<"upcoming" | "past" | "all">(initialWhen);
   const [open, setOpen] = useState<string | null>(null);
   const { data, isPending, isError, refetch } = useQuery({
     queryKey: ["admin", "events", when, q],
-    queryFn: () => api<{ items: AdminEvent[] }>(`/admin/events?when=${when}${q ? `&q=${encodeURIComponent(q)}` : ""}`).then((r) => r.items),
+    queryFn: () => api<{ items: AdminEvent[] } & NonNullable<Understood>>(`/admin/events?when=${when}${q ? `&q=${encodeURIComponent(q)}` : ""}`)
+      .then((r) => { setUnderstood(r); return r.items; }),
     placeholderData: (prev) => prev,
   });
   return (
     <section aria-label="Events">
-      <SearchBox value={text} onChange={setText} placeholder="Search events or clubs" />
+      <SearchBox value={text} onChange={setText} placeholder='Ask, like "free hackathons by AI club"' />
+      <UnderstoodLine u={understood} q={q} />
       <Segmented label="Which events" className="mb-4" value={when} onChange={setWhen}
         options={[{ value: "upcoming", label: "Upcoming" }, { value: "past", label: "Past" }, { value: "all", label: "All" }]} />
       <ListState isError={isError} isPending={isPending} empty={!data?.length} refetch={refetch}>
@@ -210,15 +227,18 @@ export function EventPeopleSheet({ id, onClose }: { id: string | null; onClose: 
 export function StudentsAdmin() {
   const [text, setText] = useState("");
   const q = useDebounced(text);
+  const [understood, setUnderstood] = useState<Understood>(null);
   const [open, setOpen] = useState<string | null>(null);
   const { data, isPending, isError, refetch } = useQuery({
     queryKey: ["admin", "students", q],
-    queryFn: () => api<{ items: StudentRow[] }>(`/admin/students${q ? `?q=${encodeURIComponent(q)}` : ""}`).then((r) => r.items),
+    queryFn: () => api<{ items: StudentRow[] } & NonNullable<Understood>>(`/admin/students${q ? `?q=${encodeURIComponent(q)}` : ""}`)
+      .then((r) => { setUnderstood(r); return r.items; }),
     placeholderData: (prev) => prev,
   });
   return (
     <section aria-label="Students">
-      <SearchBox value={text} onChange={setText} placeholder="Search by name, email or college" />
+      <SearchBox value={text} onChange={setText} placeholder='Ask, like "3rd year IT students from PSG"' />
+      <UnderstoodLine u={understood} q={q} />
       <ListState isError={isError} isPending={isPending} empty={!data?.length} refetch={refetch}>
         <p className="footnote mb-2 text-text-2 tnum">{data && count(data.length, "student")}{data?.length === 200 ? " (first 200; search to narrow)" : ""}</p>
         <ul className="card divide-y divide-line px-5">

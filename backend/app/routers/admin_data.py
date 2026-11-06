@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..models import Application, Event, Follow, Organizer, Registration, User
+from ..services import smart_find
 from ..timeutil import iso_utc, utcnow
 from .admin import admin_only
 
@@ -82,11 +83,15 @@ def events(q: str = Query("", max_length=100), when: str = Query("upcoming", pat
         stmt = stmt.where(Event.end_at < now).order_by(Event.start_at.desc())
     else:
         stmt = stmt.order_by(Event.start_at.desc())
-    if q.strip():
-        stmt = stmt.where(or_(func.lower(Event.title).like(_like(q)), func.lower(func.coalesce(Organizer.org_name, "")).like(_like(q))))
-    rows = db.execute(stmt.limit(200)).unique().all()
+    wanted, source = smart_find.terms(q, "events")
+    if wanted:  # a sentence: every key term must appear somewhere in the event's details
+        rows = [(e, name) for e, name in db.execute(stmt.limit(3000)).unique().all()
+                if smart_find.matches(smart_find.text_of(e.title, name, e.event_type, e.status, e.mode, e.venue_name,
+                                                         e.category, e.tags, "free" if not e.fee_inr else "paid"), wanted)][:200]
+    else:
+        rows = db.execute(stmt.limit(200)).unique().all()
     counts = _counts(db, [e.id for e, _ in rows])
-    return {"items": [_event_brief(e, name, counts) for e, name in rows]}
+    return {"items": [_event_brief(e, name, counts) for e, name in rows], "terms": wanted, "source": source}
 
 
 @router.get("/events/{event_id}/people")
@@ -115,11 +120,14 @@ def event_people(event_id: str, user: User = Depends(admin_only), db: Session = 
 
 @router.get("/students")
 def students(q: str = Query("", max_length=100), user: User = Depends(admin_only), db: Session = Depends(get_db)):
-    stmt = select(User).where(User.role == "student")
-    if q.strip():
-        stmt = stmt.where(or_(func.lower(User.name).like(_like(q)), func.lower(User.email).like(_like(q)),
-                              func.lower(func.coalesce(User.college, "")).like(_like(q))))
-    people = db.scalars(stmt.order_by(User.created_at.desc()).limit(200)).all()
+    stmt = select(User).where(User.role == "student").order_by(User.created_at.desc())
+    wanted, source = smart_find.terms(q, "students")
+    if wanted:  # every key term must appear somewhere in the student's details
+        people = [u for u in db.scalars(stmt.limit(5000)).all()
+                  if smart_find.matches(smart_find.text_of(*(v for k, v in _person(u).items() if k not in ("id", "joined", "last_active"))),
+                                        wanted)][:200]
+    else:
+        people = db.scalars(stmt.limit(200)).all()
     ids = [u.id for u in people]
     reg = dict(db.execute(select(Registration.user_id, func.count()).where(Registration.user_id.in_(ids), Registration.status.in_(ACTIVE))
                           .group_by(Registration.user_id)).all()) if ids else {}
@@ -127,7 +135,7 @@ def students(q: str = Query("", max_length=100), user: User = Depends(admin_only
                           .group_by(Registration.user_id)).all()) if ids else {}
     return {"items": [{"id": u.id, "name": u.name, "email": u.email, "college": u.college, **_tags(u.eligibility_tags),
                        "joined": iso_utc(u.created_at), "registrations": reg.get(u.id, 0), "attended": att.get(u.id, 0)}
-                      for u in people]}
+                      for u in people], "terms": wanted, "source": source}
 
 
 @router.get("/students/{user_id}")

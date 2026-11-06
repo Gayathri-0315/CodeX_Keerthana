@@ -1,6 +1,8 @@
 import { m } from "motion/react";
-import { ArrowLeft, Download, Lightbulb, MessageSquare, MessagesSquare, Pencil, QrCode, Search, Users, XCircle } from "lucide-react";
-import { useMemo, useState } from "react";
+import { ArrowLeft, Download, Lightbulb, MessageSquare, MessagesSquare, Pencil, QrCode, Sparkles, Users, XCircle } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { api } from "../../lib/api";
 import { Link, useParams } from "react-router-dom";
 import { Button } from "../../components/ui/Button";
 import { Tag } from "../../components/ui/Chip";
@@ -31,12 +33,31 @@ export default function EventManager() {
   const [messaging, setMessaging] = useState(false);
   const [cancelling, setCancelling] = useState(false);
 
+  // A sentence ("waitlisted people coming with friends") becomes key terms; each must match the person's name or status.
+  const [asked, setAsked] = useState("");
+  useEffect(() => {
+    const t = window.setTimeout(() => setAsked(q.trim()), 450);
+    return () => window.clearTimeout(t);
+  }, [q]);
+  const sentence = asked.split(" ").filter(Boolean).length >= 2;
+  const understood = useQuery({
+    queryKey: ["terms", "registrants", asked],
+    queryFn: () => api<{ terms: string[]; source: "ai" | "rules" }>("/search/terms", { method: "POST", body: { text: asked, kind: "registrants" } }),
+    enabled: sentence,
+    staleTime: 10 * 60_000,
+  });
+  const terms = !asked ? [] : sentence ? (understood.data?.terms ?? []) : [asked.toLowerCase()];
+
   const rows = useMemo(() => {
     const all = registrants.data ?? [];
+    const textOf = (r: Registrant) =>
+      [r.name, r.status, r.status.replace("_", " "), STATUS_LABEL[r.status], r.with_friends ? "with friends friend group" : "alone",
+        r.external ? "external guest" : ""].join(" ").toLowerCase();
     return all.filter(
-      (r) => (filter === "all" || r.status === filter || (filter === "registered" && r.status === "promoted_pending")) && r.name.toLowerCase().includes(q.trim().toLowerCase()),
+      (r) => (filter === "all" || r.status === filter || (filter === "registered" && r.status === "promoted_pending")) &&
+        terms.every((t) => textOf(r).includes(t) || (t.length > 4 && t.endsWith("s") && textOf(r).includes(t.slice(0, -1)))),
     );
-  }, [registrants.data, filter, q]);
+  }, [registrants.data, filter, terms.join("|")]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (event.isPending) return <div className="skeleton h-96 rounded-[22px]" />;
   if (event.isError || !event.data) {
@@ -108,11 +129,11 @@ export default function EventManager() {
         </div>
         <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-text-2" aria-hidden />
+            <Sparkles className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-accent" aria-hidden />
             <input
               type="search"
-              aria-label="Search registrants"
-              placeholder="Search by name"
+              aria-label="Search registrants: a name, or ask"
+              placeholder='A name, or ask "waitlisted people with friends"'
               value={q}
               onChange={(ev) => setQ(ev.target.value)}
               className="h-11 w-full rounded-[14px] bg-surface pl-11 pr-4 body shadow-[inset_0_0_0_1px_var(--line)] outline-none focus:shadow-[inset_0_0_0_2px_var(--accent)]"
@@ -130,6 +151,13 @@ export default function EventManager() {
             />
           </div>
         </div>
+        {sentence && terms.length > 0 && (
+          <p className="footnote -mt-1 mb-3 flex flex-wrap items-center gap-1.5 px-1 text-text-2" role="status">
+            <Sparkles className="size-3.5 text-accent" aria-hidden />
+            {understood.data?.source === "ai" ? "ShowUp AI is looking for" : "Looking for"}
+            {terms.map((t) => <span key={t} className="rounded-full bg-accent-soft px-2 py-0.5 font-medium text-accent">{t}</span>)}
+          </p>
+        )}
         {registrants.isPending ? (
           <div className="skeleton h-40 rounded-[22px]" />
         ) : rows.length === 0 ? (

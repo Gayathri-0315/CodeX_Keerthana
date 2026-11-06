@@ -244,17 +244,22 @@ def organizers(q: str = Query("", max_length=100), user: User = Depends(admin_on
     from sqlalchemy import func
 
     counts = dict(db.execute(select(Event.organizer_id, func.count()).where(Event.status == "published").group_by(Event.organizer_id)).all())
-    stmt = select(Organizer, User).join(User, User.id == Organizer.user_id)
-    if q.strip():
-        like = f"%{q.strip().lower()}%"
-        stmt = stmt.where(or_(func.lower(Organizer.org_name).like(like), func.lower(User.email).like(like),
-                              func.lower(func.coalesce(Organizer.college_or_company, "")).like(like)))
-    rows = db.execute(stmt.order_by(Organizer.org_name).limit(200)).all()
+    from ..services import smart_find
+
+    stmt = select(Organizer, User).join(User, User.id == Organizer.user_id).order_by(Organizer.org_name)
+    wanted, source = smart_find.terms(q, "organizers")
+    if wanted:  # every key term must appear somewhere in the organizer's details
+        rows = [(o, u) for o, u in db.execute(stmt.limit(3000)).all()
+                if smart_find.matches(smart_find.text_of(o.org_name, u.name, u.email, o.college_or_company, o.city, o.trust_level,
+                                                         "verified" if o.trust_level in ("verified", "trusted") else "new"),
+                                      wanted)][:200]
+    else:
+        rows = db.execute(stmt.limit(200)).all()
     # Unverified first: they're the ones an admin is usually looking for.
     rows.sort(key=lambda r: (r[0].trust_level != "new", r[0].org_name.lower()))
     return {"items": [{"id": o.id, "name": o.org_name, "slug": o.slug, "email": u.email, "college_or_company": o.college_or_company,
                        "city": o.city, "trust_level": o.trust_level, "events": counts.get(o.id, 0), "joined": iso_utc(u.created_at)}
-                      for o, u in rows]}
+                      for o, u in rows], "terms": wanted, "source": source}
 
 
 @router.post("/organizers/{organizer_id}/trust")

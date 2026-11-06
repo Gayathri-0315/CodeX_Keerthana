@@ -1,10 +1,10 @@
-import { ArrowRight, Loader2, Search, SlidersHorizontal, Sparkles, X } from "lucide-react";
+import { Loader2, SlidersHorizontal, Sparkles, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useCategories, useExplore, type ExploreFilters } from "../../lib/queries";
 import { Button } from "../ui/Button";
 import { Segmented } from "../ui/Segmented";
 import { Sheet } from "../ui/Sheet";
+import { AIResults } from "./AIResults";
 import { Timeline } from "./Timeline";
 
 const inputCls =
@@ -21,7 +21,6 @@ export function ExploreView({ source = "feed", category, eventType }: {
   /** Fixed category (category pages): hides the category filter. */
   category?: string;
 }) {
-  const navigate = useNavigate();
   const [text, setText] = useState("");
   const [filters, setFilters] = useState<ExploreFilters>({});
   const [sheet, setSheet] = useState(false);
@@ -29,14 +28,10 @@ export function ExploreView({ source = "feed", category, eventType }: {
   const items = feed.data?.pages.flatMap((p) => p.items) ?? [];
   const active = [filters.category, filters.date_from || filters.date_to, filters.price, filters.mode].filter(Boolean).length;
 
-  // A word or two filters this list as you type; a sentence ("free AI workshops this weekend") goes to the AI search.
-  const sentence = text.trim().split(/\s+/).filter(Boolean).length >= 3;
-  const askAI = () => text.trim() && navigate(`/search?q=${encodeURIComponent(text.trim())}`);
-
-  // Search shortly after typing stops.
+  // Everything typed here goes to the AI search, shortly after typing stops (or at once on Enter).
+  const [ask, setAsk] = useState("");
   useEffect(() => {
-    const q = (text.trim().split(/\s+/).filter(Boolean).length >= 3 ? "" : text.trim().slice(0, 100)) || undefined;
-    const t = window.setTimeout(() => setFilters((f) => (f.q === q ? f : { ...f, q })), 300);
+    const t = window.setTimeout(() => setAsk(text.trim().slice(0, 200)), 700);
     return () => window.clearTimeout(t);
   }, [text]);
 
@@ -58,6 +53,7 @@ export function ExploreView({ source = "feed", category, eventType }: {
 
   const clearAll = () => {
     setText("");
+    setAsk("");
     setFilters({});
   };
 
@@ -66,12 +62,14 @@ export function ExploreView({ source = "feed", category, eventType }: {
       <div className="mb-3 flex gap-2">
         <form role="search" className="relative flex-1" onSubmit={(e) => {
           e.preventDefault();
-          askAI();
+          setAsk(text.trim().slice(0, 200));
         }}>
           <label>
-          <span className="sr-only">Search events, or describe what you want and press Enter</span>
-          <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-text-2" aria-hidden />
-          <input type="search" enterKeyHint="search" value={text} onChange={(e) => setText(e.target.value)} placeholder='Search, or ask "free hackathons this weekend"' maxLength={200} className={`${inputCls} pl-11`} />
+          <span className="sr-only">Ask ShowUp AI: describe the event you want</span>
+          <Sparkles className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-accent" aria-hidden />
+          <input type="search" enterKeyHint="search" value={text} onChange={(e) => setText(e.target.value)}
+            placeholder={category ? "Ask about events in this category" : 'Ask anything, like "free hackathons this weekend"'}
+            maxLength={200} className={`${inputCls} pl-11`} />
           </label>
         </form>
         <button
@@ -86,17 +84,10 @@ export function ExploreView({ source = "feed", category, eventType }: {
         </button>
       </div>
 
-      {sentence && (
-        <button onClick={askAI} className="pressable mb-3 flex w-full items-center gap-3 rounded-[14px] bg-accent-soft p-3.5 text-left">
-          <Sparkles className="size-5 shrink-0 text-accent" aria-hidden />
-          <span className="min-w-0 flex-1">
-            <span className="callout block font-medium text-text">Ask ShowUp AI</span>
-            <span className="footnote block truncate text-text-2">"{text.trim()}" · press Enter</span>
-          </span>
-          <ArrowRight className="size-5 shrink-0 text-accent" aria-hidden />
-        </button>
-      )}
-
+      {ask ? (
+        <AIResults key={ask} q={ask} fixed={{ category, eventType }} onClear={clearAll} showClubs={!category} />
+      ) : (
+      <>
       <div className="no-scrollbar -mx-4 mb-6 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:px-0" role="group" aria-label="Quick filters">
         {source === "feed" && (
           <QuickChip on={filters.following === "true"} label="Following" onClick={() => setFilters((f) => ({ ...f, following: f.following ? undefined : "true" }))} />
@@ -131,6 +122,8 @@ export function ExploreView({ source = "feed", category, eventType }: {
             {feed.isFetchingNextPage && <Loader2 className="size-5 animate-spin text-text-2" aria-label="Loading more events" />}
           </div>
         </>
+      )}
+      </>
       )}
 
       <FilterSheet

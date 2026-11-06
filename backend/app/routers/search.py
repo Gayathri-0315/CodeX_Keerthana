@@ -75,6 +75,21 @@ def _run(data, f: search.SearchFilters, user):
     return items
 
 
+class TermsIn(BaseModel):
+    text: str = Field(min_length=1, max_length=search.MAX_TEXT)
+    kind: str = Field("people", pattern="^(people|registrants|students|organizers|events)$")
+
+
+@router.post("/terms")
+def terms(body: TermsIn, request: Request, user: User | None = Depends(optional_user)):
+    """A sentence -> key terms, for searching a list on the page (an organizer's registrants). Never sees the list."""
+    from ..services import smart_find
+
+    _limit(request, user)
+    wanted, source = smart_find.terms(body.text, body.kind)
+    return {"terms": wanted, "source": source}
+
+
 @router.post("/parse")
 def parse(body: ParseIn, request: Request, user: User | None = Depends(optional_user), db: Session = Depends(get_db)):
     _limit(request, user)

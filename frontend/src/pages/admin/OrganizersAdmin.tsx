@@ -1,11 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BadgeCheck, Search } from "lucide-react";
+import { BadgeCheck, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "../../components/ui/Button";
 import { Tag } from "../../components/ui/Chip";
 import { useToast } from "../../components/ui/Toaster";
 import { api } from "../../lib/api";
-import { OrganizerSheet } from "./AdminData";
+import { OrganizerSheet, UnderstoodLine, type Understood } from "./AdminData";
 
 type Trust = "new" | "verified" | "trusted";
 type Org = {
@@ -26,13 +26,15 @@ export function OrganizersAdmin() {
   const [text, setText] = useState("");
   const [q, setQ] = useState("");
   const [open, setOpen] = useState<string | null>(null);
+  const [understood, setUnderstood] = useState<Understood>(null);
   useEffect(() => {
-    const t = window.setTimeout(() => setQ(text.trim()), 250);
+    const t = window.setTimeout(() => setQ(text.trim()), 450);
     return () => window.clearTimeout(t);
   }, [text]);
   const { data, isPending, isError, refetch } = useQuery({
     queryKey: ["admin", "organizers", q],
-    queryFn: () => api<{ items: Org[] }>(`/admin/organizers${q ? `?q=${encodeURIComponent(q)}` : ""}`).then((r) => r.items),
+    queryFn: () => api<{ items: Org[] } & NonNullable<Understood>>(`/admin/organizers${q ? `?q=${encodeURIComponent(q)}` : ""}`)
+      .then((r) => { setUnderstood(r); return r.items; }),
     placeholderData: (prev) => prev,
   });
   const change = useMutation({
@@ -50,10 +52,11 @@ export function OrganizersAdmin() {
     <section aria-label="Organizers">
       <label className="relative mb-4 block">
         <span className="sr-only">Search organizers</span>
-        <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-text-2" aria-hidden />
-        <input type="search" value={text} onChange={(e) => setText(e.target.value)} placeholder="Search by name, email or college" maxLength={100}
+        <Sparkles className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-accent" aria-hidden />
+        <input type="search" value={text} onChange={(e) => setText(e.target.value)} placeholder='Ask, like "unverified clubs in Coimbatore"' maxLength={100}
           className="h-12 w-full rounded-[14px] bg-surface pl-11 pr-4 body text-text shadow-[inset_0_0_0_1px_var(--line)] outline-none focus:shadow-[inset_0_0_0_2px_var(--accent)]" />
       </label>
+      <UnderstoodLine u={understood} q={q} />
       {isError ? (
         <div className="card p-6 text-center">
           <p className="headline">Couldn't load organizers.</p>
