@@ -2,11 +2,11 @@
 
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..deps import student_only
+from ..deps import current_user, student_only
 from ..models import User
 from ..services.week import build_week
 from ..timeutil import ist_today
@@ -43,3 +43,13 @@ def my_recap(period: str | None = Query(None, max_length=8, description="e.g. 20
         return build_recap(db, user, period or f"{today.year}-H{1 if today.month <= 6 else 2}")
     except ValueError as e:
         raise HTTPException(422, str(e))
+
+
+@router.get("/brief")
+def my_brief(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Organizers and admins: today's few important things (AI-picked when GROQ_API_KEY is set)."""
+    from ..services import brief
+
+    if user.role not in ("organizer", "admin"):
+        raise HTTPException(403, "The daily brief is for organizers and admins.")
+    return brief.for_user(db, user)

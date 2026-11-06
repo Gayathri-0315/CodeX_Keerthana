@@ -28,7 +28,7 @@ MIN_MATCH = 75
 # Which alerts also go out by email (when the user has email on). Each gets one line and one button.
 EMAIL_TYPES = {"match", "similar", "club_post", "deadline", "registered", "waitlisted", "seat_opened", "reminder_24h", "seat_check",
                "reminder_leave_by", "cancelled_event", "message", "new_message",
-               "org_registration", "org_cancellation", "org_waitlist", "org_review", "org_reminder", "org_digest", "how_was", "chat_announcement", "chat_summary"}
+               "org_registration", "org_cancellation", "org_waitlist", "org_review", "org_reminder", "org_digest", "how_was", "chat_announcement", "chat_summary", "daily_brief"}
 # While alerts are paused, only these still email: things the user is actively waiting on.
 PAUSE_EXEMPT = {"seat_opened", "cancelled_event", "registered", "waitlisted", "new_message", "org_review"}
 # Shown as a live toast? Registration confirmations already show their own animation and toast in the app.
@@ -195,6 +195,8 @@ def email_button(n: Notification) -> tuple[str, str]:
         return ("Open event", f"{base}/organizer/event/{n.event_id}") if n.event_id else ("Open dashboard", f"{base}/")
     if n.type == "how_was":
         return "Rate it in one tap", f"{base}/my"
+    if n.type == "daily_brief":
+        return "Open your brief", f"{base}/"
     if n.type in ("chat_announcement", "chat_summary"):
         return "Open the chat", f"{base}/event/{n.event_id}/chat"
     return "Open ShowUp", event

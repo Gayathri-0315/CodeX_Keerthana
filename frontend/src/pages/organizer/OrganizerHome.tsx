@@ -1,6 +1,7 @@
 import { Bell, CalendarClock, ChevronRight, Plus, Ticket, TrendingUp } from "lucide-react";
 import { Link } from "react-router-dom";
 import { PageHeader } from "../../components/AppShell";
+import { BriefCard } from "../../components/organizer/BriefCard";
 import { Thumb } from "../../components/events/EventCard";
 import { Tag } from "../../components/ui/Chip";
 import { CountUp } from "../../components/ui/CountUp";
@@ -31,6 +32,7 @@ export default function OrganizerHome() {
         }
       />
 
+      <BriefCard className="mb-6" />
       {summary && <Followers count={summary.followers} growth={summary.follower_growth} slug={summary.slug} />}
       <div className="mb-8 grid grid-cols-3 gap-3">
         <Tile icon={CalendarClock} label="Upcoming" value={summary?.upcoming} />
