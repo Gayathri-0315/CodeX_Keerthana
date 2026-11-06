@@ -12,7 +12,7 @@ from ..models import Event, Organizer, User
 from ..schemas import EventIn
 from ..seed.venues import AREAS
 from ..timeutil import ist_to_utc, to_ist, utcnow
-from . import embeddings, extraction, spam
+from . import embeddings, extraction, scam_model, spam
 from .feed import user_going, user_profile, user_windows
 from .matching import check_event
 from .ranking import score_event, tag_label
@@ -152,10 +152,25 @@ def run_gate(db: Session, organizer: Organizer, event_like, exclude_id: str | No
                              find_duplicate(db, event_like, exclude_id))
     if blocks := internship_reasons(event_like):
         assessment = spam.Assessment(max(assessment.score, spam.HIGH), blocks + assessment.reasons, assessment.duplicate_of)
-    judgement = extraction.judge_spam(f"{candidate.title}\n{candidate.description}\nFee: ₹{candidate.fee_inr}\nLink: {candidate.registration_url or '-'}")
+    text = f"{candidate.title}\n{candidate.description}\nFee: ₹{candidate.fee_inr}\nLink: {candidate.registration_url or '-'}"
+    assessment = learned_check(db, assessment, text)
+    judgement = extraction.judge_spam(text)
     if judgement:
         assessment = spam.combine_llm(assessment, judgement.risk, judgement.reasons)
+    elif (ai := scam_model.ai_judge(db, text)) is not None:
+        assessment = spam.combine_llm(assessment, ai[0], ai[1])
     return assessment
+
+
+def learned_check(db: Session, a: spam.Assessment, text: str) -> spam.Assessment:
+    """The classifier trained on admin decisions adds to the score (never lowers it) with a reason admins can read."""
+    p, words = scam_model.model(db).p_scam(text)
+    bump = 25 if p >= 0.85 else 12 if p >= 0.65 else 0
+    if not bump:
+        return a
+    why = f"Reads like listings that were rejected before ({round(p * 100)}% sure"
+    why += f"; for example {', '.join(words)})" if words else ")"
+    return spam.Assessment(min(100, a.score + bump), a.reasons + [why], a.duplicate_of)
 
 
 def is_first_event(db: Session, organizer: Organizer, exclude_id: str | None) -> bool:
