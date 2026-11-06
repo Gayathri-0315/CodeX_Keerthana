@@ -105,10 +105,10 @@ function EventRow({ e, onOpen, showOrg = true }: { e: AdminEvent; onOpen: (id: s
 }
 
 /** Every event; tap one to see who registered. */
-export function EventsAdmin() {
+export function EventsAdmin({ initialWhen = "upcoming" }: { initialWhen?: "upcoming" | "past" | "all" }) {
   const [text, setText] = useState("");
   const q = useDebounced(text);
-  const [when, setWhen] = useState<"upcoming" | "past" | "all">("upcoming");
+  const [when, setWhen] = useState<"upcoming" | "past" | "all">(initialWhen);
   const [open, setOpen] = useState<string | null>(null);
   const { data, isPending, isError, refetch } = useQuery({
     queryKey: ["admin", "events", when, q],

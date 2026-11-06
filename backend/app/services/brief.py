@@ -67,10 +67,12 @@ def organizer_items(db: Session, org: Organizer, now: datetime) -> list[Item]:
             open_q = rule_summary(msgs)["questions"]
             if open_q:
                 items.append(Item(75, f"{len(open_q)} unanswered question{'s' if len(open_q) != 1 else ''} in the {title} chat.", f"/event/{e.id}/chat"))
-    reported = db.execute(select(Event.title, func.count()).join(Report, Report.event_id == Event.id)
-                          .where(Event.organizer_id == org.id, Report.created_at > now - timedelta(days=2)).group_by(Event.title)).all()
-    for title, c in reported:
-        items.append(Item(90, f"{_short(title)} was reported {c} time{'s' if c != 1 else ''}. Check the details are right.", "/"))
+    reported = db.execute(select(Event.id, Event.title, func.count()).join(Report, Report.event_id == Event.id)
+                          .where(Event.organizer_id == org.id, Report.created_at > now - timedelta(days=2))
+                          .group_by(Event.id, Event.title)).all()
+    for event_id, title, c in reported:
+        items.append(Item(90, f"{_short(title)} was reported {c} time{'s' if c != 1 else ''}. Check the details are right.",
+                          f"/organizer/event/{event_id}"))
     blocked = db.scalars(select(Event).where(Event.organizer_id == org.id, Event.status.in_(("pending_review", "blocked")),
                                              Event.created_at > now - timedelta(days=3))).all()
     for e in blocked:
@@ -85,26 +87,26 @@ def admin_items(db: Session, now: datetime) -> list[Item]:
     if pending:
         oldest = (now - pending[0].created_at).total_seconds() / 3600
         items.append(Item(85 if oldest > 24 else 70, f"{len(pending)} event{'s' if len(pending) != 1 else ''} waiting for review"
-                          f"{f', the oldest for {round(oldest)} hours' if oldest >= 2 else ''}.", "/"))
+                          f"{f', the oldest for {round(oldest)} hours' if oldest >= 2 else ''}.", "/?tab=review&focus=queue"))
     risky = [e for e in pending if (e.risk_score or 0) >= 60]
     if risky:
-        items.append(Item(95, f"{len(risky)} of them look like possible scams (high risk score). Review these first.", "/"))
+        items.append(Item(95, f"{len(risky)} of them look like possible scams (high risk score). Review these first.", "/?tab=review&focus=queue"))
     reports = db.scalar(select(func.count(func.distinct(Report.event_id))).where(Report.created_at > now - timedelta(days=1))) or 0
     if reports:
-        items.append(Item(80, f"{reports} event{'s' if reports != 1 else ''} reported by students in the last day.", "/"))
+        items.append(Item(80, f"{reports} event{'s' if reports != 1 else ''} reported by students in the last day.", "/?tab=review&focus=queue"))
     chat = db.scalar(select(func.count()).select_from(ChatReport).where(ChatReport.status == "open")) or 0
     if chat:
-        items.append(Item(75, f"{chat} reported chat message{'s' if chat != 1 else ''} to review.", "/"))
+        items.append(Item(75, f"{chat} reported chat message{'s' if chat != 1 else ''} to review.", "/?tab=review&focus=chat"))
     verif = db.scalar(select(func.count()).select_from(OrgVerificationRequest).where(OrgVerificationRequest.status == "pending")) or 0
     if verif:
-        items.append(Item(60, f"{verif} organizer{'s' if verif != 1 else ''} asking to be verified.", "/"))
+        items.append(Item(60, f"{verif} organizer{'s' if verif != 1 else ''} asking to be verified.", "/?tab=review&focus=verification"))
     blocked = db.scalar(select(func.count()).select_from(Event).where(Event.status == "blocked", Event.created_at > now - timedelta(days=1))) or 0
     if blocked:
-        items.append(Item(40, f"Safety checks blocked {blocked} listing{'s' if blocked != 1 else ''} in the last day.", "/"))
+        items.append(Item(40, f"Safety checks blocked {blocked} listing{'s' if blocked != 1 else ''} in the last day.", "/?tab=events&when=all"))
     new_orgs = db.scalar(select(func.count()).select_from(Organizer).join(User, User.id == Organizer.user_id)
                          .where(User.created_at > now - timedelta(days=1), Organizer.trust_level == "new")) or 0
     if new_orgs:
-        items.append(Item(35, f"{new_orgs} new organizer{'s' if new_orgs != 1 else ''} joined (not verified yet).", "/"))
+        items.append(Item(35, f"{new_orgs} new organizer{'s' if new_orgs != 1 else ''} joined (not verified yet).", "/?tab=organizers"))
     return items
 
 

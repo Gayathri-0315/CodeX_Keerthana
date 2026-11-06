@@ -1,5 +1,6 @@
-import { Flag, Mail } from "lucide-react";
-import { useState } from "react";
+import { Flag, Mail, MessageSquareWarning } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import { PageHeader } from "../../components/AppShell";
@@ -14,8 +15,31 @@ import { OrganizersAdmin } from "./OrganizersAdmin";
 import { EventsAdmin, StudentsAdmin } from "./AdminData";
 import { BriefCard } from "../../components/organizer/BriefCard";
 
+type Tab = "review" | "events" | "students" | "organizers";
+const TABS: Tab[] = ["review", "events", "students", "organizers"];
+
 export default function ReviewQueue() {
-  const [tab, setTab] = useState<"review" | "events" | "students" | "organizers">("review");
+  // The tab lives in the URL, so links from the brief (/?tab=review&focus=chat) open the right place.
+  const [params, setParams] = useSearchParams();
+  const tab: Tab = TABS.includes(params.get("tab") as Tab) ? (params.get("tab") as Tab) : "review";
+  const setTab = (t: Tab) => setParams(t === "review" ? {} : { tab: t }, { replace: true });
+  const focus = params.get("focus");
+  const when = params.get("when");
+
+  // Scroll to the section the brief pointed at, once it has loaded.
+  useEffect(() => {
+    if (!focus) return;
+    let tries = 0;
+    const t = window.setInterval(() => {
+      const el = document.getElementById(`admin-${focus}`);
+      if (el || ++tries > 20) {
+        window.clearInterval(t);
+        el?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }, 150);
+    return () => window.clearInterval(t);
+  }, [focus, tab]);
+
   const subtitle = {
     review: "Events waiting for review, reported events and appeals.",
     events: "Every event. Tap one to see who registered.",
@@ -28,7 +52,7 @@ export default function ReviewQueue() {
       <BriefCard className="mb-6" />
       <Segmented label="Admin section" className="mb-6 w-full sm:w-auto" value={tab} onChange={setTab}
         options={[{ value: "review", label: "Review" }, { value: "events", label: "Events" }, { value: "students", label: "Students" }, { value: "organizers", label: "Organizers" }]} />
-      {tab === "review" ? <Review /> : tab === "events" ? <EventsAdmin /> : tab === "students" ? <StudentsAdmin /> : <OrganizersAdmin />}
+      {tab === "review" ? <Review /> : tab === "events" ? <EventsAdmin key={when ?? ""} initialWhen={when === "all" || when === "past" ? when : "upcoming"} /> : tab === "students" ? <StudentsAdmin /> : <OrganizersAdmin />}
     </>
   );
 }
@@ -38,6 +62,8 @@ function Review() {
   return (
     <>
       <VerificationRequests />
+      <ChatReports />
+      <h2 id="admin-queue" className="footnote mb-2 scroll-mt-24 px-1 font-semibold uppercase tracking-wide text-text-2">Events to review</h2>
       {isError ? (
         <div className="card p-6 text-center">
           <p className="headline">Couldn't load the queue.</p>
@@ -169,7 +195,7 @@ function VerificationRequests() {
   });
   if (!data || data.length === 0) return null;
   return (
-    <section className="mb-8">
+    <section id="admin-verification" className="mb-8 scroll-mt-24">
       <h2 className="footnote mb-2 px-1 font-semibold uppercase tracking-wide text-text-2">Organization verification</h2>
       <ul className="flex flex-col gap-3">
         {data.map((r) => (
@@ -185,6 +211,48 @@ function VerificationRequests() {
                 className="pressable inline-flex min-h-11 items-center rounded-[14px] bg-accent-soft px-4 callout font-semibold text-accent">View document</a>
               <Button size="sm" onClick={() => decide.mutate({ id: r.id, ok: true })}>Verify</Button>
               <Button size="sm" variant="danger" onClick={() => decide.mutate({ id: r.id, ok: false })}>Decline</Button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+type ChatReportItem = { id: string; reason: string; message: string; message_id: string; event_title: string; at: string };
+
+/** Group-chat messages students reported: hide the message, or keep it. */
+function ChatReports() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const { data } = useQuery({
+    queryKey: ["admin", "chat-reports"],
+    queryFn: () => api<{ items: ChatReportItem[] }>("/admin/chat-reports").then((r) => r.items),
+  });
+  const decide = useMutation({
+    mutationFn: ({ id, action }: { id: string; action: "hide" | "dismiss" }) => api(`/admin/chat-reports/${id}/${action}`, { method: "POST" }),
+    onSuccess: (_r, { action }) => {
+      toast({ tone: "success", title: action === "hide" ? "Message removed from the chat" : "Report dismissed" });
+      qc.invalidateQueries({ queryKey: ["admin", "chat-reports"] });
+      qc.invalidateQueries({ queryKey: ["brief"] });
+    },
+    onError: (e) => toast({ tone: "error", title: "Couldn't save", body: (e as Error).message }),
+  });
+  if (!data || data.length === 0) return null;
+  return (
+    <section id="admin-chat" className="mb-8 scroll-mt-24">
+      <h2 className="footnote mb-2 px-1 font-semibold uppercase tracking-wide text-text-2">Reported chat messages</h2>
+      <ul className="flex flex-col gap-3">
+        {data.map((r) => (
+          <li key={r.id} className="card p-5">
+            <p className="footnote flex items-center gap-1.5 text-text-2">
+              <MessageSquareWarning className="size-4" aria-hidden /> {r.event_title} chat
+            </p>
+            <p className="callout mt-2 rounded-[14px] bg-surface-2 p-3">{r.message}</p>
+            <p className="footnote mt-2 text-text-2">Reported: {r.reason}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button size="sm" variant="danger" disabled={decide.isPending} onClick={() => decide.mutate({ id: r.id, action: "hide" })}>Remove message</Button>
+              <Button size="sm" variant="secondary" disabled={decide.isPending} onClick={() => decide.mutate({ id: r.id, action: "dismiss" })}>Keep it</Button>
             </div>
           </li>
         ))}
