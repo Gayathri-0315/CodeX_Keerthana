@@ -198,10 +198,14 @@ def _seed_rest(db: Session, pw: str, rng, today, now, organizer, samples_only: b
     return {"users": 1 + len(orgs) + 1 + len(students), "events": len(events)}
 
 
+# Exactly the accounts load_samples creates. Anyone else on example.com (say, a tester's sign-up) isn't a sample.
+SAMPLE_EMAILS = [dev_email(x) for x in ("club", "neworg", "design", "volunteers")] + [dev_email(f"student{i}") for i in range(1, 31)]
+
+
 def has_samples(db: Session) -> bool:
     from sqlalchemy import select
 
-    return db.scalar(select(User.id).where(User.email.like(f"%@{DEV_DOMAIN}"), User.role != "admin").limit(1)) is not None
+    return db.scalar(select(User.id).where(User.email.in_(SAMPLE_EMAILS)).limit(1)) is not None
 
 
 def load_samples() -> dict:
@@ -218,7 +222,7 @@ def remove_samples() -> dict:
     from sqlalchemy import delete, select
 
     with SessionLocal() as db:
-        users = select(User.id).where(User.email.like(f"%@{DEV_DOMAIN}"), User.role != "admin")
+        users = select(User.id).where(User.email.in_(SAMPLE_EMAILS), User.role != "admin")
         orgs = select(Organizer.id).where(Organizer.user_id.in_(users))
         n_events = db.execute(delete(Event).where(Event.organizer_id.in_(orgs))).rowcount
         n_users = db.execute(delete(User).where(User.id.in_(users))).rowcount

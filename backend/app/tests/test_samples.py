@@ -19,6 +19,7 @@ def test_load_and_remove_samples_keep_real_data(client):
     assert _count(Event) == 0
     with SessionLocal() as db:  # real people already on the site
         db.add(User(email="real.student@gmail.com", name="Real", role="student", password_hash=hash_password("x"), onboarded=True))
+        db.add(User(email="tester@example.com", name="Tester", role="student", password_hash=hash_password("x"), onboarded=True))
         db.add(User(email="boss@college.edu", name="Admin", role="admin", password_hash=hash_password("x"), onboarded=True))
         db.commit()
 
@@ -27,7 +28,7 @@ def test_load_and_remove_samples_keep_real_data(client):
     with SessionLocal() as db:
         events = db.scalars(select(Event)).all()
         assert all(e.description.startswith(seed_mod.SAMPLE_NOTE) for e in events)
-        assert db.scalar(select(User).where(User.email == "asha@example.com")) is None  # no sign-in demo accounts
+        assert set(db.scalars(select(User.email).where(User.email.like("%@example.com")))) ==             set(seed_mod.SAMPLE_EMAILS) | {"asha@example.com", "admin@example.com", "tester@example.com"}  # only the 34 samples added
         assert db.scalar(select(func.count()).select_from(User).where(User.role == "admin")) == 2  # local + real: no new one
     assert client.get("/api/public/events").status_code == 200
     # The sample accounts' password was random and never shown.
@@ -39,4 +40,4 @@ def test_load_and_remove_samples_keep_real_data(client):
     out = seed_mod.remove_samples()
     assert out["events"] == 25 and _count(Event) == 0 and _count(Organizer) == 0
     with SessionLocal() as db:
-        assert {u.email for u in db.scalars(select(User))} == {"real.student@gmail.com", "boss@college.edu", "admin@example.com"}
+        assert {u.email for u in db.scalars(select(User))} == {"real.student@gmail.com", "boss@college.edu", "admin@example.com", "tester@example.com", "asha@example.com"}
