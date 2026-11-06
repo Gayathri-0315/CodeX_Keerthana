@@ -12,7 +12,7 @@ from ..config import settings
 from ..db import SessionLocal
 from ..models import Event, Organizer, Registration, Report, User
 from ..timeutil import utcnow
-from . import alerts, assist, brief, feedcache, followup, notify, org_alerts, registration, together
+from . import alerts, assist, brief, concepts, feedcache, followup, notify, org_alerts, registration, together
 from .showup_score import reminder_times
 
 log = logging.getLogger("showup.jobs")
@@ -158,6 +158,7 @@ def tick(now: datetime | None = None) -> None:
             ("chat summaries", lambda: assist.send_daily_summaries(db, now)),
             ("seat checks", lambda: send_seat_checks(db, now)),
             ("daily briefs", lambda: brief.send_daily_briefs(db, now)),
+            ("topics for matching", lambda: concepts.warm(db)),
             ("show-up model", lambda: retrain_showup_model(db, now)),
             ("close", lambda: close_finished(db, now)),
         ):

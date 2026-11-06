@@ -130,15 +130,31 @@ def event_text(event) -> list[tuple[str, float]]:
     return [(" ".join(event.tags or []), 2.0), (event.title or "", 1.5), (event.description or "", 1.0)]
 
 
+CONCEPT_WEIGHT = 1.5  # how much the AI's topic reading counts next to the words themselves
+
+
+def _with_concepts(vec: dict[str, float], text: str, weight: float) -> dict[str, float]:
+    """Add the stored AI topics for this text (see services/concepts.py). Memory only; never calls the AI here."""
+    from . import concepts
+
+    for tag, w in concepts.lookup(None, text):
+        vec[tag] = vec.get(tag, 0.0) + weight * w * CONCEPT_WEIGHT
+    return vec
+
+
 def compute_event_vector(event):
     """Uncached; for drafts and forms that have no stable id yet."""
     if _model is not None:
         return _encode([f"{event.title}. {event.description} Tags: {', '.join(event.tags or [])}"])[0]
-    return _sparse(event_text(event))
+    from .concepts import event_text as concept_text
+
+    return _with_concepts(_sparse(event_text(event)), concept_text(event), 2.0)
 
 
 def event_vector(event):
-    key = f"{event.id}:{backend()}:{event.title}:{len(event.description or '')}"
+    from . import concepts
+
+    key = f"{event.id}:{backend()}:{event.title}:{len(event.description or '')}:{concepts.version}"
     hit = _event_cache.get(key)
     if hit is None:
         hit = _event_cache[key] = compute_event_vector(event)
@@ -156,7 +172,10 @@ def text_vector(weighted: list[tuple[str, float]]):
         avg = sum(v * w for v, w in zip(vecs, weights)) / sum(weights)
         norm = float((avg @ avg) ** 0.5)
         return avg / norm if norm else None
-    return _sparse(weighted)
+    vec = _sparse(weighted)
+    for text, weight in weighted:
+        _with_concepts(vec, text, weight)
+    return vec
 
 
 def cosine(a, b) -> float:
