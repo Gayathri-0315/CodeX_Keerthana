@@ -78,8 +78,8 @@ def _run(data, f: search.SearchFilters, user):
 @router.post("/parse")
 def parse(body: ParseIn, request: Request, user: User | None = Depends(optional_user), db: Session = Depends(get_db)):
     _limit(request, user)
-    f, source, note = search.parse(body.text, ist_today(), db)
-    return {"filters": f.model_dump(mode="json"), "chips": chips(f), "source": source, "note": note}
+    f, source, note, summary = search.parse_full(body.text, ist_today(), db)
+    return {"filters": f.model_dump(mode="json"), "chips": chips(f), "source": source, "note": note, "summary": summary}
 
 
 @router.post("/results")

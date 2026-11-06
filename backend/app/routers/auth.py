@@ -17,7 +17,7 @@ from ..security import (
     new_link_token, password_problem, sha256, verify_password,
 )
 from ..services.email import send_email
-from ..timeutil import utcnow
+from ..timeutil import to_ist, utcnow
 from .users import user_out
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -161,11 +161,13 @@ def forgot(body: ForgotIn, request: Request, db: Session = Depends(get_db)):
     """Always answers the same way, so it can't be used to find out who has an account."""
     email_limit.hit(f"ip:{client_ip(request)}")
     user = db.scalar(select(User).where(User.email == body.email.strip().lower()))
-    if user is None or user.role == "admin":
+    if user is None:
         return
     email_limit.hit(f"reset:{user.id}")
     link = _issue_reset(db, user)
-    send_email(user.email, "Reset your password",
+    # The time in the subject keeps a second request from hiding inside the first one's Gmail thread.
+    sent = to_ist(utcnow()).strftime("%I:%M %p").lstrip("0")
+    send_email(user.email, f"Reset your password ({sent})",
                f"Tap the button to choose a new password. The link works for {RESET_MINUTES} minutes.",
                "Choose a new password", f"{settings.public_url}/reset?token={link}", transactional=True)
 

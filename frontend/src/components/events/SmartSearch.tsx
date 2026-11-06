@@ -1,4 +1,4 @@
-import { Search } from "lucide-react";
+import { Search, Sparkles } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -7,6 +7,8 @@ const EXAMPLES = [
   "Cyber security workshop under ₹300",
   "AI events this Saturday",
   "Online webinars next week",
+  "I want to learn coding",
+  "Something fun this weekend",
   "Internships",
 ];
 
@@ -34,14 +36,14 @@ export function SmartSearch({ initial = "", className = "", onSearch }: { initia
     <form role="search" onSubmit={submit} className={`flex gap-2 ${className}`}>
       <label className="relative flex-1">
         <span className="sr-only">Describe the event you want</span>
-        <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-text-2" aria-hidden />
+        <Sparkles className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-accent" aria-hidden />
         <input
           type="search"
           enterKeyHint="search"
           value={text}
           onChange={(e) => setText(e.target.value)}
           maxLength={200}
-          placeholder={`Try "${EXAMPLES[i]}"`}
+          placeholder={`Ask anything, like "${EXAMPLES[i]}"`}
           className="h-12 w-full rounded-[14px] bg-surface pl-11 pr-4 body text-text shadow-[inset_0_0_0_1px_var(--line)] outline-none focus:shadow-[inset_0_0_0_2px_var(--accent)]"
         />
       </label>

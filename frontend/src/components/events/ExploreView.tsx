@@ -1,4 +1,4 @@
-import { Loader2, Search, SlidersHorizontal, X } from "lucide-react";
+import { ArrowRight, Loader2, Search, SlidersHorizontal, Sparkles, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCategories, useExplore, type ExploreFilters } from "../../lib/queries";
@@ -29,9 +29,13 @@ export function ExploreView({ source = "feed", category, eventType }: {
   const items = feed.data?.pages.flatMap((p) => p.items) ?? [];
   const active = [filters.category, filters.date_from || filters.date_to, filters.price, filters.mode].filter(Boolean).length;
 
+  // A word or two filters this list as you type; a sentence ("free AI workshops this weekend") goes to the AI search.
+  const sentence = text.trim().split(/\s+/).filter(Boolean).length >= 3;
+  const askAI = () => text.trim() && navigate(`/search?q=${encodeURIComponent(text.trim())}`);
+
   // Search shortly after typing stops.
   useEffect(() => {
-    const q = text.trim().slice(0, 100) || undefined;
+    const q = (text.trim().split(/\s+/).filter(Boolean).length >= 3 ? "" : text.trim().slice(0, 100)) || undefined;
     const t = window.setTimeout(() => setFilters((f) => (f.q === q ? f : { ...f, q })), 300);
     return () => window.clearTimeout(t);
   }, [text]);
@@ -62,12 +66,12 @@ export function ExploreView({ source = "feed", category, eventType }: {
       <div className="mb-3 flex gap-2">
         <form role="search" className="relative flex-1" onSubmit={(e) => {
           e.preventDefault();
-          if (text.trim()) navigate(`/search?q=${encodeURIComponent(text.trim())}`);
+          askAI();
         }}>
           <label>
           <span className="sr-only">Search events, or describe what you want and press Enter</span>
           <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-text-2" aria-hidden />
-          <input type="search" enterKeyHint="search" value={text} onChange={(e) => setText(e.target.value)} placeholder='Search, or try "free hackathons this weekend"' maxLength={200} className={`${inputCls} pl-11`} />
+          <input type="search" enterKeyHint="search" value={text} onChange={(e) => setText(e.target.value)} placeholder='Search, or ask "free hackathons this weekend"' maxLength={200} className={`${inputCls} pl-11`} />
           </label>
         </form>
         <button
@@ -81,6 +85,17 @@ export function ExploreView({ source = "feed", category, eventType }: {
           )}
         </button>
       </div>
+
+      {sentence && (
+        <button onClick={askAI} className="pressable mb-3 flex w-full items-center gap-3 rounded-[14px] bg-accent-soft p-3.5 text-left">
+          <Sparkles className="size-5 shrink-0 text-accent" aria-hidden />
+          <span className="min-w-0 flex-1">
+            <span className="callout block font-medium text-text">Ask ShowUp AI</span>
+            <span className="footnote block truncate text-text-2">"{text.trim()}" · press Enter</span>
+          </span>
+          <ArrowRight className="size-5 shrink-0 text-accent" aria-hidden />
+        </button>
+      )}
 
       <div className="no-scrollbar -mx-4 mb-6 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:px-0" role="group" aria-label="Quick filters">
         {source === "feed" && (

@@ -233,3 +233,15 @@ def test_near_relaxes_the_radius_first(client):
     r = client.post("/api/search/results", json={"filters": {"near": "Sulur", "max_distance_km": 1, "event_type": "hackathon"}}).json()
     if r["relaxed"]:
         assert "km away" in r["relaxed"]["message"] or "anywhere" in r["relaxed"]["message"]
+
+
+def test_search_says_what_it_looks_for():
+    from app.services.search import parse_full
+
+    fake = {"categories": ["web-app"], "summary": "  Coding workshops and hackathons to help you learn. "}
+    with patch.object(search.llm, "enabled", return_value=True), patch.object(search.llm, "chat_json", return_value=fake):
+        f, source, _, summary = parse_full("i want to learn coding", TODAY)
+    assert source == "ai" and f.categories == ["web-app"] and summary == "Coding workshops and hackathons to help you learn."
+    with patch.object(search.llm, "enabled", return_value=False):
+        f, source, _, summary = parse_full("learn programming", TODAY)
+    assert source == "rules" and f.categories == ["web-app"] and summary.startswith("Looking for")

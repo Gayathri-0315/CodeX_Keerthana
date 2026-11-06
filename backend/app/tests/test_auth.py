@@ -136,3 +136,10 @@ def test_admin_can_sign_in_from_either_side_until_the_admin_page_exists(client):
         r = client.post("/api/auth/login", json={"email": "admin@example.com", "password": PASSWORD, "role": side})
         assert r.status_code == 200 and r.json()["role"] == "admin"
         client.post("/api/auth/logout")
+
+
+def test_admin_can_reset_their_password_and_each_email_has_its_own_subject(client, caplog):
+    assert client.post("/api/auth/forgot", json={"email": "admin@example.com"}).status_code == 204
+    assert "Reset your password (" in caplog.text
+    me = client.post("/api/auth/reset", json={"token": latest_link(caplog, "reset"), "password": "admin-new-pass-1"}).json()
+    assert me["role"] == "admin"

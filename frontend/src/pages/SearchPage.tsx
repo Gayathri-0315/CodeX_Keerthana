@@ -27,7 +27,7 @@ export type SearchFilters = {
   keywords: string[];
 };
 type Chip = { field: keyof SearchFilters; value: string | number | boolean | null; label: string };
-type Parsed = { filters: SearchFilters; chips: Chip[]; source: "ai" | "rules"; note: string | null };
+type Parsed = { filters: SearchFilters; chips: Chip[]; source: "ai" | "rules"; note: string | null; summary: string | null };
 type Results = { items: FeedItem[]; total: number; relaxed: { message: string; filters: SearchFilters; chips: Chip[] } | null };
 
 /** Remove one chip: lists drop that value, everything else goes back to "any". */
@@ -54,6 +54,7 @@ export default function SearchPage() {
   const [filters, setFilters] = useState<SearchFilters | null>(null);
   const [allChips, setAllChips] = useState<Chip[]>([]);
   const [note, setNote] = useState<string | null>(null);
+  const [summary, setSummary] = useState<{ text: string; ai: boolean } | null>(null);
 
   const parse = useMutation({
     mutationFn: (text: string) => api<Parsed>("/search/parse", { method: "POST", body: { text } }),
@@ -61,6 +62,7 @@ export default function SearchPage() {
       setFilters(p.filters);
       setAllChips(p.chips);
       setNote(p.note);
+      setSummary(p.summary ? { text: p.summary, ai: p.source === "ai" } : null);
     },
   });
   useEffect(() => {
@@ -80,6 +82,7 @@ export default function SearchPage() {
     setFilters(null);
     setAllChips([]);
     setNote(null);
+    setSummary(null);
     setParams({});
   };
 
@@ -90,7 +93,7 @@ export default function SearchPage() {
 
       {parse.isPending ? (
         <p className="callout flex items-center gap-2 py-4 text-text-2" role="status">
-          <Sparkles className="size-4 animate-pulse text-accent" aria-hidden /> Understanding your search...
+          <Sparkles className="size-4 animate-pulse text-accent" aria-hidden /> ShowUp AI is reading your search...
         </p>
       ) : parse.isError ? (
         <div className="card p-6 text-center">
@@ -102,6 +105,18 @@ export default function SearchPage() {
         <p className="callout py-6 text-text-2">Describe what you're looking for, like "free hackathons this weekend" or "AI workshop under ₹200".</p>
       ) : (
         <>
+          {summary && (
+            <div className="mb-3 flex items-start gap-3 rounded-[14px] bg-accent-soft p-4" role="status">
+              <Sparkles className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
+              <div className="min-w-0">
+                <p className="callout font-medium text-text">{summary.text}</p>
+                <p className="footnote mt-0.5 text-text-2">
+                  {summary.ai ? "Understood by ShowUp AI" : "Understood from your words"}
+                  {results.data ? ` · ${results.data.total === 1 ? "1 event" : `${results.data.total} events`} found` : ""}. Tap a chip to remove it.
+                </p>
+              </div>
+            </div>
+          )}
           <div className="mb-5 flex flex-wrap items-center gap-2" role="group" aria-label="What we understood">
             {chips.length === 0 ? (
               <span className="callout text-text-2">Showing every upcoming event.</span>
