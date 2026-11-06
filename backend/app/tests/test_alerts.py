@@ -68,15 +68,36 @@ def test_matching_event_that_fits_sends_one_alert(client):
         assert n.user_id == asha(db).id and n.title == "Something like the one you missed" and len(n.body) <= 90
 
 
-def test_no_alert_without_shared_tags_or_outside_window(client):
+def test_no_alert_without_shared_tags(client):
     login(client, "student")
     client.post("/api/alerts", json={"event_id": hackathon_id()})
     with SessionLocal() as db:
         other_topic = publish(db, "Sketching Morning", ["design"], 10 * 60, 12 * 60)
-        late = publish(db, "Night Hack", ["hackathons"], 19 * 60, 21 * 60)  # after the saved 9-5 window
         assert alerts.suggest_similar(db, other_topic) == 0
-        assert alerts.suggest_similar(db, late) == 0
         assert similar_count(db, asha(db).id) == 0
+
+
+def test_similar_event_on_another_day_counts_when_she_is_free(client):
+    """The time of the missed event isn't copied: any day works if the student's own free time allows it."""
+    login(client, "student")
+    client.post("/api/alerts", json={"event_id": hackathon_id()})
+    with SessionLocal() as db:
+        e = publish(db, "Another Morning Hack", ["hackathons"], 10 * 60, 12 * 60)
+        e.start_at, e.end_at = e.start_at + timedelta(days=7), e.end_at + timedelta(days=7)  # next Sunday morning
+        e.registration_deadline = e.start_at - timedelta(hours=2)
+        db.commit()
+        assert alerts.suggest_similar(db, e) == 1
+
+
+def test_saving_shows_similar_events_that_already_fit(client):
+    with SessionLocal() as db:
+        e = publish(db, "Mini Hack Morning", ["hackathons"], 10 * 60, 12 * 60)  # fits her Sunday free time
+        clash = publish(db, "All-day Hack", ["ai"], 9 * 60, 17 * 60)  # doesn't fit
+        ids = e.id, clash.id
+    login(client, "student")
+    found = client.post("/api/alerts", json={"event_id": hackathon_id()}).json()["found"]
+    assert ids[0] in [f["id"] for f in found] and ids[1] not in [f["id"] for f in found]
+    assert hackathon_id() not in [f["id"] for f in found]
 
 
 def test_no_alert_when_it_fails_hard_filters(client):

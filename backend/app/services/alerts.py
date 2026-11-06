@@ -1,10 +1,12 @@
 """Saved alerts ("Remind me of similar events", prompt v2 item 2).
 
-An alert keeps the Almost event's main tags and the day/time window it clashed with. When a new
-event is published, each student with a matching alert is notified if the event:
-  - shares at least one of the alert's tags,
-  - falls on the same weekday and overlaps the saved time window, and
+An alert keeps the Almost event's main tags (its topic). When a new event is published, each student
+with a matching alert is notified if the event:
+  - shares at least one of the alert's tags, and
   - passes that student's normal hard filters (strict schedule, distance, budget, eligibility...).
+The time is not part of the match: the Almost event usually clashed with the timetable at exactly that
+time, so "same time" would almost never fit. The student's own free time decides instead.
+Saving an alert also returns the upcoming similar events that already fit, so the student sees results now.
 Delivery uses the same weekly cap, quiet hours, pause and dedupe as match alerts. No match, no alert.
 """
 
@@ -46,10 +48,26 @@ def matches(alert: SavedAlert, event: Event) -> bool:
     if event.id == alert.source_event_id or not event.start_at or not event.end_at:
         return False
     tags = set(event.tags or []) | ({event.category.lower()} if event.category else set())
-    if not tags & set(alert.tags or []):
-        return False
-    dow, s, e = window_of(event)
-    return dow == alert.day_of_week and s < alert.end_min and e > alert.start_min
+    return bool(tags & set(alert.tags or []))
+
+
+def fitting_now(db: Session, user: User, alert: SavedAlert, limit: int = 3) -> list[dict]:
+    """Upcoming published events like the alert's that already fit this student, soonest first."""
+    from .feed import evaluate_one
+
+    found = []
+    rows = db.scalars(select(Event).where(Event.status == "published", Event.start_at > utcnow(), Event.risk_score < 30)
+                      .order_by(Event.start_at).limit(300)).all()
+    for event in rows:
+        if not matches(alert, event):
+            continue
+        ev = evaluate_one(db, user, event)
+        if ev.result.passed and not ev.dismissed:
+            start = to_ist(event.start_at)
+            found.append({"id": event.id, "title": event.title, "when": f"{DAY_NAMES[start.weekday()][:3]} {start:%d %b}, {fmt_time(start)}"})
+            if len(found) >= limit:
+                break
+    return found
 
 
 def window_text(alert: SavedAlert) -> str:

@@ -1,7 +1,7 @@
 import { AnimatePresence, m } from "motion/react";
 import { ArrowDown, Loader2 } from "lucide-react";
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/AppShell";
 import { EventCard, EventCardSkeleton } from "../components/events/EventCard";
 import { ExploreView } from "../components/events/ExploreView";
@@ -13,7 +13,7 @@ import { Segmented } from "../components/ui/Segmented";
 import { useToast } from "../components/ui/Toaster";
 import { greeting } from "../lib/format";
 import { spring } from "../lib/motion";
-import { useCreateAlert, useDismissEvent, useFeed, useFeedCount, useMe, useSaveEvent } from "../lib/queries";
+import { useCreateAlert, useDismissEvent, useFeed, useFeedCount, useMe, useSaveEvent, useSavedAlerts } from "../lib/queries";
 import type { FeedItem, FeedTab, HomeTab } from "../lib/types";
 import { usePullToRefresh } from "../lib/usePullToRefresh";
 
@@ -33,6 +33,9 @@ export default function Home() {
   const save = useSaveEvent();
   const dismiss = useDismissEvent();
   const createAlert = useCreateAlert();
+  const savedAlerts = useSavedAlerts(tab === "almost" && me?.role === "student");
+  const reminded = new Set((savedAlerts.data ?? []).map((a) => a.source_event_id));
+  const navigate = useNavigate();
   const toast = useToast();
   const { pull, refreshing, ready } = usePullToRefresh(() => feed.refetch());
 
@@ -57,7 +60,15 @@ export default function Home() {
 
   const remindSimilar = (e: FeedItem) =>
     createAlert.mutate(e.id, {
-      onSuccess: () => toast({ tone: "success", title: "Got it. We'll tell you about similar events." }),
+      onSuccess: ({ found = [] }) =>
+        found.length > 0
+          ? toast({
+              tone: "success",
+              title: found.length === 1 ? "1 similar event already fits you" : `${found.length} similar events already fit you`,
+              body: `${found[0].title}, ${found[0].when}. We'll also tell you when new ones come up.`,
+              action: { label: "See it", onClick: () => navigate(`/event/${found[0].id}`) },
+            })
+          : toast({ tone: "success", title: "Reminder on", body: "Nothing similar fits your free time yet. We'll tell you when one comes up." }),
       onError: (err) => toast({ tone: "error", title: "Couldn't save the alert", body: (err as Error).message }),
     });
 
@@ -124,6 +135,7 @@ export default function Home() {
                     onToggleSave={toggleSave}
                     onDismiss={tab === "saved" ? undefined : notForMe}
                     onRemindSimilar={tab === "almost" ? remindSimilar : undefined}
+                    reminded={reminded.has(e.id)}
                   />
                 </m.li>
               ))}

@@ -29,7 +29,8 @@ def create_alert(body: AlertIn, user: User = Depends(student_only), db: Session 
     event = db.get(Event, body.event_id)
     if event is None or event.status != "published" or event.start_at is None:
         raise HTTPException(404, "That event isn't available any more.")
-    return alerts.alert_out(alerts.create_from_event(db, user, event))
+    alert = alerts.create_from_event(db, user, event)
+    return {**alerts.alert_out(alert), "found": alerts.fitting_now(db, user, alert)}
 
 
 @router.delete("/{alert_id}", status_code=204)

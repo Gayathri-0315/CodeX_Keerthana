@@ -266,7 +266,8 @@ export function useDismissEvent() {
   });
 }
 
-export type SavedAlert = { id: string; tags: string[]; source_title: string; window: string; created_at: string };
+export type SavedAlert = { id: string; tags: string[]; source_title: string; source_event_id: string | null; window: string; created_at: string };
+export type SimilarFound = { id: string; title: string; when: string };
 
 export function useSavedAlerts(enabled = true) {
   return useQuery({
@@ -279,7 +280,7 @@ export function useSavedAlerts(enabled = true) {
 export function useCreateAlert() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (eventId: string) => api<SavedAlert>("/alerts", { method: "POST", body: { event_id: eventId } }),
+    mutationFn: (eventId: string) => api<SavedAlert & { found: SimilarFound[] }>("/alerts", { method: "POST", body: { event_id: eventId } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["alerts", "saved"] }),
   });
 }

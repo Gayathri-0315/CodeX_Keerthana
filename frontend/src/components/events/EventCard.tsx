@@ -58,11 +58,13 @@ type Props = {
   onToggleSave: (e: FeedItem) => void;
   onDismiss?: (e: FeedItem) => void;
   onRemindSimilar?: (e: FeedItem) => void;
+  /** A "similar events" reminder is already on for this event. */
+  reminded?: boolean;
   /** Explore shows every event with a time-fit badge instead of reasons and the match bar. */
   variant?: "feed" | "explore";
 };
 
-export function EventCard({ event, index, onToggleSave, onDismiss, onRemindSimilar, variant = "feed" }: Props) {
+export function EventCard({ event, index, onToggleSave, onDismiss, onRemindSimilar, reminded = false, variant = "feed" }: Props) {
   const explore = variant === "explore";
   const prefetch = usePrefetchEvent();
   const x = useMotionValue(0);
@@ -171,9 +173,15 @@ export function EventCard({ event, index, onToggleSave, onDismiss, onRemindSimil
 
         {muted && onRemindSimilar && (
           <div className="-mt-2 px-4 pb-3 pl-[104px]">
-            <button onClick={() => onRemindSimilar(event)} className="min-h-11 callout font-medium text-accent">
-              Remind me of similar events
-            </button>
+            {reminded ? (
+              <p className="flex min-h-11 items-center gap-1.5 callout font-medium text-success-text">
+                <CircleCheck className="size-4" aria-hidden /> Reminder on for similar events
+              </p>
+            ) : (
+              <button onClick={() => onRemindSimilar(event)} className="min-h-11 callout font-medium text-accent">
+                Remind me of similar events
+              </button>
+            )}
           </div>
         )}
 
