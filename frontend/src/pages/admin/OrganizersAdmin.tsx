@@ -1,11 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BadgeCheck, Search } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { Button } from "../../components/ui/Button";
 import { Tag } from "../../components/ui/Chip";
 import { useToast } from "../../components/ui/Toaster";
 import { api } from "../../lib/api";
+import { OrganizerSheet } from "./AdminData";
 
 type Trust = "new" | "verified" | "trusted";
 type Org = {
@@ -25,6 +25,7 @@ export function OrganizersAdmin() {
   const toast = useToast();
   const [text, setText] = useState("");
   const [q, setQ] = useState("");
+  const [open, setOpen] = useState<string | null>(null);
   useEffect(() => {
     const t = window.setTimeout(() => setQ(text.trim()), 250);
     return () => window.clearTimeout(t);
@@ -71,7 +72,7 @@ export function OrganizersAdmin() {
               <li key={o.id} className="flex flex-wrap items-center justify-between gap-3 py-4">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    {o.slug ? <Link to={`/club/${o.slug}`} className="headline hover:text-accent">{o.name}</Link> : <span className="headline">{o.name}</span>}
+                    <button onClick={() => setOpen(o.id)} className="headline text-left hover:text-accent">{o.name}</button>
                     <Tag tone={LABEL[o.trust_level].tone}>{verified && <BadgeCheck className="size-3.5" aria-hidden />}{LABEL[o.trust_level].text}</Tag>
                   </div>
                   <p className="footnote mt-0.5 break-all text-text-2">
@@ -90,6 +91,7 @@ export function OrganizersAdmin() {
           })}
         </ul>
       )}
+      <OrganizerSheet id={open} onClose={() => setOpen(null)} />
     </section>
   );
 }
