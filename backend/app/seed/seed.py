@@ -62,16 +62,38 @@ def dev_email(local: str) -> str:
     return f"{local}@{DEV_DOMAIN}"
 
 
-def seed(db: Session, password: str) -> dict:
-    if settings.is_production:
+SAMPLE_NOTE = "Sample event: demo data to show how ShowUp works, not a real event."
+
+
+def seed(db: Session, password: str, samples_only: bool = False) -> dict:
+    """Local dev: everything, including sign-in accounts. samples_only (safe on a live site): only the sample
+    clubs, students and events, added next to real data, with accounts nobody can sign in to."""
+    if settings.is_production and not samples_only:
         raise SystemExit("Refusing to load sample data: APP_ENV=production.")
     rng = random.Random(42)
     categories.ensure_rows(db)
     pw = hash_password(password)
     today = ist_today()
     now = utcnow()
+    if not samples_only:
+        _main_student(db, pw)
 
-    # ---- main sample student ----
+    def organizer(email, name, org_name, domain, trust, past=0, rate=None):
+        u = make_user(email, name, pw, role="organizer")
+        db.add(u)
+        db.flush()
+        from ..services.clubs import unique_slug
+
+        o = Organizer(user_id=u.id, org_name=org_name, slug=unique_slug(db, org_name), org_email_domain=domain, trust_level=trust,
+                      past_events_count=past, avg_attendance_rate=rate)
+        db.add(o)
+        db.flush()
+        return o
+
+    return _seed_rest(db, pw, rng, today, now, organizer, samples_only)
+
+
+def _main_student(db: Session, pw: str) -> None:
     home = find_area("Gandhipuram")
     student = make_user(
         dev_email("asha"), "Asha", pw, college="Sample College of Technology",
@@ -85,26 +107,16 @@ def seed(db: Session, password: str) -> dict:
     db.flush()
     db.add_all([slot(student.id, 5, "14:00", "18:00"), slot(student.id, 6, "09:00", "13:00")])
 
-    # ---- organizers + admin ----
-    def organizer(email, name, org_name, domain, trust, past=0, rate=None):
-        u = make_user(email, name, pw, role="organizer")
-        db.add(u)
-        db.flush()
-        from ..services.clubs import unique_slug
 
-        o = Organizer(user_id=u.id, org_name=org_name, slug=unique_slug(db, org_name), org_email_domain=domain, trust_level=trust,
-                      past_events_count=past, avg_attendance_rate=rate)
-        db.add(o)
-        db.flush()
-        return o
-
+def _seed_rest(db: Session, pw: str, rng, today, now, organizer, samples_only: bool) -> dict:
     orgs = {
         "club": organizer(dev_email("club"), "Club lead", "Coimbatore AI Club", "kct.ac.in", "trusted", 9, 0.78),
         "new": organizer(dev_email("neworg"), "Quick Careers", "QuickCareers Hub", "gmail.com", "new"),
         "design": organizer(dev_email("design"), "Design lead", "PSG Design Society", "psgtech.ac.in", "verified", 2, 0.71),
         "volunteers": organizer(dev_email("volunteers"), "Volunteer lead", "Kovai Volunteers", "kovaivolunteers.org", "verified", 4, 0.66),
     }
-    db.add(make_user(dev_email("admin"), "Admin", pw, role="admin"))
+    if not samples_only:
+        db.add(make_user(dev_email("admin"), "Admin", pw, role="admin"))
 
     # ---- 30 generated students (so reach preview has realistic numbers) ----
     students: list[User] = []
@@ -146,7 +158,8 @@ def seed(db: Session, password: str) -> dict:
         clean_label = "organizer_verified" if org.trust_level in ("verified", "trusted") else "details_reviewed"
         status = item.get("status", "published")
         e = Event(
-            organizer_id=org.id, title=item["title"], description=item["description"], category=item["category"],
+            organizer_id=org.id, title=item["title"],
+            description=f"{SAMPLE_NOTE}\n\n{item['description']}" if samples_only else item["description"], category=item["category"],
             category_slug=categories.suggest(item["tags"], item["title"]),
             event_type=item.get("type") or event_types.suggest(item["title"], item["category"], " ".join(item["tags"])),
             tags=item["tags"], mode=item.get("mode", "in_person"), venue_name=item["venue"], address=item["address"],
@@ -178,9 +191,40 @@ def seed(db: Session, password: str) -> dict:
 
     db.commit()
     feedcache.invalidate_all()
+    if samples_only:
+        return {"users": len(orgs) + len(students), "events": len(events)}
     make_posters(today)
     make_timetables()
     return {"users": 1 + len(orgs) + 1 + len(students), "events": len(events)}
+
+
+def has_samples(db: Session) -> bool:
+    from sqlalchemy import select
+
+    return db.scalar(select(User.id).where(User.email.like(f"%@{DEV_DOMAIN}"), User.role != "admin").limit(1)) is not None
+
+
+def load_samples() -> dict:
+    """Add the sample clubs, students and events to any database (live too), without touching real data.
+    Their accounts get a random password that is never shown, so nobody can sign in to them."""
+    with SessionLocal() as db:
+        if has_samples(db):
+            raise SystemExit("Sample data is already loaded. Run remove_samples first to load it fresh.")
+        return seed(db, secrets.token_urlsafe(32), samples_only=True)
+
+
+def remove_samples() -> dict:
+    """Delete every sample account and sample event (all on the reserved example.com domain). Real data stays."""
+    from sqlalchemy import delete, select
+
+    with SessionLocal() as db:
+        users = select(User.id).where(User.email.like(f"%@{DEV_DOMAIN}"), User.role != "admin")
+        orgs = select(Organizer.id).where(Organizer.user_id.in_(users))
+        n_events = db.execute(delete(Event).where(Event.organizer_id.in_(orgs))).rowcount
+        n_users = db.execute(delete(User).where(User.id.in_(users))).rowcount
+        db.commit()
+    feedcache.invalidate_all()
+    return {"users": n_users, "events": n_events}
 
 
 def dev_password() -> tuple[str, bool]:

@@ -3,6 +3,8 @@
   python manage.py migrate                    Apply database migrations (safe to run any time)
   python manage.py seed_dev                   LOCAL ONLY: wipe the database and load sample data
   python manage.py create_admin --email X     Create an admin account (prompts for a strong password)
+  python manage.py load_samples               Add sample clubs and events (live site too; real data stays)
+  python manage.py remove_samples             Delete the sample clubs and events again
 """
 
 import argparse
@@ -32,6 +34,23 @@ def cmd_seed_dev(_args) -> None:
         print(f"Their password for this run: {password}   (set SEED_DEV_PASSWORD in .env to choose your own)")
     else:
         print("Their password is your SEED_DEV_PASSWORD.")
+
+
+def cmd_load_samples(_args) -> None:
+    from app.migrate import upgrade
+    from app.seed.seed import load_samples
+
+    upgrade()
+    r = load_samples()
+    print(f"Added {r['events']} sample events from 4 sample clubs, with {r['users'] - 4} sample students.")
+    print("Each sample event says so at the top of its description. Remove them any time: python manage.py remove_samples")
+
+
+def cmd_remove_samples(_args) -> None:
+    from app.seed.seed import remove_samples
+
+    r = remove_samples()
+    print(f"Removed {r['events']} sample events and {r['users']} sample accounts. Real data is untouched.")
 
 
 def ask(prompt: str) -> str:
@@ -87,6 +106,8 @@ def main() -> None:
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("migrate", help="Apply database migrations").set_defaults(func=cmd_migrate)
     sub.add_parser("seed_dev", help="LOCAL ONLY: reset the database with sample data").set_defaults(func=cmd_seed_dev)
+    sub.add_parser("load_samples", help="Add sample clubs and events (safe on the live site)").set_defaults(func=cmd_load_samples)
+    sub.add_parser("remove_samples", help="Delete the sample clubs and events").set_defaults(func=cmd_remove_samples)
     p = sub.add_parser("create_admin", help="Create or reset an admin account")
     p.add_argument("--email", required=True)
     p.add_argument("--name", default="Admin")
