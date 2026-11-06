@@ -12,6 +12,7 @@ import { ApiError } from "../../lib/api";
 import { haptic, spring } from "../../lib/motion";
 import { previewEvent, useAppeal, useExtractPoster, useOrgEvent, usePublishEvent } from "../../lib/organizer";
 import type { EventForm, OrgEvent, Preview } from "../../lib/types";
+import { BestTimes } from "../../components/organizer/BestTimes";
 
 type Step = "drop" | "reading" | "form" | "done";
 const PREVIEW_DEBOUNCE_MS = 700;
@@ -190,6 +191,7 @@ export default function EventEditor() {
                 <div className="hidden flex-col gap-4 lg:flex">
                   <TrustPanel risk={preview?.risk ?? null} checking={checking} />
                   <ReachPanel preview={preview} />
+                  <BestTimes form={form} onChange={change} />
                 </div>
               </aside>
               <div>
@@ -197,6 +199,7 @@ export default function EventEditor() {
                 <div className="flex flex-col gap-4 lg:hidden">
                   <TrustPanel risk={preview?.risk ?? null} checking={checking} />
                   <ReachPanel preview={preview} />
+                  <BestTimes form={form} onChange={change} />
                 </div>
                 <div className="mt-6 flex flex-col gap-2">
                   <OutcomeHint preview={preview} />

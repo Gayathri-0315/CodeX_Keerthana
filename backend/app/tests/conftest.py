@@ -58,9 +58,10 @@ def client():
     from app.routers.assist import ask_limit, write_limit
 
     write_limit.reset()
-    from app.routers.organizer import link_limit
+    from app.routers.organizer import best_time_limit, link_limit
 
     link_limit.reset()
+    best_time_limit.reset()
     from app.routers.applications import apply_limit
 
     apply_limit.reset()

@@ -141,7 +141,8 @@ def title_overlap(a: str, b: str) -> float:
     return len(ta & tb) / len(ta | tb) if ta and tb else 0.0
 
 
-def run_gate(db: Session, organizer: Organizer, event_like, exclude_id: str | None) -> spam.Assessment:
+def run_gate(db: Session, organizer: Organizer, event_like, exclude_id: str | None, ai: bool = True) -> spam.Assessment:
+    """`ai=False` for the live preview (runs on every pause in typing): rules and the learned classifier only."""
     candidate = spam.Candidate(
         title=event_like.title or "", description=event_like.description or "", category=event_like.category or "",
         mode=event_like.mode, venue_name=event_like.venue_name, start_at=event_like.start_at, end_at=event_like.end_at,
@@ -154,11 +155,11 @@ def run_gate(db: Session, organizer: Organizer, event_like, exclude_id: str | No
         assessment = spam.Assessment(max(assessment.score, spam.HIGH), blocks + assessment.reasons, assessment.duplicate_of)
     text = f"{candidate.title}\n{candidate.description}\nFee: ₹{candidate.fee_inr}\nLink: {candidate.registration_url or '-'}"
     assessment = learned_check(db, assessment, text)
-    judgement = extraction.judge_spam(text)
+    judgement = extraction.judge_spam(text) if ai else None
     if judgement:
         assessment = spam.combine_llm(assessment, judgement.risk, judgement.reasons)
-    elif (ai := scam_model.ai_judge(db, text)) is not None:
-        assessment = spam.combine_llm(assessment, ai[0], ai[1])
+    elif ai and (verdict := scam_model.ai_judge(db, text)) is not None:
+        assessment = spam.combine_llm(assessment, verdict[0], verdict[1])
     return assessment
 
 
@@ -258,15 +259,26 @@ def draft_from_form(db: Session, form: EventIn, organizer: Organizer) -> SimpleN
 
 # ---- reach preview ----
 
-def reach(db: Session, event_like) -> dict:
-    """Students who'd pass the hard filters with match >= 75, plus a small breakdown."""
-    fields = ("title", "description", "category", "tags", "mode", "venue_name", "lat", "lng", "start_at", "end_at",
-              "fee_inr", "capacity", "eligibility", "skill_level")
+REACH_FIELDS = ("title", "description", "category", "tags", "mode", "venue_name", "lat", "lng", "start_at", "end_at",
+                "fee_inr", "capacity", "eligibility", "skill_level")
+
+
+def reach_probe(event_like):
+    """A stand-in for the draft, as it will look once published. None without a date and time."""
     # A throwaway id keeps this probe's vector out of the shared cache key space.
-    probe = SimpleNamespace(**{k: getattr(event_like, k) for k in fields}, id=f"reach:{uuid.uuid4().hex}")
+    probe = SimpleNamespace(**{k: getattr(event_like, k) for k in REACH_FIELDS}, id=f"reach:{uuid.uuid4().hex}")
     probe.status = "published"
     probe.registration_deadline = None  # a draft's deadline shouldn't hide it from its own preview
+    probe.event_type = getattr(event_like, "event_type", "other")
     if probe.start_at is None or probe.end_at is None:
+        return None
+    return probe
+
+
+def reach(db: Session, event_like) -> dict:
+    """Students who'd pass the hard filters with match >= 75, plus a small breakdown."""
+    probe = reach_probe(event_like)
+    if probe is None:
         return {"count": 0, "free": 0, "interested": 0, "interest_label": None, "ready": False}
 
     # Preview an event as it will look before it starts, even if the draft's date is already past.

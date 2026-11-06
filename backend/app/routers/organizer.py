@@ -125,9 +125,21 @@ def preview(body: EventIn, user: User = Depends(organizer_only), db: Session = D
     """Live trust check and reach for an unsaved form."""
     org = my_org(user)
     draft = listing.draft_from_form(db, body, org)
-    assessment = listing.run_gate(db, org, draft, None)
+    assessment = listing.run_gate(db, org, draft, None, ai=False)
     status, label = listing.predicted_outcome(db, org, assessment, None, draft)
     return {"risk": risk_out(assessment), "outcome": {"status": status, "label": label}, "reach": listing.reach(db, draft)}
+
+
+best_time_limit = RateLimit(6, 60, "Wait a moment before looking for more times.")
+
+
+@router.post("/events/best-times")
+def best_times(body: EventIn, user: User = Depends(organizer_only), db: Session = Depends(get_db)):
+    """Start times in the next days that would reach more students who fit and are free. Counts only."""
+    from ..services import best_time
+
+    best_time_limit.hit(user.id)
+    return best_time.suggest(db, listing.draft_from_form(db, body, my_org(user)))
 
 
 @router.post("/events")
