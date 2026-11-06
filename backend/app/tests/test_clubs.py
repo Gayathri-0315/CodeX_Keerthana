@@ -131,3 +131,18 @@ def test_following_filter_on_explore(client):
 def test_follow_toggle_setting(client):
     login(client, "student")
     assert client.patch("/api/users/me", json={"follow_updates": False}).json()["follow_updates"] is False
+
+
+def test_search_finds_clubs_by_name_and_shows_follow_state(client):
+    names = lambda q: [c["name"] for c in client.get("/api/public/clubs", params={"q": q}).json()["items"]]  # noqa: E731
+    assert names("coimbatore ai club")[0] == "Coimbatore AI Club"
+    assert names("follow AI club") == ["Coimbatore AI Club"]  # "ai" as a word: not every club
+    assert names("clubs")  # "clubs" alone lists clubs
+    assert names("hackathons this weekend") == [] or all("hackathon" in n.lower() for n in names("hackathons this weekend"))
+    assert names("free workshop in coimbatore") == [] or all(
+        any(w in n.lower() for w in ("free", "workshop", "coimbatore")) for n in names("free workshop in coimbatore"))
+    login(client, "student")
+    client.post(f"/api/clubs/{SLUG}/follow")
+    hit = client.get("/api/public/clubs", params={"q": "AI club"}).json()["items"]
+    assert next(c for c in hit if c["slug"] == SLUG)["following"] is True
+    assert "@" not in str(hit)

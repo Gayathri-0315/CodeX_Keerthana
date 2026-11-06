@@ -1,16 +1,17 @@
 """Club pages (public) and follow (students)."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..deps import optional_user, student_only
+from ..deps import RateLimit, client_ip, optional_user, student_only
 from ..models import Follow, Organizer, User
 from ..services import clubs, feedcache
 
 router = APIRouter(tags=["clubs"])
+search_limit = RateLimit(30, 60, "You're searching quickly. Wait a moment and try again.")
 
 
 def _club(db: Session, slug: str) -> Organizer:
@@ -18,6 +19,14 @@ def _club(db: Session, slug: str) -> Organizer:
     if org is None:
         raise HTTPException(404, "That club doesn't exist.")
     return org
+
+
+@router.get("/public/clubs")
+def search_clubs(request: Request, q: str = Query("", max_length=200), viewer: User | None = Depends(optional_user),
+                 db: Session = Depends(get_db)):
+    """Clubs by name, for search. Public, so guests can find a club too."""
+    search_limit.hit(client_ip(request))
+    return {"items": clubs.search(db, q, viewer)}
 
 
 @router.get("/public/clubs/{slug}")

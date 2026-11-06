@@ -2,6 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { MapPinOff, Sparkles, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { ClubResults } from "../components/events/ClubResults";
 import { SmartSearch } from "../components/events/SmartSearch";
 import { Timeline } from "../components/events/Timeline";
 import { Button } from "../components/ui/Button";
@@ -117,6 +118,8 @@ export default function SearchPage() {
           </div>
 
           {note && <p className="callout -mt-2 mb-5 flex items-start gap-2 text-text-2" role="status"><MapPinOff className="mt-0.5 size-4 shrink-0" aria-hidden />{note}</p>}
+
+          <ClubResults q={q} />
 
           {results.isError ? (
             <div className="card p-6 text-center">

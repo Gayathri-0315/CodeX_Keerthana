@@ -69,5 +69,8 @@ def client():
 
     ask_limit.reset()
     summary_limit.reset()
+    from app.routers.clubs import search_limit as club_search_limit
+
+    club_search_limit.reset()
     with TestClient(app) as c:
         yield with_csrf(c)

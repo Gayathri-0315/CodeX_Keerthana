@@ -119,3 +119,43 @@ def club_out(db: Session, org: Organizer, viewer: User | None) -> dict:
         "upcoming": [brief(e) for e in upcoming],
         "past": [brief(e) for e in past],
     }
+
+
+# Words that say "I'm looking for a club" rather than naming one.
+_CLUB_WORDS = {"club", "clubs", "organizer", "organizers", "organiser", "organisers", "community", "communities",
+               "society", "societies", "chapter", "team"}
+_FILLER = {"a", "an", "the", "of", "by", "from", "for", "in", "at", "on", "and", "to", "me", "my", "show", "find", "search",
+           "follow", "following", "events", "event", "page", "near", "all", "any", "list", "which", "what", "who", "is", "are"}
+
+
+def search(db: Session, text: str, viewer: User | None, limit: int = 6) -> list[dict]:
+    """Clubs whose name matches the search. College or city words only help rank a name match, so
+    "hackathons in Coimbatore" doesn't list every club in Coimbatore. "clubs" alone lists the most followed."""
+    words = [w for w in re.findall(r"[a-z0-9]+", (text or "").lower())]
+    asks_for_clubs = any(w in _CLUB_WORDS for w in words)
+    terms = [w for w in words if w not in _FILLER and w not in _CLUB_WORDS and len(w) >= 2]
+    terms = [w[:-1] if len(w) > 4 and w.endswith("s") else w for w in terms]  # "hackathons" finds "Hackathon Club"
+    if not terms and not asks_for_clubs:
+        return []
+    orgs = db.scalars(select(Organizer)).all()
+    counts = dict(db.execute(select(Follow.organizer_id, func.count()).group_by(Follow.organizer_id)).all())
+    trust = {"trusted": 2, "verified": 1}
+    scored = []
+    for o in orgs:
+        name = (o.org_name or "").lower()
+        place = f"{o.college_or_company or ''} {o.city or ''}".lower()
+        name_words = set(re.findall(r"[a-z0-9]+", name))
+        hit = lambda t, txt, ws: t in ws if len(t) < 3 else t in txt  # noqa: E731 - "ai" must be a whole word
+        in_name = sum(1 for t in terms if hit(t, name, name_words))
+        if terms and not in_name:
+            continue
+        score = in_name * 3 + sum(1 for t in terms if hit(t, place, set(re.findall(r"[a-z0-9]+", place))) and not hit(t, name, name_words))
+        scored.append((score, trust.get(o.trust_level, 0), counts.get(o.id, 0), o))
+    scored.sort(key=lambda s: (-s[0], -s[1], -s[2], s[3].org_name or ""))
+    following = set()
+    if viewer is not None and viewer.role == "student":
+        following = set(db.scalars(select(Follow.organizer_id).where(Follow.student_id == viewer.id)))
+    return [{"slug": ensure_slug(db, o), "name": o.org_name, "logo_url": o.logo_url, "city": o.city,
+             "college_or_company": o.college_or_company,
+             "trust_level": o.trust_level, "trust_label": {"verified": "Verified", "trusted": "Trusted"}.get(o.trust_level),
+             "followers": n, "following": o.id in following} for _, _, n, o in scored[:limit]]

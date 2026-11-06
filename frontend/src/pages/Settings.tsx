@@ -263,7 +263,7 @@ function FollowingSection() {
   return (
     <Section title="Clubs you follow">
       {data.length === 0 ? (
-        <Row><p className="callout text-text-2">You don't follow any clubs yet. Tap a club's name on an event to see its page.</p></Row>
+        <Row><p className="callout text-text-2">You don't follow any clubs yet. Search a club's name, or tap a club's name on an event.</p></Row>
       ) : (
         data.map((c) => (
           <Link key={c.slug} to={`/club/${c.slug}`} className="pressable -mx-2 flex min-h-12 items-center gap-3 rounded-[12px] px-2 py-2 hover:bg-text/5">
