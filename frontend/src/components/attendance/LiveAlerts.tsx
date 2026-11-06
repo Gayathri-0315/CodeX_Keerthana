@@ -34,6 +34,35 @@ export function LiveAlerts() {
 
   useEffect(() => {
     if (!me) return;
+    // Browsers allow only 6 connections per site, and each stream holds one for as long as it's open. So only
+    // the tab on screen listens: background tabs close theirs (or every request waits once 6 tabs are open)
+    // and catch up when they're shown again.
+    let es: EventSource | null = null;
+    const sync = () => {
+      if (document.visibilityState === "visible") {
+        if (es) return;
+        es = connect();
+        if (wasHidden) {
+          qc.invalidateQueries({ queryKey: attKeys.notifications });
+          qc.invalidateQueries({ queryKey: ["chat"] });
+          qc.invalidateQueries({ queryKey: chatKeys.mine });
+        }
+      } else if (es) {
+        es.close();
+        es = null;
+        wasHidden = true;
+      }
+    };
+    let wasHidden = false;
+    document.addEventListener("visibilitychange", sync);
+    sync();
+    return () => {
+      document.removeEventListener("visibilitychange", sync);
+      es?.close();
+    };
+  }, [me?.id, qc]); // reconnect only when the signed-in user changes
+
+  function connect() {
     const es = new EventSource("/api/stream");
     es.addEventListener("checked_in", (e) => {
       const d: { event_id: string; title: string } = JSON.parse((e as MessageEvent).data);
@@ -86,8 +115,8 @@ export function LiveAlerts() {
           .catch((err) => toast({ tone: "error", title: "That didn't work", body: (err as Error).message }));
       }
     });
-    return () => es.close();
-  }, [me?.id, qc]); // reconnect only when the signed-in user changes
+    return es;
+  }
 
   return null;
 }
